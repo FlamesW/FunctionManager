@@ -7,11 +7,13 @@ local cloneref = (cloneref or clonereference or function(instance: any)
 end)
 
 -- // Variables
-local Players: Players = cloneref(game:GetService("Players"))
+local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer
-local MarketplaceService: MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService");
+local TweenService = cloneref(game:GetService("TweenService"));
+local MarketplaceService: MarketplaceService = game:GetService("MarketplaceService");
 local HttpService: HttpService = cloneref(game:GetService("HttpService"));
-local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"))
+local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
 
 -- // Functions
 local AssetCache, HighlightCache, RecencyStores = {}, {}, {}, {}
