@@ -646,7 +646,7 @@ function API:Help()
     local List = {}
 
     for k, v in pairs(API) do
-        if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "OverrideFunction" and k ~= "SelectEverything" then
+        if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "OverrideFunction" and k ~= "Launch" and k ~= "SelectEverything" then
             table.insert(List, k)
         end
     end
