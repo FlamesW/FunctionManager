@@ -699,4 +699,5 @@ end
 function API.Launch(Class)
     return setmetatable(Class, API);
 end
+
 return API
