@@ -16,6 +16,20 @@ local TeleportService: TeleportService = cloneref(game:GetService("TeleportServi
 -- // Functions
 local AssetCache, HighlightCache, RecencyStores = {} {}, {}, {}
 
+function API:CreateInstance(ClassName, Properties)
+    local InstanceObj = Instance.new(ClassName)
+
+    if Properties then
+        for Property, Value in pairs(Properties) do
+            pcall(function()
+                InstanceObj[Property] = Value
+            end)
+        end
+    end
+
+    return InstanceObj
+end
+
 function API:GetAssetInfo(Id)
     local Cached = AssetCache[Id]
     if Cached then
@@ -40,20 +54,6 @@ function API:GetAssetInfo(Id)
     AssetCache[id] = Result
 
     return Result
-end
-
-function API:CreateInstance(ClassName, Properties)
-    local InstanceObj = Instance.new(ClassName)
-
-    if Properties then
-        for Property, Value in pairs(Properties) do
-            pcall(function()
-                InstanceObj[Property] = Value
-            end)
-        end
-    end
-
-    return InstanceObj
 end
 
 function API:ResolvePosition(...)
