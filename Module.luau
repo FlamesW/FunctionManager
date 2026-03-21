@@ -14,7 +14,7 @@ local HttpService: HttpService = cloneref(game:GetService("HttpService"));
 local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"))
 
 -- // Functions
-local AssetCache, HighlightCache, RecencyStores = {} {}, {}, {}
+local AssetCache, HighlightCache, RecencyStores = {}, {}, {}, {}
 
 function API:CreateInstance(ClassName, Properties)
     local InstanceObj = Instance.new(ClassName)
