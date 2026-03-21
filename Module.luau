@@ -1,10 +1,10 @@
 -- // Made by Mommy Flames
-local API = {}
-API.__index = API
-
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
+
+local API = {}
+API.__index = API
 
 -- // Variables
 local Players: Players = cloneref(game:GetService("Players"));
