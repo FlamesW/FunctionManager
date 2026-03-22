@@ -14,6 +14,7 @@ local TweenService = cloneref(game:GetService("TweenService"));
 local MarketplaceService: MarketplaceService = game:GetService("MarketplaceService");
 local HttpService: HttpService = cloneref(game:GetService("HttpService"));
 local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
+local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
 
 -- // Functions
 local AssetCache, HighlightCache, RecencyStores = {}, {}, {}, {}
@@ -736,6 +737,235 @@ function API:ServerHop(MinPlayers, MaxPing)
     end
 
     warn("[ServerHop]: No suitable server found, try Rejoin()")
+end
+
+function API:GetHWID(Method)
+    Method = Method or "Roblox"
+    
+    if Method == "Executor" then
+        local Success, HWID = pcall(function()
+            if type(gethwid) == "function" then
+                return gethwid()
+            end
+            return nil
+        end)
+        
+        if Success and HWID then
+            return HWID
+        end
+        return nil
+    elseif Method == "Roblox" then
+        local RbxAnalytics = game:GetService("RbxAnalyticsService")
+        return RbxAnalytics:GetClientId()
+    elseif Method == "IP" then
+        local Success, IP = pcall(function()
+            return game:HttpGet("https://api.ipify.org")
+        end)
+        
+        if Success and IP then
+            return IP
+        end
+        return nil
+    end
+    
+    return nil
+end
+
+function API:Kick(Reason)
+    Reason = Reason or "Disconnected by API";
+    self:GetPlayer():Kick(Reason);
+end
+
+function API:Verify(Options)
+    Options = Options or {}
+    
+    local LPlayer = self:GetPlayer()
+    local OnFail = Options.OnFail or "Kick"
+    local OnSuccess = Options.OnSuccess
+    local FailCallback = Options.FailCallback
+    local Success = Options.SuccessCallback
+    local AllowedUsers, AllowedHWIDs = {}, {}
+    
+    local Auth = nil
+    local Methods = Options.Method or {"Roblox"}
+    if type(Methods) ~= "table" then
+        Methods = {Methods}
+    end
+    
+    for _, method in ipairs(Methods) do
+        if method == "Executor" or method == "Roblox" then
+            local hwid = self:GetHWID(method)
+            if hwid then
+                Auth = hwid
+                break
+            end
+        elseif method == "IP" then
+            self:Kick("[Auth]: IP method is not allowed.")
+            return false, nil, nil
+        else
+            self:Kick("[Auth]: Invalid method '" .. tostring(method))
+            return false, nil, nil
+        end
+    end
+    
+    if not Auth then
+        self:Kick("[Auth]: Failed to get Hwid from any method! Tried: " .. table.concat(Methods, ", "))
+        return false, nil, nil
+    end
+
+    if Options.Url then
+        local Success, Content = pcall(function()
+            return game:HttpGet(Options.Url)
+        end)
+    
+        if Success then
+            local allMatches = {}
+            
+            local success, decoded = pcall(function()
+                return HttpService:JSONDecode(Content)
+            end)
+            
+            if success and type(decoded) == "table" then
+                local function extractFromTable(t)
+                    for k, v in pairs(t) do
+                        if type(v) == "string" then
+                            table.insert(allMatches, v)
+                        elseif type(v) == "number" then
+                            table.insert(allMatches, tostring(v))
+                        elseif type(v) == "table" then
+                            extractFromTable(v)
+                        end
+                        if type(k) == "string" then
+                            table.insert(allMatches, k)
+                        elseif type(k) == "number" then
+                            table.insert(allMatches, tostring(k))
+                        end
+                    end
+                end
+                extractFromTable(decoded)
+            end
+            
+            local function splitByAnyDelimiter(text)
+                local results = {}
+                local delimiters = {",", ";", "|", "\t", "\n", "\r", "  "}
+                for _, delim in ipairs(delimiters) do
+                    text = string.gsub(text, delim, " ")
+                end
+                for word in string.gmatch(text, "[^%s]+") do
+                    table.insert(results, word)
+                end
+                return results
+            end
+            
+            for line in string.gmatch(Content, "[^\r\n]+") do
+                line = line:gsub("^%s+", ""):gsub("%s+$", "")
+                if line ~= "" and not line:match("^%s*%-%-") and not line:match("^%s*#") and not line:match("^%s*//") then
+                    local words = splitByAnyDelimiter(line)
+                    for _, word in ipairs(words) do
+                        table.insert(allMatches, word)
+                    end
+                end
+            end
+            
+            for _, match in ipairs(allMatches) do
+                match = match:gsub("^%s+", ""):gsub("%s+$", "")
+                match = match:gsub('"', "")
+                match = match:gsub("'", "")
+                match = match:gsub("[{}%[%]()]", "")
+                
+                if match ~= "" then
+                    if match:match("%-") or #match > 20 or match:match("^[Hh][Ww][Ii][Dd]:") then
+                        local hwid = match:gsub("^[Hh][Ww][Ii][Dd]:", "")
+                        table.insert(AllowedHWIDs, hwid)
+                    else
+                        if tonumber(match) then
+                            table.insert(AllowedUsers, tonumber(match))
+                        else
+                            table.insert(AllowedUsers, match)
+                        end
+                    end
+                end
+            end
+        else
+            warn("[Auth]: Failed to load:", Options.Url)
+        end
+    end
+    
+    for _, user in ipairs(Options.AllowedUsers or {}) do
+        table.insert(AllowedUsers, user)
+    end
+    for _, hwid in ipairs(Options.AllowedHwids or {}) do
+        table.insert(AllowedHWIDs, hwid)
+    end
+    
+    local function unique(t)
+        local seen = {}
+        local result = {}
+        for _, v in ipairs(t) do
+            if not seen[tostring(v)] then
+                seen[tostring(v)] = true
+                table.insert(result, v)
+            end
+        end
+        return result
+    end
+    
+    AllowedUsers = unique(AllowedUsers)
+    AllowedHWIDs = unique(AllowedHWIDs)
+    
+    local IsWhitelisted = false
+    local Type, Value = nil, nil
+    
+    for _, Hwid in ipairs(AllowedHWIDs) do
+        if Auth and tostring(Auth):lower() == tostring(Hwid):lower() then
+            IsWhitelisted = true
+            Type = "HWID"
+            Value = Hwid
+            break
+        end
+    end
+    
+    if not IsWhitelisted then
+        for _, AllowedUser in ipairs(AllowedUsers) do
+            local AllowedStr = tostring(AllowedUser):lower()
+            if AllowedStr == tostring(LPlayer.UserId) or AllowedStr == LPlayer.Name:lower() then
+                IsWhitelisted = true
+                Type = "User"
+                Value = AllowedUser
+                break
+            end
+        end
+    end
+    
+    if IsWhitelisted then
+        if Success or OnSuccess then
+            local Callback = Success or OnSuccess
+            if type(Callback) == "function" then
+                pcall(function()
+                    Callback(Type, Value, Auth)
+                end)
+            end
+        end
+        return true, Type, Value
+    end
+
+    if OnFail == "Kick" then
+        self:Kick(Options.KickMessage or "[Auth]: Nothing is defined")
+    elseif OnFail == "Callback" then
+        if FailCallback and type(FailCallback) == "function" then
+            pcall(function()
+                FailCallback(Auth, LPlayer.Name, LPlayer.UserId)
+            end)
+        else
+            self:Kick("[Auth]: Nothing is defined")
+        end
+    elseif OnFail == "Return" then
+        return false, nil, nil
+    else
+        self:Kick("[Auth]: Nothing is defined")
+    end
+    
+    return false, nil, nil
 end
 
 function API:OverrideFunction(Name, Function)
