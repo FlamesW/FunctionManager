@@ -1,4 +1,4 @@
-# Example:
+# Example Usage:
 
 ```lua
 local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
