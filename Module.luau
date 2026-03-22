@@ -58,6 +58,19 @@ function API:GetAssetInfo(Id)
     return Result
 end
 
+function API:RandomString(Length)
+    Length = Length or 10
+    local Characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local Result = ""
+    
+    for i = 1, Length do
+        local RandomIndex = math.random(1, #Characters)
+        Result = Result .. string.sub(Characters, RandomIndex, RandomIndex)
+    end
+    
+    return Result
+end
+
 function API:ResolvePosition(...)
     local args = {...}
     local arg = args[1]
@@ -241,26 +254,29 @@ function API:AntiFling()
 
     self.FlingActive = true
     self.FlingLoop = RunService.Heartbeat:Connect(function()
-        local Char = self:GetCharacter();
-        if not Char then return end;
-   
-        local Hum = Char:FindFirstChild("HumanoidRootPart");
-        if not Hum then return end;
-  
-        if not Hum:FindFirstChild("0x0x0x0x0") then
-            local AntiFling = Instance.new("BodyVelocity");
-            AntiFling.Name = "0x0x0x0x0";
-            AntiFling.Velocity = Vector3.new(0, 0, 0);
-            AntiFling.MaxForce = Vector3.new(40000, 40000, 40000);
-            AntiFling.Parent = Hum;
-        end
-     
-        Hum.Velocity = Vector3.new(0, 0, 0);
- 
-        local AntiFling = Hum:FindFirstChild("0x0x0x0x0");
-        if AntiFling then
-            AntiFling.Velocity = Vector3.new(0, 0, 0);
-        end
+        pcall(function()
+            local Char = self:GetCharacter()
+            if not Char then return end
+            
+            local Hum = Char:FindFirstChild("HumanoidRootPart")
+            if not Hum then return end
+            
+            if not Hum:FindFirstChild("0x0x0x0x0") then
+                local AntiFling = Instance.new("BodyVelocity")
+                AntiFling.Name = "0x0x0x0x0"
+                AntiFling.Velocity = Vector3.new(0, 0, 0)
+                AntiFling.MaxForce = Vector3.new(40000, 40000, 40000)
+                AntiFling.Parent = Hum
+            end
+            
+            Hum.Velocity = Vector3.new(0, 0, 0)
+            Hum.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            
+            local AntiFling = Hum:FindFirstChild("0x0x0x0x0")
+            if AntiFling then
+                AntiFling.Velocity = Vector3.new(0, 0, 0)
+            end
+        end)
     end)
 end
 
@@ -270,78 +286,89 @@ function API:StopFling()
     end
 
     self.FlingActive = false
+    
     if self.FlingLoop then
-        self.FlingLoop:Disconnect();
-        self.FlingLoop = nil;
+        pcall(function()
+            self.FlingLoop:Disconnect()
+        end)
+        self.FlingLoop = nil
     end
 
-    local Char = self:GetCharacter();
+    local Char = self:GetCharacter()
     if Char then
-        local Hum = Char:FindFirstChild("HumanoidRootPart");
+        local Hum = Char:FindFirstChild("HumanoidRootPart")
         if Hum then
-            local AntiFling = Hum:FindFirstChild("0x0x0x0x0");
+            local AntiFling = Hum:FindFirstChild("0x0x0x0x0")
             if AntiFling then
-                AntiFling:Destroy();
+                pcall(function()
+                    AntiFling:Destroy()
+                end)
             end
         end
     end
 end
 
-function API:Noclip()
-    self.EndPoint = tick() + 0.45
+function API:Noclip(Duration) -- // Noclip that must be used in loops at least faster than 0.45 seconds
+    Duration = Duration or 0.45
 
-    if not self.Noclipping then
-        self.Clip = false
+    if self.Noclipping then
+        pcall(function()
+            self.Noclipping:Disconnect()
+        end)
+        self.Noclipping = nil
+    end
+
+    self.Clip = false
+    self.EndPoint = tick() + Duration
+    
+    if not self.Origins then
         self.Origins = {}
+    end
 
-        local function NoclipLoop()
-            if self.Clip == false and self:GetCharacter() ~= nil then
+    local function NoclipLoop()
+        if tick() >= self.EndPoint then
+            self:StopClip()
+            return
+        end
+        
+        if self.Clip == false and self:GetCharacter() ~= nil then
+            pcall(function()
                 for _, v in pairs(self:GetCharacter():GetDescendants()) do
                     if v:IsA("BasePart") then
                         if self.Origins[v] == nil then
                             self.Origins[v] = v.CanCollide
                         end
-                        if v.CanCollide == true then
-                            v.CanCollide = false
-                        end
+                        v.CanCollide = false
                     end
                 end
-            end
+            end)
         end
-
-        self.Noclipping = RunService.Stepped:Connect(NoclipLoop)
-
-        local function CheckTimeout()
-            if self.EndPoint and tick() >= self.EndPoint then
-                self:StopClip()
-            end
-        end
-        self.TimeoutConnection = RunService.Heartbeat:Connect(CheckTimeout)
     end
+
+    self.Noclipping = RunService.Stepped:Connect(NoclipLoop)
 end
 
 function API:StopClip()
-    self.EndPoint = nil
-
     if self.Noclipping then
-        self.Noclipping:Disconnect()
+        pcall(function()
+            self.Noclipping:Disconnect()
+        end)
         self.Noclipping = nil
     end
-    if self.TimeoutConnection then
-        self.TimeoutConnection:Disconnect()
-        self.TimeoutConnection = nil
-    end
-
+    
     self.Clip = true
-
-    if self:GetCharacter() ~= nil then
-        for _, v in pairs(self:GetCharacter():GetDescendants()) do
-            if v:IsA("BasePart") and self.Origins[v] ~= nil then
-                v.CanCollide = self.Origins[v]
+    self.EndPoint = nil
+    
+    if self:GetCharacter() then
+        pcall(function()
+            for _, v in pairs(self:GetCharacter():GetDescendants()) do
+                if v:IsA("BasePart") and self.Origins[v] ~= nil then
+                    v.CanCollide = self.Origins[v]
+                end
             end
-        end
+        end)
     end
-
+    
     self.Origins = {}
 end
 
@@ -355,7 +382,7 @@ function API:CreateHighlight(Target, Options)
     end
 
     local Highlight = self:CreateInstance("Highlight", {
-        Name = Options.Name or "Highlight",
+        Name = Options.Name or self:RandomString(15),
         Adornee = Target,
         Enabled = Options.Enabled ~= false,
         FillColor = Options.FillColor or Color3.fromRGB(255, 0, 0),
@@ -614,6 +641,31 @@ function API:FakeTP(Speed, ...)
     self:GetCharacter():PivotTo(cf);
 end
 
+function API:IsColor(Target, __Colors)
+    if __Colors == "Nigger" then
+        __Colors = {["Really black"] = true,["Black"] = true,["Dark brown"] = true,["Reddish brown"] = true,
+            ["Dark orange"] = true,["Earth orange"] = true,["Burnt Sienna"] = true,["Dirt brown"] = true,
+            ["Medium brown"] = true,["CGA brown"] = true,["Pine Cone"] = true,["Dark taupe"] = true,
+            ["Brown"] = true,["Rust"] = true,["Dark"] = true,["Brownish"] = true,
+            ["Dark red"] = true,["Maroon"] = true,["Chocolate"] = true,["Coffee"] = true,
+        };
+    end
+
+    if Target:IsA("Player") then
+        Target = Target.Character or Target.CharacterAdded:Wait()
+    end
+
+    local BodyColors = Target and Target:FindFirstChild("Body Colors")
+    if not BodyColors then
+        return false
+    end
+
+    local HeadColor = BodyColors.HeadColor;
+    local TorsoColor = BodyColors.TorsoColor;
+
+    return __Colors[HeadColor.Name] and __Colors[TorsoColor.Name] or false
+end
+
 function API:SelectEverything(Dropdown, List) -- // Obsidian Only
     if not getgenv().Library then
         return
@@ -646,7 +698,7 @@ function API:Help()
     local List = {}
 
     for k, v in pairs(API) do
-        if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "OverrideFunction" and k ~= "Launch" and k ~= "SelectEverything" then
+        if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "OverrideFunction" and k ~= "Merge" and k ~= "Launch" and k ~= "SelectEverything" then
             table.insert(List, k)
         end
     end
@@ -696,6 +748,18 @@ function API:OverrideFunction(Name, Function)
     self[Name] = Function
 
     return true
+end
+
+function API:Merge(Module)
+    for MethodName, MethodFunc in pairs(Module) do
+        if typeof(MethodFunc) == "function" then
+            self[MethodName] = function(_, ...)
+                return MethodFunc(self, ...)
+            end
+        end
+    end
+
+    return self
 end
 
 function API.Launch(Class)
