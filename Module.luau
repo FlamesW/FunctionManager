@@ -537,6 +537,28 @@ function API:StopClip()
     self.Origins = {}
 end
 
+-- [[ Aimbot functions coming soon ]]
+function API:IsVisible(Character, Target, Ignorelist)
+    if not Target then return false end
+
+    local Origin = Character:FindFirstChild("Head")
+    if not Origin then return false end
+
+    Ignorelist = Ignorelist or {Character}
+
+    local Params = RaycastParams.new()
+    Params.FilterType = Enum.RaycastFilterType.Blacklist
+    Params.FilterDescendantsInstances = Ignorelist
+
+    local Raycast = workspace:Raycast(Origin.Position, (Target.Position - Origin.Position), Params)
+
+    if Raycast and Raycast.Instance:IsDescendantOf(Target.Parent) then
+        return true
+    end
+
+    return Raycast == nil
+end
+
 function API:CreateHighlight(Target, Options)
     if not Target then return nil end
 
