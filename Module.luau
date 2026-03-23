@@ -172,8 +172,11 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
             })
         end
 
-        StartPoint = Response:find("</entry>", StartPoint) + 8
-        if #Commits >= Version then break end
+        local Point = Response:find("</entry>", StartPoint)
+        if not Point then break end
+        StartPoint = NextPos + 8
+
+        if Version and #Commits >= Version then break end
     end
 
     if Version and Commits[Version] then
