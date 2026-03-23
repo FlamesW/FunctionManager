@@ -113,7 +113,7 @@ function API:HowLong(Ago)
     end
 end
 
-function API:LogCommit(Repo, Branch, Version)
+function API:LogCommit(Repo, Branch, Version) -- // Github Only
     local Owner, RepoName
 
     local Matches = {Repo:match("github%.com/([^/]+)/([^/]+)")}
