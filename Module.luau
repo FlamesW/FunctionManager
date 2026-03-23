@@ -176,10 +176,14 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
         if #Commits >= Version then break end
     end
 
-    if Commits[Version] then
+    if Version and Commits[Version] then
         return Commits[Version]
+    elseif not Version and #Commits > 0 then
+        return Commits[1] -- Return latest
     else
-        warn("Version " .. Version .. " not found. Only " .. #Commits .. " commits available.")
+        if Version then
+            warn("Version " .. Version .. " not found. Only " .. #Commits .. " commits available.")
+        end
         return nil
     end
 end
