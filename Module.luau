@@ -50,6 +50,11 @@ function API:LoadFile(Url)
     return Success and Result or nil
 end
 
+function API:Gitport(Owner, Repo, Version, File)
+    local Tag = (Version == "latest" and "latest/download" or "download/" .. Version)    
+    return self:LoadFile(("https://github.com/%s/%s/releases/%s/%s"):format(Owner, Repo, Tag, File))
+end
+
 function API:GetAssetInfo(Id)
     local Cached = AssetCache[Id]
     if Cached then
