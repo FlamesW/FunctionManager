@@ -471,8 +471,8 @@ function API:IsNPC(Model)
         return false
     end
 
-    local Humanoid = model:FindFirstChildOfClass("Humanoid")
-    local RootPart = model:FindFirstChild("HumanoidRootPart")
+    local Humanoid = Model:FindFirstChildOfClass("Humanoid")
+    local RootPart = Model:FindFirstChild("HumanoidRootPart")
 
     return Humanoid ~= nil and RootPart ~= nil
 end
