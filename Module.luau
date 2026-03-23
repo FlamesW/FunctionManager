@@ -172,22 +172,19 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
             })
         end
 
-        local Point = Response:find("</entry>", StartPoint)
-        if not Point then break end
-        StartPoint = NextPos + 8
-
-        if Version and #Commits >= Version then break end
+        StartPoint = Response:find("</entry>", StartPoint) + 8
+        if #Commits >= Version then break end
     end
 
-    if Version and Commits[Version] then
-        return Commits[Version]
-    elseif not Version and #Commits > 0 then
-        return Commits[1] -- Return latest
-    else
-        if Version then
+    if Version then
+        if Commits[Version] then
+            return Commits[Version]
+        else
             warn("Version " .. Version .. " not found. Only " .. #Commits .. " commits available.")
+            return nil
         end
-        return nil
+    else
+        return Commits[1] or nil
     end
 end
 
