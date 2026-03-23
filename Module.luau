@@ -33,6 +33,15 @@ function API:CreateInstance(ClassName, Properties)
     return InstanceObj
 end
 
+function API:Req(url)
+    local Make_Request = http and http.request or request or http_request or syn and syn.request
+    if Make_Request then
+        return Make_Request({Url = url, Method = "GET"}).Body
+    else
+        return HttpService:HttpGet(url, true)
+    end
+end
+
 function API:LoadFile(Url)
     local Success, Result = pcall(function()
         return loadstring(game:HttpGet(Url .. "?nocache=" .. tostring(os.clock())))()
@@ -78,6 +87,102 @@ function API:RandomString(Length)
     end
     
     return Result
+end
+
+function API:HowLong(SecondsAgo)
+    if SecondsAgo < 60 then
+        return "Just now"
+    elseif SecondsAgo >= 31536000 then
+        local y = math.floor(SecondsAgo / 31536000)
+        return y .. " year" .. (y == 1 and "" or "s") .. " ago"
+    elseif SecondsAgo >= 2592000 then
+        local m = math.floor(SecondsAgo / 2592000)
+        return m .. " month" .. (m == 1 and "" or "s") .. " ago"
+    elseif SecondsAgo >= 604800 then
+        local w = math.floor(SecondsAgo / 604800)
+        return w .. " week" .. (w == 1 and "" or "s") .. " ago"
+    elseif SecondsAgo >= 86400 then
+        local d = math.floor(SecondsAgo / 86400)
+        return d .. " day" .. (d == 1 and "" or "s") .. " ago"
+    elseif SecondsAgo >= 3600 then
+        local h = math.floor(SecondsAgo / 3600)
+        return h .. " hour" .. (h == 1 and "" or "s") .. " ago"
+     else
+        local min = math.floor(SecondsAgo / 60)
+        return min .. " minute" .. (min == 1 and "" or "s") .. " ago"
+    end
+end
+
+function API:LogCommit(Repo, Branch, Version)
+    local Owner, RepoName
+
+    local Matches = {Repo:match("github%.com/([^/]+)/([^/]+)")}
+    if #Matches >= 2 then
+        Owner = Matches[1]
+        RepoName = Matches[2]
+        RepoName = RepoName:gsub("%.git$", "")
+    else
+        warn("Invalid GitHub URL")
+        return nil
+    end
+
+    local function StripString(s)
+        if not s then return "Unknown" end
+        s = s:match("^%s*(.-)%s*$")
+        s = s:gsub("%s+", " ")
+        return s
+    end
+
+    local Selected = Branch or "main"
+    local Github = "https://github.com/" .. Owner .. "/" .. RepoName .. "/commits/" .. Selected .. ".atom"
+
+    local Success, Response = pcall(function()
+        return self:Req(Github .. "?nocache=" .. os.clock())
+    end)
+
+    if not Success then warn("Failed to fetch commit logs~") return nil end
+
+    local Commits = {}
+    local StartPoint = 1
+
+    while true do
+        local Entry = Response:match("<entry>(.-)</entry>", StartPoint)
+        if not Entry then break end
+
+        local author = StripString(Entry:match("<name>(.-)</name>"))
+        local message = StripString(Entry:match("<title>(.-)</title>"))
+        local updated = Entry:match("<updated>(.-)</updated>")
+        local fullSha = StripString(Entry:match("<id>.-[Cc]ommit/(.-)</id>"))
+        local sha = fullSha and fullSha:sub(1, 7) or "Unknown"
+
+        if updated and fullSha then
+            local commitTime = DateTime.fromIsoDate(updated)
+            local now = DateTime.now()
+            local SecondsAgo = now.UnixTimestamp - commitTime.UnixTimestamp
+            local timeAgo = self:HowLong(SecondsAgo)
+
+            table.insert(Commits, {
+                Author = author,
+                Message = message,
+                Sha = sha,
+                FullSha = fullSha,
+                TimeAgo = timeAgo,
+                Timestamp = commitTime,
+                RawDate = updated,
+                Version = #Commits + 1
+            })
+        end
+
+        StartPoint = Response:find("</entry>", StartPoint) + 8
+        if #Commits >= Version then break end
+    end
+
+    if Commits[Version] then
+        return Commits[Version]
+    else
+        warn("Version " .. Version .. " not found. Only " .. #Commits .. " commits available.")
+        return nil
+    end
 end
 
 function API:ResolvePosition(...)
