@@ -15,6 +15,7 @@ local MarketplaceService: MarketplaceService = game:GetService("MarketplaceServi
 local HttpService: HttpService = cloneref(game:GetService("HttpService"));
 local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
 local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
+local RequestService = http and http.request or request or http_request or syn and syn.request;
 
 -- // Functions
 local AssetCache, HighlightCache, RecencyStores = {}, {}, {}, {}
@@ -34,9 +35,8 @@ function API:CreateInstance(ClassName, Properties)
 end
 
 function API:Req(url)
-    local Make_Request = http and http.request or request or http_request or syn and syn.request
-    if Make_Request then
-        return Make_Request({Url = url, Method = "GET"}).Body
+    if RequestService then
+        return RequestService({Url = url, Method = "GET"}).Body
     else
         return HttpService:HttpGet(url, true)
     end
