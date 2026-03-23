@@ -33,6 +33,14 @@ function API:CreateInstance(ClassName, Properties)
     return InstanceObj
 end
 
+function API:LoadFile(Url)
+    local Success, Result = pcall(function()
+        return loadstring(game:HttpGet(Url .. "?nocache=" .. tostring(os.clock())))()
+    end)
+
+    return Success and Result or nil
+end
+
 function API:GetAssetInfo(Id)
     local Cached = AssetCache[Id]
     if Cached then
