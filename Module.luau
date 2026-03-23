@@ -184,6 +184,49 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
     end
 end
 
+function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
+    task.spawn(function()
+        Options = Options or {}
+        local MaxSize = Options.MaxSize or math.huge
+        
+        local FileName = FilePath:match("[^/]+$")
+        local Dir = FilePath:match("^(.+)/[^/]+$")
+        if Dir then
+            local path = ""
+            for folder in Dir:gmatch("[^/]+") do
+                path = path .. folder .. "/"
+                if not isfolder(path) then makefolder(path) end
+            end
+        end
+        
+        local Success, Remote = pcall(function()
+            return API:Req(RemoteUrl .. "?v=" .. os.time())
+        end)
+        if not Success then return warn("Failed: " .. RemoteUrl) end
+        
+        local StoredContent = Remote
+        local Truncated = false
+        if #Remote > MaxSize then
+            StoredContent = Remote:sub(1, MaxSize)
+            Truncated = true
+        end
+        
+        local Exists = isfile(FilePath)
+        local Old = Exists and readfile(FilePath) or nil
+        local Changed = Exists and Old ~= StoredContent
+        
+        writefile(FilePath, StoredContent)
+        
+        if not Exists and OnDownloaded then
+            OnDownloaded({FileName = FileName, Content = Remote, Size = #Remote, StoredSize = #StoredContent, Truncated = Truncated})
+        elseif Changed and OnChanged then
+            OnChanged({FileName = FileName, Content = Remote, OldSize = #Old, NewSize = #Remote, Truncated = Truncated})
+        end
+        
+        return {FileName = FileName, Changed = Changed, New = not Exists, Content = Remote, StoredSize = #StoredContent}
+    end)
+end
+
 function API:ResolvePosition(...)
     local args = {...}
     local arg = args[1]
