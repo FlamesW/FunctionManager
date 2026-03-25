@@ -94,6 +94,32 @@ function API:RandomString(Length)
     return Result
 end
 
+function API:SpeedTest(Func, Iterations, ...)
+    Iterations = Iterations or 100
+    local args = {...}
+
+    for i = 1, 10 do
+        pcall(function() Func(unpack(args)) end)
+    end
+    
+    local Start = os.clock()
+    for i = 1, Iterations do
+        pcall(function() Func(unpack(args)) end)
+    end
+    local TotalMs = (os.clock() - Start) * 1000
+    
+    local Result = {
+        Total = TotalMs,
+        Average = TotalMs / Iterations,
+        Iterations = Iterations
+    }
+    
+    print(string.format("[SpeedTest] %d iterations: %.2f ms total (avg: %.3f ms)", 
+        Iterations, TotalMs, Result.Average))
+    
+    return Result
+end
+
 function API:HowLong(Ago)
     if Ago < 60 then
         return "Just now"
