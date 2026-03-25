@@ -16,6 +16,7 @@ local HttpService: HttpService = cloneref(game:GetService("HttpService"));
 local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
 local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
 local RequestService = http and http.request or request or http_request or syn and syn.request;
+local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
 
 -- // Functions
 local AssetCache, HighlightCache, RecencyStores = {}, {}, {}, {}
@@ -32,6 +33,10 @@ function API:CreateInstance(ClassName, Properties)
     end
 
     return InstanceObj
+end
+
+function API:GetDevice()
+    return UserInputService:GetPlatform()
 end
 
 function API:Req(url)
@@ -217,6 +222,11 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
     else
         return Commits[1] or nil
     end
+end
+
+function API:IsMobile()
+    local Plat = self:GetDevice()
+    return Plat == Enum.Platform.IOS or Plat == Enum.Platform.Android
 end
 
 function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
