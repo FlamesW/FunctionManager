@@ -323,6 +323,11 @@ function API:GetHumanoid()
     return Char:FindFirstChildOfClass("Humanoid")
 end
 
+function API:GetTeam()
+    local Plr = self:GetPlayer()
+    return Plr.Team
+end
+
 function API:IsAlive()
     local Hum = self:GetHumanoid()
     return Hum and Hum.Health > 0
@@ -593,6 +598,23 @@ function API:IsVisible(Character, Target, Ignorelist)
     end
 
     return Raycast == nil
+end
+
+function API:IsTeamMate(Target)
+    return self:GetTeam() == Target.Team
+end
+
+function API:GetEnemies()
+    local Enemies = {}
+    local MyTeam = self:GetTeam()
+    
+    for _, Player in ipairs(self:GetPlayers()) do
+        if Player.Team ~= MyTeam then
+            table.insert(Enemies, Player)
+        end
+    end
+    
+    return Enemies
 end
 
 function API:CreateHighlight(Target, Options)
