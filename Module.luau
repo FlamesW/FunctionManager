@@ -537,6 +537,28 @@ function API:Tween(Target: BasePart?, Property: string, Goal: any,
     return Tween
 end
 
+function API:SetGravity(Amount)
+    workspace.Gravity = Amount
+end
+
+function API:SetSpeed(Amount)
+    local Hum = self:GetHumanoid()
+    if Hum then
+        Hum.WalkSpeed = Amount
+    end
+end
+
+function API:SetJumpPower(Amount)
+    local Hum = self:GetHumanoid()
+    if Hum then
+        Hum.JumpPower = Amount
+    end
+end
+
+function API:SetTime(Amount)
+    game.Lighting.ClockTime = Amount
+end
+
 function API:AntiFling()
     if self.FlingActive then
         return
