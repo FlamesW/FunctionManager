@@ -533,6 +533,107 @@ function API:Tween(Target: BasePart?, Property: string, Goal: any,
     return Tween
 end
 
+function API:GetTools()
+    local Tools = {}
+    
+    for _, tool in ipairs(self:GetBackpack():GetChildren()) do
+        if tool:IsA("Tool") then
+            table.insert(Tools, tool)
+        end
+    end
+    
+    local Char = self:GetCharacter()
+    if Char then
+        for _, tool in ipairs(Char:GetChildren()) do
+            if tool:IsA("Tool") then
+                table.insert(Tools, tool)
+            end
+        end
+    end
+    
+    return Tools
+end
+
+function API:FindTool(toolName)
+    for _, tool in ipairs(self:GetTools()) do
+        if tool.Name:lower() == toolName:lower() then
+            return tool
+        end
+    end
+    return nil
+end
+
+function API:EquipTool(Name)
+    local Tool = self:FindTool(Name)
+    if not Tool then
+        return false
+    end
+    
+    if Tool.Parent == self:GetBackpack() then
+        Tool.Parent = self:GetCharacter()
+        return true
+    end
+    
+    if Tool.Parent == self:GetCharacter() then
+        return true
+    end
+    
+    return false
+end
+
+function API:UnequipTool(Name)
+    local Tool = self:FindTool(Name)
+    if not Tool then
+        return false
+    end
+    
+    if Tool.Parent == self:GetCharacter() then
+        Tool.Parent = self:GetBackpack()
+        return true
+    end
+    
+    return false
+end
+
+function API:UseTool(Name)
+    local Tool = self:FindTool(Name)
+    if not Tool then
+        return false
+    end
+    
+    if Tool.Parent ~= self:GetCharacter() then
+        self:Equip(Name)
+        task.wait(0.1)
+    end
+    
+    if Tool:FindFirstChild("Activate") then
+        Tool:Activate()
+        return true
+    end
+    
+    return false
+end
+
+function API:UseHeldTool()
+    local Char = self:GetCharacter()
+    if Char then
+        local HeldTool = Char:FindFirstChildWhichIsA("Tool")
+        if HeldTool then
+            HeldTool:Activate()
+            return true
+        end
+    end
+    return false
+end
+
+function API:GetHeldTool()
+    local Char = self:GetCharacter()
+    if Char then
+        return Char:FindFirstChildWhichIsA("Tool")
+    end
+    return nil
+end
+
 function API:AddPriority(Name, Priority, Condition, Action)
     table.insert(self.Stuffs, {
         name = Name,
