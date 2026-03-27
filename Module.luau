@@ -48,6 +48,10 @@ function API:GetDevice()
     return UserInputService:GetPlatform()
 end
 
+function API:ToPlace(Place)
+    TeleportService:Teleport(Place)
+end
+
 function API:Req(url)
     if RequestService then
         return RequestService({Url = url, Method = "GET"}).Body
