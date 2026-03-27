@@ -554,9 +554,9 @@ function API:GetTools()
     return Tools
 end
 
-function API:FindTool(toolName)
+function API:FindTool(Name)
     for _, tool in ipairs(self:GetTools()) do
-        if tool.Name:lower() == toolName:lower() then
+        if tool.Name:lower() == Name:lower() then
             return tool
         end
     end
