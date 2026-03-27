@@ -617,6 +617,15 @@ function API:GetEnemies()
     return Enemies
 end
 
+function API:LookAt(Target, Part)
+    local T = self:ResolvePosition(Target)
+    local P = Part or self:GetRoot()
+    
+    if P and T then
+        P.CFrame = CFrame.lookAt(P.Position, T)
+    end
+end
+
 function API:CreateHighlight(Target, Options)
     if not Target then return nil end
 
