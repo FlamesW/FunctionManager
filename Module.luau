@@ -105,6 +105,12 @@ function API:RGBToHSV(Rgb)
     return Rgb.R, Rgb.G, Rgb.B
 end
 
+function API:Rainbowify(Speed)
+    Speed = Speed or 1
+    local Time = tick() * Speed
+    return Color3.fromHSV(Time % 1, 1, 1)
+end
+
 function API:Gitport(Owner, Repo, Version, File)
     local Tag = (Version == "latest" and "latest/download" or "download/" .. Version)    
     return self:LoadFile(("https://github.com/%s/%s/releases/%s/%s"):format(Owner, Repo, Tag, File))
