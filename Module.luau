@@ -579,25 +579,34 @@ function API:StopClip()
 end
 
 -- [[ Aimbot functions coming soon ]]
-function API:IsVisible(Character, Target, Ignorelist)
-    if not Target then return false end
-
-    local Origin = Character:FindFirstChild("Head")
-    if not Origin then return false end
-
-    Ignorelist = Ignorelist or {Character}
-
+function API:Raycast(Origin, Direction, Distance, IgnoreList)
+    local OriginPos = self:ResolvePosition(Origin)
+    local Dir = self:ResolvePosition(Direction) or Direction
+    
+    if not OriginPos then return nil end
+    
     local Params = RaycastParams.new()
     Params.FilterType = Enum.RaycastFilterType.Blacklist
-    Params.FilterDescendantsInstances = Ignorelist
+    Params.FilterDescendantsInstances = IgnoreList or {}
+    
+    return workspace:Raycast(OriginPos, Dir.Unit * Distance, Params)
+end
 
-    local Raycast = workspace:Raycast(Origin.Position, (Target.Position - Origin.Position), Params)
-
-    if Raycast and Raycast.Instance:IsDescendantOf(Target.Parent) then
-        return true
-    end
-
-    return Raycast == nil
+function API:IsVisible(Origin, Target, IgnoreList)
+    local OriginPos = self:ResolvePosition(Origin)
+    local TargetPos = self:ResolvePosition(Target)
+    
+    if not OriginPos or not TargetPos then return false end
+    
+    local Direction = TargetPos - OriginPos
+    local Distance = Direction.Magnitude
+    
+    local Result = self:Raycast(OriginPos, Direction, Distance, IgnoreList)
+    
+    if not Result then return true end
+    
+    local TargetParent = Target:IsA("BasePart") and Target.Parent or Target
+    return Result.Instance:IsDescendantOf(TargetParent)
 end
 
 function API:IsTeamMate(Target)
