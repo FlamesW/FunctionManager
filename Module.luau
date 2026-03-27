@@ -79,7 +79,7 @@ function API:StringToRGB(String)
 end
 
 function API:RGBToString(Rgb)
-    return math.floor(rgb.R * 255) .. ", " .. math.floor(Rgb.G * 255) .. ", " .. math.floor(Rgb.B * 255)
+    return math.floor(Rgb.R * 255) .. ", " .. math.floor(Rgb.G * 255) .. ", " .. math.floor(Rgb.B * 255)
 end
 
 function API:HexToRGB(Hex)
