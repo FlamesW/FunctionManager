@@ -279,6 +279,10 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
     end)
 end
 
+function API:Chance(Percent)
+    return math.random(1, 100) <= Percent
+end
+
 function API:ResolvePosition(...)
     local args = {...}
     local arg = args[1]
