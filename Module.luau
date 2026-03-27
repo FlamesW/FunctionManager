@@ -168,10 +168,6 @@ end
 function API:SpeedTest(Func, Iterations, ...)
     Iterations = Iterations or 100
     local args = {...}
-
-    for i = 1, 10 do
-        pcall(function() Func(unpack(args)) end)
-    end
     
     local Start = os.clock()
     for i = 1, Iterations do
@@ -535,6 +531,37 @@ function API:Tween(Target: BasePart?, Property: string, Goal: any,
     Tween:Play()
 
     return Tween
+end
+
+function API:AddPriority(Name, Priority, Condition, Action)
+    table.insert(self.Stuffs, {
+        name = Name,
+        priority = Priority,
+        condition = Condition,
+        action = Action
+    })
+    
+    table.sort(self.Stuffs, function(a, b)
+        return a.priority > b.priority
+    end)
+end
+
+function API:GetPriority()
+    for _, task in ipairs(self.Stuffs) do
+        if task.condition() then
+            return task
+        end
+    end
+    return nil
+end
+
+function API:RunPriorities()
+    local Task = self:GetPriority()
+    if Task then
+        Task.action()
+        return Task.name
+    end
+    return nil
 end
 
 function API:SetGravity(Amount)
