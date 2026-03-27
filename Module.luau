@@ -36,6 +36,14 @@ function API:CreateInstance(ClassName, Properties)
     return InstanceObj
 end
 
+function API:Time()
+    return os.date("%H:%M:%S")
+end
+
+function API:Date()
+    return os.date("%Y-%m-%d")
+end
+
 function API:GetDevice()
     return UserInputService:GetPlatform()
 end
@@ -54,6 +62,47 @@ function API:LoadFile(Url)
     end)
 
     return Success and Result or nil
+end
+
+function API:StringToRGB(String)
+    if not String then return nil end
+    
+    local R = tonumber(string.match(String, "(%d+)[%s]*,[%s]*%d+[%s]*,[%s]*%d+"))
+    local G = tonumber(string.match(String, "%d+[%s]*,[%s]*(%d+)[%s]*,[%s]*%d+"))
+    local B = tonumber(string.match(String, "%d+[%s]*,[%s]*%d+[%s]*,[%s]*(%d+)"))
+    
+    if R and G and B then
+        return Color3.fromRGB(R, G, B)
+    end
+    
+    return nil
+end
+
+function API:RGBToString(Rgb)
+    return math.floor(rgb.R * 255) .. ", " .. math.floor(Rgb.G * 255) .. ", " .. math.floor(Rgb.B * 255)
+end
+
+function API:HexToRGB(Hex)
+    Hex = Hex:gsub("#", "")
+    local R = tonumber(Hex:sub(1, 2), 16)
+    local G = tonumber(Hex:sub(3, 4), 16)
+    local B = tonumber(Hex:sub(5, 6), 16)
+    return Color3.fromRGB(R, G, B)
+end
+
+function API:RGBToHex(Rgb)
+    local R = math.floor(Rgb.R * 255)
+    local G = math.floor(Rgb.G * 255)
+    local B = math.floor(Rgb.B * 255)
+    return string.format("#%02X%02X%02X", R, G, B)
+end
+
+function API:HSVToRGB(H, S, V)
+    return Color3.fromHSV(H, S, V)
+end
+
+function API:RGBToHSV(Rgb)
+    return Rgb.R, Rgb.G, Rgb.B
 end
 
 function API:Gitport(Owner, Repo, Version, File)
