@@ -393,6 +393,13 @@ function API:GetHumanoid()
     return Char:FindFirstChildOfClass("Humanoid")
 end
 
+function API:ForceReset()
+    local Hum = self:GetHumanoid()
+    if Hum then
+        Hum:ChangeState(15)
+    end
+end
+
 function API:GetBackpack()
     local Plr = self:GetPlayer()
     if not Plr then return nil end
