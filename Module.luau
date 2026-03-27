@@ -17,6 +17,7 @@ local TeleportService: TeleportService = cloneref(game:GetService("TeleportServi
 local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
 local RequestService = http and http.request or request or http_request or syn and syn.request;
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
+local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 
 -- // Functions
 local AssetCache, HighlightCache, RecencyStores = {}, {}, {}, {}
@@ -84,6 +85,12 @@ function API:GetAssetInfo(Id)
     AssetCache[id] = Result
 
     return Result
+end
+
+function API:ControlF9(State)
+    pcall(function()
+        StarterGuiService:SetCore("DevConsoleVisible", State or false)
+    end)
 end
 
 function API:RandomString(Length)
@@ -321,6 +328,13 @@ end
 function API:GetHumanoid()
     local Char = self:GetCharacter()
     return Char:FindFirstChildOfClass("Humanoid")
+end
+
+function API:GetBackpack()
+    local Plr = self:GetPlayer()
+    if not Plr then return nil end
+    
+    return Plr:FindFirstChild("Backpack") or Plr:WaitForChild("Backpack")
 end
 
 function API:GetTeam()
