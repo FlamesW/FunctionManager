@@ -559,6 +559,32 @@ function API:SetTime(Amount)
     game.Lighting.ClockTime = Amount
 end
 
+function API:XRay(State)
+    if State then
+        if self.XRayActive then return end
+        
+        for _, part in ipairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part ~= self:GetCharacter() then
+                self.HistoryParts[part] = part.Transparency
+                part.Transparency = 0.5
+            end
+        end
+        
+        self.XRayActive = true
+    else
+        if not self.XRayActive then return end
+        
+        for part, transparency in pairs(self.HistoryParts) do
+            if part then
+                part.Transparency = transparency
+            end
+        end
+        
+        self.HistoryParts = {}
+        self.XRayActive = false
+    end
+end
+
 function API:AntiFling()
     if self.FlingActive then
         return
