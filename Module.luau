@@ -839,6 +839,14 @@ function API:StopClip()
 end
 
 -- [[ Aimbot functions coming soon ]]
+function API:GetMousePosition()
+    return UserInputService:GetMouseLocation()
+end
+
+function API:IsKeyPressed(Key)
+    return UserInputService:IsKeyDown(Key)
+end
+
 function API:Raycast(Origin, Direction, Distance, IgnoreList)
     local OriginPos = self:ResolvePosition(Origin)
     local Dir = self:ResolvePosition(Direction) or Direction
