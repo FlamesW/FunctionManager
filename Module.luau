@@ -1543,7 +1543,36 @@ function API:Merge(Module)
 end
 
 function API.Launch(Class)
-    return setmetatable(Class, API);
+    for key, value in pairs(API) do
+        if type(value) ~= "function" and key ~= "__index" then
+            Class[key] = value
+        end
+    end
+
+--[[
+    Class.Players = Players
+    Class.LocalPlayer = LocalPlayer
+    Class.RunService = RunService
+    Class.TweenService = TweenService
+    Class.MarketplaceService = MarketplaceService
+    Class.HttpService = HttpService
+    Class.TeleportService = TeleportService
+    Class.RbxAnalyticsService = RbxAnalyticsService
+    Class.UserInputService = UserInputService
+    Class.StarterGuiService = StarterGuiService
+    Class.RequestService = RequestService
+--]]
+
+    Class._Timers = Class._Timers or {}
+    Class.Stuffs = Class.Stuffs or {}
+    Class.HistoryParts = Class.HistoryParts or {}
+    Class.Origins = Class.Origins or {}
+    
+    Class.XRayActive = Class.XRayActive or false
+    Class.FlingActive = Class.FlingActive or false
+    Class.Clip = Class.Clip == nil and true or Class.Clip
+    
+    return setmetatable(Class, API)
 end
 
 return API
