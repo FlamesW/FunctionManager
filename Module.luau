@@ -50,7 +50,7 @@ function API:ToPlace(Place)
     TeleportService:Teleport(Place)
 end
 
-function API:Req(url)
+function API:Request(url)
     if RequestService then
         return RequestService({Url = url, Method = "GET"}).Body
     else
@@ -253,7 +253,7 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
     local Github = "https://github.com/" .. Owner .. "/" .. RepoName .. "/commits/" .. Selected .. ".atom"
 
     local Success, Response = pcall(function()
-        return self:Req(Github .. "?nocache=" .. os.clock())
+        return self:Request(Github .. "?nocache=" .. os.clock())
     end)
 
     if not Success then warn("Failed to fetch commit logs~") return nil end
@@ -325,7 +325,7 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
         end
         
         local Success, Remote = pcall(function()
-            return API:Req(RemoteUrl .. "?v=" .. os.time())
+            return API:Request(RemoteUrl .. "?v=" .. os.time())
         end)
         if not Success then return warn("Failed: " .. RemoteUrl) end
         
