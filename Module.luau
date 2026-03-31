@@ -774,13 +774,14 @@ function API:AntiFling()
             if not Hum then return end
             
             if not Hum:FindFirstChild("0x0x0x0x0") then
-                local AntiFling = Instance.new("BodyVelocity")
-                AntiFling.Name = "0x0x0x0x0"
-                AntiFling.Velocity = Vector3.new(0, 0, 0)
-                AntiFling.MaxForce = Vector3.new(40000, 40000, 40000)
-                AntiFling.Parent = Hum
+                local AntiFling = self:CreateInstance("BodyVelocity", {
+                    Name = "0x0x0x0x0",
+                    Velocity = Vector3.new(0, 0, 0),
+                    MaxForce = Vector3.new(40000, 40000, 40000),
+                    Parent = Hum
+                })
             end
-            
+
             Hum.Velocity = Vector3.new(0, 0, 0)
             Hum.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             
