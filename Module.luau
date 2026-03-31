@@ -20,8 +20,6 @@ local UserInputService: UsedInputService = cloneref(game:GetService("UserInputSe
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 
 -- // Functions
-local AssetCache, HighlightCache, RecencyStores = {}, {}, {}, {}
-
 function API:CreateInstance(ClassName, Properties)
     local InstanceObj = Instance.new(ClassName)
 
@@ -121,7 +119,7 @@ function API:Gitport(Owner, Repo, Version, File)
 end
 
 function API:GetAssetInfo(Id)
-    local Cached = AssetCache[Id]
+    local Cached = self.AssetCache[Id]
     if Cached then
         return Cached
     end
@@ -141,7 +139,7 @@ function API:GetAssetInfo(Id)
         Description = Info.Description
     }
 
-    AssetCache[id] = Result
+    self.AssetCache[id] = Result
 
     return Result
 end
@@ -482,7 +480,7 @@ function API:Resolve(Mode, Input, Key)
             return Result;
         end
 
-        local Recency = RecencyStores[Key] or {}
+        local Recency = self.RecencyStores[Key] or {}
 
         local Current = {}
         for _, Item in ipairs(Result) do
@@ -504,7 +502,7 @@ function API:Resolve(Mode, Input, Key)
             end
         end
 
-        RecencyStores[Key] = NewRec;
+        self.RecencyStores[Key] = NewRec;
 
         local Prioritized = {}
         for i = #NewRec, 1, -1 do
@@ -928,8 +926,8 @@ function API:CreateHighlight(Target, Options)
 
     Options = Options or {}
 
-    if HighlightCache[Target] then
-        return HighlightCache[Target]
+    if self.HighlightCache[Target] then
+        return self.HighlightCache[Target]
     end
 
     local Highlight = self:CreateInstance("Highlight", {
@@ -944,7 +942,7 @@ function API:CreateHighlight(Target, Options)
         Parent = Options.Parent or Target
     })
 
-    HighlightCache[Target] = Highlight
+    self.HighlightCache[Target] = Highlight
 
     Target.AncestryChanged:Connect(function()
         if not Target:IsDescendantOf(game) then
@@ -956,19 +954,19 @@ function API:CreateHighlight(Target, Options)
 end
 
 function API:RemoveHighlight(Target)
-    local Highlight = HighlightCache[Target]
+    local Highlight = self.HighlightCache[Target]
     if not Highlight then return false end
 
     if Highlight and Highlight.Destroy then
         Highlight:Destroy()
     end
 
-    HighlightCache[Target] = nil
+    self.HighlightCache[Target] = nil
     return true
 end
 
 function API:ClearHighlights()
-    for Target, Highlight in pairs(HighlightCache) do
+    for Target, Highlight in pairs(self.HighlightCache) do
         if Highlight and Highlight.Destroy then
             pcall(function()
                 Highlight:Destroy()
@@ -976,7 +974,7 @@ function API:ClearHighlights()
         end
     end
 
-    table.clear(HighlightCache)
+    table.clear(self.HighlightCache)
 end
 
 function API:GetPlayers(SelfIncluded)
@@ -1563,11 +1561,15 @@ function API.Launch(Class)
     Class.RequestService = RequestService
 --]]
 
+    Class.AssetCache = {}
+    Class.HighlightCache = {}
+    Class.RecencyStores = {}
+
     Class._Timers = Class._Timers or {}
     Class.Stuffs = Class.Stuffs or {}
     Class.HistoryParts = Class.HistoryParts or {}
     Class.Origins = Class.Origins or {}
-    
+ 
     Class.XRayActive = Class.XRayActive or false
     Class.FlingActive = Class.FlingActive or false
     Class.Clip = Class.Clip == nil and true or Class.Clip
