@@ -50,7 +50,7 @@ function API:ToPlace(Place)
     TeleportService:Teleport(Place)
 end
 
-function API:Request(url)
+function API:Req(url)
     if RequestService then
         return RequestService({Url = url, Method = "GET"}).Body
     else
@@ -119,6 +119,8 @@ function API:Gitport(Owner, Repo, Version, File)
 end
 
 function API:GetAssetInfo(Id)
+    self.AssetCache = self.AssetCache or {}
+
     local Cached = self.AssetCache[Id]
     if Cached then
         return Cached
@@ -165,9 +167,9 @@ function API:LoadCustomAsset(Asset, Url)
 end
 
 function API:ControlF9(State)
-    pcall(function()
-        StarterGuiService:SetCore("DevConsoleVisible", State or false)
-    end)
+    pcall(function()
+        StarterGuiService:SetCore("DevConsoleVisible", State or false)
+    end)
 end
 
 function API:RandomString(Length)
@@ -253,7 +255,7 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
     local Github = "https://github.com/" .. Owner .. "/" .. RepoName .. "/commits/" .. Selected .. ".atom"
 
     local Success, Response = pcall(function()
-        return self:Request(Github .. "?nocache=" .. os.clock())
+        return self:Req(Github .. "?nocache=" .. os.clock())
     end)
 
     if not Success then warn("Failed to fetch commit logs~") return nil end
@@ -325,7 +327,7 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
         end
         
         local Success, Remote = pcall(function()
-            return API:Request(RemoteUrl .. "?v=" .. os.time())
+            return API:Req(RemoteUrl .. "?v=" .. os.time())
         end)
         if not Success then return warn("Failed: " .. RemoteUrl) end
         
@@ -407,6 +409,18 @@ function API:GetHumanoid()
     return Char:FindFirstChildOfClass("Humanoid")
 end
 
+function API:GetHead()
+    local Char = self:GetCharacter()
+    if not Char then return nil end
+    
+    local Head = Char:FindFirstChild("Head")
+    if not Head then
+        Head = Char:WaitForChild("Head", 5)
+    end
+    
+    return Head
+end
+
 function API:ForceReset()
     local Hum = self:GetHumanoid()
     if Hum then
@@ -462,6 +476,7 @@ end
 
 function API:Resolve(Mode, Input, Key)
     local Result = {}
+    self.RecencyStores = self.RecencyStores or {}
 
     if typeof(Input) == "string" then
         return {Input}
@@ -706,26 +721,39 @@ function API:SetTime(Amount)
 end
 
 function API:XRay(State)
+    self.HistoryParts = self.HistoryParts or {}
+    
     if State then
         if self.XRayActive then return end
-        
-        for _, part in ipairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") and part ~= self:GetCharacter() then
-                self.HistoryParts[part] = part.Transparency
-                part.Transparency = 0.5
+
+        for _, p in ipairs(workspace:GetDescendants()) do
+            if p:IsA("BasePart") and not p.Parent:FindFirstChildWhichIsA("Humanoid") and not p.Parent.Parent:FindFirstChildWhichIsA("Humanoid") then
+                local Flag = false
+    
+                for _, v in ipairs(self:GetPlayers(true)) do
+                    if v.Character and p:IsDescendantOf(v.Character) then
+                        Flag = true
+                        break
+                    end
+                end
+                
+                if not Flag then
+                    self.HistoryParts[p] = p.LocalTransparencyModifier
+                    p.LocalTransparencyModifier = 0.5
+                end
             end
         end
-        
+
         self.XRayActive = true
     else
         if not self.XRayActive then return end
-        
-        for part, transparency in pairs(self.HistoryParts) do
-            if part then
-                part.Transparency = transparency
+
+        for p, modifier in pairs(self.HistoryParts) do
+            if p and p.Parent then
+                p.LocalTransparencyModifier = modifier
             end
         end
-        
+
         self.HistoryParts = {}
         self.XRayActive = false
     end
@@ -856,7 +884,6 @@ function API:StopClip()
     self.Origins = {}
 end
 
--- [[ Aimbot functions coming soon ]]
 function API:GetMousePosition()
     return UserInputService:GetMouseLocation()
 end
@@ -870,29 +897,139 @@ function API:Raycast(Origin, Direction, Distance, IgnoreList)
     local Dir = self:ResolvePosition(Direction) or Direction
     
     if not OriginPos then return nil end
-    
+
     local Params = RaycastParams.new()
     Params.FilterType = Enum.RaycastFilterType.Blacklist
     Params.FilterDescendantsInstances = IgnoreList or {}
-    
+
     return workspace:Raycast(OriginPos, Dir.Unit * Distance, Params)
 end
 
-function API:IsVisible(Origin, Target, IgnoreList)
-    local OriginPos = self:ResolvePosition(Origin)
-    local TargetPos = self:ResolvePosition(Target)
+function API:IsBehindWall()
+    local Head = self:GetHead()
+    if not Head then return false end
+
+    local Origin = Head.Position
+
+    for _, v in ipairs(self:GetPlayers(false)) do
+        if v.Character then
+            local Target  = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")
+            if Target then
+                local Direction = Target.Position - Origin
+                local Hit = workspace:FindPartOnRayWithIgnoreList(Ray.new(Origin, Direction), {self:GetCharacter(), v.Character})
+
+                if Hit == nil then
+                    return false
+                end
+            end
+        end
+    end
+
+    return true
+end
+
+function API:TpNearestWall(Radius)
+    Radius = Radius or 90
     
-    if not OriginPos or not TargetPos then return false end
+    if self:IsBehindWall() then
+        return false
+    end
+
+    local root = self:GetRoot()
+    if not root then return false end
     
-    local Direction = TargetPos - OriginPos
-    local Distance = Direction.Magnitude
+    local originalPos = root.Position
+    local wallPositions = {}
     
-    local Result = self:Raycast(OriginPos, Direction, Distance, IgnoreList)
+    for angle = 0, 360, 10 do
+        local rad = math.rad(angle)
+        local direction = Vector3.new(math.cos(rad), 0, math.sin(rad))
+        
+        local wallHit = self:Raycast(originalPos, direction, Radius)
+        
+        if wallHit then
+            local wallPos = wallHit.Position
+            local wallDistance = (wallPos - originalPos).Magnitude
+            
+            for offset = 2, 5 do
+                local behindWall = wallPos + (direction * offset)
+                
+                local groundHit = self:Raycast(behindWall, Vector3.new(0, -1, 0), 10)
+                if groundHit then
+                    local groundPos = groundHit.Position.Y
+                    local groundY = groundPos + 3
+                    
+                    local ceilingHit = self:Raycast(Vector3.new(behindWall.X, groundY + 5, behindWall.Z), Vector3.new(0, 1, 0), 8)
+                    
+                    if groundY > 0 and not ceilingHit then
+                        local finalPos = Vector3.new(behindWall.X, groundY, behindWall.Z)
+                        
+                        local character = self:GetCharacter()
+                        if character then
+                            local charSize = character:GetExtentsSize()
+                            local checkBox = self:Raycast(finalPos + Vector3.new(0, charSize.Y/2, 0), Vector3.new(0, 0, 0), 0)
+                            
+                            if not checkBox then
+                                table.insert(wallPositions, {
+                                    Position = finalPos,
+                                    Distance = wallDistance,
+                                    Direction = direction
+                                })
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
     
-    if not Result then return true end
+    table.sort(wallPositions, function(a, b)
+        return a.Distance < b.Distance
+    end)
     
-    local TargetParent = Target:IsA("BasePart") and Target.Parent or Target
-    return Result.Instance:IsDescendantOf(TargetParent)
+    for _, wallSpot in ipairs(wallPositions) do
+        if wallSpot.Position.Y > 0 then
+            local oldPos = root.Position
+            root.CFrame = CFrame.new(wallSpot.Position)
+            task.wait()
+            
+            if self:IsBehindWall() then
+                return true
+            end
+            
+            root.CFrame = CFrame.new(oldPos)
+        end
+    end
+    
+    for radius = 3, Radius, 5 do
+        for angle = 0, 360, 30 do
+            local rad = math.rad(angle)
+            local offset = Vector3.new(math.cos(rad) * radius, 0, math.sin(rad) * radius)
+            local testPos = originalPos + offset
+            
+            local groundHit = self:Raycast(testPos, Vector3.new(0, -1, 0), 10)
+            if groundHit then
+                local groundPos = groundHit.Position.Y + 3
+                
+                if groundPos > 0 then
+                    local finalPos = Vector3.new(testPos.X, groundPos, testPos.Z)
+                    
+                    local oldPos = root.Position
+                    root.CFrame = CFrame.new(finalPos)
+                    task.wait()
+                    
+                    if self:IsBehindWall() then
+                        return true
+                    end
+                    
+                    root.CFrame = CFrame.new(oldPos)
+                end
+            end
+        end
+    end
+    
+    root.CFrame = CFrame.new(originalPos)
+    return false
 end
 
 function API:IsTeamMate(Target)
@@ -925,6 +1062,7 @@ function API:CreateHighlight(Target, Options)
     if not Target then return nil end
 
     Options = Options or {}
+    self.HighlightCache = self.HighlightCache or {}
 
     if self.HighlightCache[Target] then
         return self.HighlightCache[Target]
@@ -954,6 +1092,8 @@ function API:CreateHighlight(Target, Options)
 end
 
 function API:RemoveHighlight(Target)
+    self.HighlightCache = self.HighlightCache or {}
+
     local Highlight = self.HighlightCache[Target]
     if not Highlight then return false end
 
@@ -966,6 +1106,8 @@ function API:RemoveHighlight(Target)
 end
 
 function API:ClearHighlights()
+    self.HighlightCache = self.HighlightCache or {}
+
     for Target, Highlight in pairs(self.HighlightCache) do
         if Highlight and Highlight.Destroy then
             pcall(function()
@@ -1162,9 +1304,10 @@ end
 
 function API:FakeTP(Speed, ...)
     local args = {...}
+    if #args < 1 then return end
 
     local Position = self:ResolvePosition(args[1])
-    local LookAt = self:ResolvePosition(args[2])
+    local LookAt = args[2] and self:ResolvePosition(args[2]) or nil
 
     local Roots = self:GetRoot();
     if not Roots then return end
@@ -1186,7 +1329,7 @@ function API:FakeTP(Speed, ...)
     local Direction = (Distance > 0 and Delta.Unit) or Vector3.zero
     local NewPos = Current + Direction * Step;                
 
-    local cf = CFrame.lookAt(NewPos,LookAt or (NewPos + Direction));
+    local cf = CFrame.lookAt(NewPos, LookAt or (NewPos + Direction));
     self:GetCharacter():PivotTo(cf);
 end
 
@@ -1522,7 +1665,7 @@ function API:OverrideFunction(Name, Function)
         return false
     end
 
-    self["[Overide Function] - " .. Name] = self[Name]
+    self["[0x0x0x0] - " .. Name] = self[Name]
     self[Name] = Function
 
     return true
@@ -1541,39 +1684,49 @@ function API:Merge(Module)
 end
 
 function API.Launch(Class)
+    local function set(data)
+        for k, v in pairs(data) do Class[k] = v end
+    end
+
     for key, value in pairs(API) do
         if type(value) ~= "function" and key ~= "__index" then
             Class[key] = value
         end
     end
 
---[[
-    Class.Players = Players
-    Class.LocalPlayer = LocalPlayer
-    Class.RunService = RunService
-    Class.TweenService = TweenService
-    Class.MarketplaceService = MarketplaceService
-    Class.HttpService = HttpService
-    Class.TeleportService = TeleportService
-    Class.RbxAnalyticsService = RbxAnalyticsService
-    Class.UserInputService = UserInputService
-    Class.StarterGuiService = StarterGuiService
-    Class.RequestService = RequestService
---]]
+    -- // Services
+    set({
+        Players = Players,
+        LocalPlayer = LocalPlayer,
+        RunService = RunService,
+        TweenService = TweenService,
+        MarketplaceService = MarketplaceService,
+        HttpService = HttpService,
+        TeleportService = TeleportService,
+        RbxAnalyticsService = RbxAnalyticsService,
+        UserInputService = UserInputService,
+        StarterGuiService = StarterGuiService,
+        RequestService = RequestService,
+    })
 
-    Class.AssetCache = {}
-    Class.HighlightCache = {}
-    Class.RecencyStores = {}
+    -- // Caches
+    set({
+        AssetCache = {},
+        HighlightCache = {},
+        RecencyStores = {},
+        HistoryParts = Class.HistoryParts or {},
+        Origins = Class.Origins or {},
+        Timers = Class._Timers or {},
+        Stuffs = Class.Stuffs or {},
+    })
 
-    Class._Timers = Class._Timers or {}
-    Class.Stuffs = Class.Stuffs or {}
-    Class.HistoryParts = Class.HistoryParts or {}
-    Class.Origins = Class.Origins or {}
- 
-    Class.XRayActive = Class.XRayActive or false
-    Class.FlingActive = Class.FlingActive or false
-    Class.Clip = Class.Clip == nil and true or Class.Clip
-    
+    -- // States
+    set({
+        XRayActive = Class.XRayActive or false,
+        FlingActive = Class.FlingActive or false,
+        Clip = Class.Clip == nil and true or Class.Clip,
+    })
+
     return setmetatable(Class, API)
 end
 
