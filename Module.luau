@@ -588,6 +588,10 @@ function API:GetTools()
     return Tools
 end
 
+function API:GetToolCount()
+    return #self:GetTools()
+end
+
 function API:FindTool(Name)
     for _, tool in ipairs(self:GetTools()) do
         if tool.Name:lower() == Name:lower() then
@@ -602,16 +606,26 @@ function API:EquipTool(Name)
     if not Tool then
         return false
     end
-    
-    if Tool.Parent == self:GetBackpack() then
-        Tool.Parent = self:GetCharacter()
+
+    local Character = self:GetCharacter()
+    local Backpack = self:GetBackpack()
+    if not Character or not Backpack then return false end
+
+    local HeldTool = self:GetHeldTool()
+
+    if HeldTool and HeldTool.Name == Name then
         return true
     end
-    
-    if Tool.Parent == self:GetCharacter() then
+
+    if HeldTool then
+        HeldTool.Parent = Backpack
+    end
+
+    if Tool.Parent == Backpack then
+        Tool.Parent = Character
         return true
     end
-    
+
     return false
 end
 
@@ -634,29 +648,33 @@ function API:UseTool(Name)
     if not Tool then
         return false
     end
-    
-    if Tool.Parent ~= self:GetCharacter() then
-        self:Equip(Name)
+
+    local HeldTool = self:GetHeldTool()
+
+    if HeldTool ~= Tool then
+        self:EquipTool(Name)
         task.wait(0.1)
     end
-    
-    if Tool:FindFirstChild("Activate") then
-        Tool:Activate()
+
+    HeldTool = self:GetHeldTool()
+
+    if HeldTool == Tool then
+        HeldTool:Activate()
         return true
     end
-    
+
     return false
 end
 
 function API:UseHeldTool()
-    local Char = self:GetCharacter()
-    if Char then
-        local HeldTool = Char:FindFirstChildWhichIsA("Tool")
-        if HeldTool then
-            HeldTool:Activate()
-            return true
-        end
+    local HeldTool = self:GetHeldTool()
+    if not HeldTool then return false end
+
+    if HeldTool.Enabled ~= false then
+        HeldTool:Activate()
+        return true
     end
+
     return false
 end
 
@@ -697,6 +715,10 @@ function API:RunPriorities()
         return Task.name
     end
     return nil
+end
+
+function API:SetFOV(Num)
+    workspace.CurrentCamera.FieldOfView = Num
 end
 
 function API:SetGravity(Amount)
@@ -1355,6 +1377,24 @@ function API:IsMobAlive(Model)
     end
 
     return Hum.Health > 0
+end
+
+function API:GetClosestPlayer(Radius)
+    Radius = Radius or math.huge
+    local Closest = nil
+    local ClosestDist = Radius
+
+    for _, v in ipairs(self:GetPlayers(false)) do
+        if v.Character then
+            local Distance = self:GetDistance(v.Character)
+            if Distance < ClosestDist then
+                ClosestDist = Distance
+                Closest = v
+            end
+        end
+    end
+    
+    return Closest, ClosestDist
 end
 
 function API:GetNPC(Model)
