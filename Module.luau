@@ -35,20 +35,20 @@ function API:CreateInstance(ClassName, Properties)
     return InstanceObj
 end
 
-function API:Time()
-    return os.date("%H:%M:%S")
-end
-
-function API:Date()
-    return os.date("%Y-%m-%d")
-end
-
 function API:GetDevice()
     return UserInputService:GetPlatform()
 end
 
 function API:ToPlace(Place)
     TeleportService:Teleport(Place)
+end
+
+function API:Time()
+    return os.date("%H:%M:%S")
+end
+
+function API:Date()
+    return os.date("%Y-%m-%d")
 end
 
 function API:Request(url)
