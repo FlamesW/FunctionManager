@@ -1602,24 +1602,6 @@ function API:SelectEverything(Dropdown, List) -- // Obsidian Only
     return State
 end
 
-function API:Help()
-    warn("=====[ FUNCTIONS ]=====")
-    local List = {}
-
-    for k, v in pairs(API) do
-        if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "Req" and k ~= "OverrideFunction" and k ~= "Merge" and k ~= "Launch" and k ~= "SelectEverything" then
-            table.insert(List, k)
-        end
-    end
-
-    table.sort(List)
-    for _, k in ipairs(List) do
-        print("• " .. k)
-    end
-
-    warn("=======================")
-end
-
 function API:Rejoin()
     local Plr = self:GetPlayer()
     TeleportService:Teleport(game.PlaceId, Plr)
@@ -1886,6 +1868,24 @@ function API:OverrideFunction(Name, Function)
     self[Name] = Function
 
     return true
+end
+
+function API:Help()
+    warn("=====[ FUNCTIONS ]=====")
+    local List = {}
+
+    for k, v in pairs(API) do
+        if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "Req" and k ~= "OverrideFunction" and k ~= "Merge" and k ~= "Launch" and k ~= "SelectEverything" then
+            table.insert(List, k)
+        end
+    end
+
+    table.sort(List)
+    for _, k in ipairs(List) do
+        print("• " .. k)
+    end
+
+    warn("=======================")
 end
 
 function API:Merge(Module)
