@@ -48,7 +48,7 @@ function API:Time()
 end
 
 function API:Date()
-    return os.date("%Y-%m-%d")
+    return os.date("%Y/%m/%d")
 end
 
 function API:Request(url)
