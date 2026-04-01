@@ -18,6 +18,7 @@ local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAn
 local RequestService = http and http.request or request or http_request or syn and syn.request;
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
+local LightingService: LightingService = cloneref(game:GetService("Lighting"))
 
 -- // Functions
 function API:CreateInstance(ClassName, Properties)
@@ -717,7 +718,169 @@ function API:SetJumpPower(Amount)
 end
 
 function API:SetTime(Amount)
-    game.Lighting.ClockTime = Amount
+    LightingService.ClockTime = Amount
+end
+
+function API:Flight(State, Speed)
+    State = State or false
+    Speed = Speed or 50
+
+    self.FlightData = self.FlightData or 
+    {Active = false, Speed = Speed,Connections = {}, BodyVelocity = nil, BodyGyro = nil, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
+
+    local function CleanUP()
+        self.FlightData.Active = false
+        
+        local Roots = self:GetRoot()
+        if Roots then
+            if self.FlightData.BodyVelocity then
+                self.FlightData.BodyVelocity:Destroy()
+            end
+            if self.FlightData.BodyGyro then
+                self.FlightData.BodyGyro:Destroy()
+            end
+        end
+        
+        for _, conn in ipairs(self.FlightData.Connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(self.FlightData.Connections)
+    end
+    
+    if not State then
+        CleanUP()
+        return false
+    end
+    
+    if self.FlightData.Active then
+        return true
+    end
+
+    local Roots = self:GetRoot()
+
+    if not Roots then
+        return false
+    end
+    
+    self.FlightData.Active = true
+    self.FlightData.Speed = Speed
+    
+    local BV = self:CreateInstance("BodyVelocity", {
+        Name = "00x00x00x00x00",
+        MaxForce = Vector3.new(1e5, 1e5, 1e5),
+        Velocity = Vector3.zero,
+        Parent = Roots
+    })
+    self.FlightData.BodyVelocity = BV
+    
+    local BG = self:CreateInstance("BodyGyro", {
+        Name = "11x11x11x11x11",
+        MaxTorque = Vector3.new(1e5, 1e5, 1e5),
+        P = 3000,
+        D = 500,
+        CFrame = Roots.CFrame,
+        Parent = Roots
+    })
+    self.FlightData.BodyGyro = BG
+    
+    local Camera = workspace.CurrentCamera
+    
+    local Connection = RunService.RenderStepped:Connect(function()
+        if not self.FlightData.Active or not Roots or not Camera then 
+            return 
+        end
+        
+        local moveDirection = Vector3.zero
+        
+        if self:IsKeyPressed(Enum.KeyCode.W) then
+            moveDirection += Camera.CFrame.LookVector
+        end
+        if self:IsKeyPressed(Enum.KeyCode.S) then
+            moveDirection -= Camera.CFrame.LookVector
+        end
+        if self:IsKeyPressed(Enum.KeyCode.A) then
+            moveDirection -= Camera.CFrame.RightVector
+        end
+        if self:IsKeyPressed(Enum.KeyCode.D) then
+            moveDirection += Camera.CFrame.RightVector
+        end
+        
+        if self:IsKeyPressed(Enum.KeyCode.Space) then
+            moveDirection += Camera.CFrame.UpVector
+        end
+        if self:IsKeyPressed(Enum.KeyCode.LeftControl) then
+            moveDirection -= Camera.CFrame.UpVector
+        end
+        
+        if self:IsKeyPressed(Enum.KeyCode.Equals) then
+            self.FlightData.Speed = math.clamp(self.FlightData.Speed + self.FlightData.SpeedStep, 
+                self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+        elseif self:IsKeyPressed(Enum.KeyCode.Minus) then
+            self.FlightData.Speed = math.clamp(self.FlightData.Speed - self.FlightData.SpeedStep, 
+                self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+        end
+        
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit * self.FlightData.Speed
+        end
+        
+        if self.FlightData.BodyVelocity then
+            self.FlightData.BodyVelocity.Velocity = moveDirection
+        end
+        
+        if self.FlightData.BodyGyro then
+            self.FlightData.BodyGyro.CFrame = Camera.CFrame
+        end
+    end)
+
+    table.insert(self.FlightData.Connections, Connection)
+
+    local NewConnection = self:GetPlayer().CharacterAdded:Connect(function()
+        task.wait(1)
+        if self.FlightData.Active then
+            if self.FlightData.BodyVelocity then
+                self.FlightData.BodyVelocity:Destroy()
+            end
+            if self.FlightData.BodyGyro then
+                self.FlightData.BodyGyro:Destroy()
+            end
+            
+            local New = self:GetRoot()
+            if New then
+                self.FlightData.BodyVelocity = self:CreateInstance("BodyVelocity", {
+                    Name = "00x00x00x00x00",
+                    MaxForce = Vector3.new(1e5, 1e5, 1e5),
+                    Velocity = Vector3.zero,
+                    Parent = New
+                })
+                
+                self.FlightData.BodyGyro = self:CreateInstance("BodyGyro", {
+                    Name = "11x11x11x11x11",
+                    MaxTorque = Vector3.new(1e5, 1e5, 1e5),
+                    P = 3000,
+                    D = 500,
+                    CFrame = New.CFrame,
+                    Parent = New
+                })
+
+                Roots = New
+            end
+        end
+    end)
+
+    table.insert(self.FlightData.Connections, NewConnection)
+    return true
+end
+
+function API:SetFlightSpeed(Speed)
+    if not self.FlightData or not self.FlightData.Active then
+        return false
+    end
+
+    Speed = math.clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+    self.FlightData.Speed = Speed
+
+    return true
 end
 
 function API:XRay(State)
@@ -891,6 +1054,19 @@ end
 
 function API:IsKeyPressed(Key)
     return UserInputService:IsKeyDown(Key)
+end
+
+function API:Bind(Key, Callback)
+    local Connection
+    Connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Key or input.UserInputType == Key then
+            Callback(input)
+        end
+    end)
+    
+    return Connection
 end
 
 function API:Raycast(Origin, Direction, Distance, IgnoreList)
@@ -1708,6 +1884,7 @@ function API.Launch(Class)
         UserInputService = UserInputService,
         StarterGuiService = StarterGuiService,
         RequestService = RequestService,
+        LightingService = LightingService,
     })
 
     -- // Caches
