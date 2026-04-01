@@ -1058,7 +1058,7 @@ end
 
 function API:Bind(Key, Callback)
     local Connection
-    Connection = self.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    Connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         
         if input.KeyCode == Key or input.UserInputType == Key then
