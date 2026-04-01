@@ -35,6 +35,76 @@ function API:CreateInstance(ClassName, Properties)
     return InstanceObj
 end
 
+function API:GetAssetInfo(Id)
+    self.AssetCache = self.AssetCache or {}
+
+    local Cached = self.AssetCache[Id]
+    if Cached then
+        return Cached
+    end
+
+    local Success, Info = pcall(function()
+        return MarketplaceService:GetProductInfo(Id)
+    end)
+
+    if not Success or not Info then
+        return nil
+    end
+
+    local AssetTypes = {
+        [1] = "Image",
+        [2] = "TShirt",
+        [3] = "Audio",
+        [4] = "Mesh",
+        [5] = "Lua",
+        [8] = "Hat",
+        [9] = "Place",
+        [10] = "Model",
+        [11] = "Shirt",
+        [12] = "Pants",
+        [13] = "Decal",
+        [17] = "Head",
+        [18] = "Face",
+        [19] = "Gear",
+        [21] = "Badge",
+        [24] = "Animation",
+        [27] = "Torso",
+        [28] = "RightArm",
+        [29] = "LeftArm",
+        [30] = "LeftLeg",
+        [31] = "RightLeg",
+        [32] = "Package",
+        [34] = "GamePass",
+        [38] = "Plugin",
+        [41] = "MeshPart",
+        [42] = "Video",
+        [43] = "Tool"
+    }
+
+    local Result = {
+        Id = Id,
+        Name = Info.Name,
+        Creator = Info.Creator and Info.Creator.Name,
+        CreatorId = Info.Creator and Info.Creator.Id,
+        TypeId = Info.AssetTypeId,
+        TypeName = AssetTypes[Info.AssetTypeId] or "Unknown",
+        Description = Info.Description,
+        Created = Info.Created,
+        Updated = Info.Updated,
+        Price = Info.PriceInRobux,
+        IsForSale = Info.IsForSale,
+        IsLimited = Info.IsLimited,
+        IsLimitedUnique = Info.IsLimitedUnique,
+        CollectibleItemId = Info.CollectibleItemId,
+        SaleLocation = Info.SaleLocation,
+        Genres = Info.Genres,
+        ItemRestrictions = Info.ItemRestrictions
+    }
+
+    self.AssetCache[Id] = Result
+    return Result
+end
+
 function API:GetDevice()
     return UserInputService:GetPlatform()
 end
@@ -117,54 +187,6 @@ end
 function API:Gitport(Owner, Repo, Version, File)
     local Tag = (Version == "latest" and "latest/download" or "download/" .. Version)    
     return self:LoadFile(("https://github.com/%s/%s/releases/%s/%s"):format(Owner, Repo, Tag, File))
-end
-
-function API:GetAssetInfo(Id)
-    self.AssetCache = self.AssetCache or {}
-
-    local Cached = self.AssetCache[Id]
-    if Cached then
-        return Cached
-    end
-
-    local Success, Info = pcall(function()
-        return MarketplaceService:GetProductInfo(Id)
-    end)
-
-    if not Success or not Info then
-        return nil
-    end
-
-    local Result = {
-        Name = Info.Name,
-        Creator = Info.Creator and Info.Creator.Name,
-        Type = Info.AssetTypeId,
-        Description = Info.Description
-    }
-
-    self.AssetCache[id] = Result
-
-    return Result
-end
-
-function API:LoadCustomAsset(Asset, Url)
-    if not isfile(Asset) then
-        local Succ, Cont = pcall(function()
-            return game:HttpGet(Url, true)
-        end)
-
-        if Succ then 
-            writefile(Asset, Cont) 
-        else 
-            return Url 
-        end
-    end
-
-    if getcustomasset then
-        return getcustomasset(Asset)
-    else
-        return isfile(Asset) and "rbxasset://" .. Asset or Url
-    end
 end
 
 function API:ControlF9(State)
