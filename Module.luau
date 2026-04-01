@@ -18,7 +18,7 @@ local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAn
 local RequestService = http and http.request or request or http_request or syn and syn.request;
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
-local LightingService: LightingService = cloneref(game:GetService("Lighting"))
+local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 
 -- // Functions
 function API:CreateInstance(ClassName, Properties)
