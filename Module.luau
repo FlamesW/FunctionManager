@@ -1104,6 +1104,11 @@ function API:Raycast(Origin, Direction, Distance, IgnoreList)
     return workspace:Raycast(OriginPos, Dir.Unit * Distance, Params)
 end
 
+function API:WorldToScreen(Position)
+    local Vector, OnScreen = workspace.CurrentCamera:WorldToScreenPoint(self:ResolvePosition(Position))
+    return {X = Vector.X, Y = Vector.Y, Z = Vector.Z, OnScreen = OnScreen}
+end
+
 function API:IsBehindWall()
     local Head = self:GetHead()
     if not Head then return false end
