@@ -21,6 +21,11 @@ local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGu
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 
 -- // Functions
+function API:Flags()
+    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}
+    self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
+end
+
 function API:CreateInstance(ClassName, Properties)
     local InstanceObj = Instance.new(ClassName)
 
@@ -489,13 +494,13 @@ function API:IsAlive()
 end
 
 function API:SmartTimer(Name, Delay)
-    self._Timers = self._Timers or {}
+    self.Timers = self.Timers or {}
 
     local CT = tick()
-    local Last = self._Timers[Name] or 0;
+    local Last = self.Timers[Name] or 0;
 
     if CT - Last >= Delay then
-        self._Timers[Name] = CT;
+        self.Timers[Name] = CT;
         return true;
     end
 
@@ -1174,110 +1179,6 @@ function API:IsBehindWall()
     return true
 end
 
-function API:TpNearestWall(Radius)
-    Radius = Radius or 90
-    
-    if self:IsBehindWall() then
-        return false
-    end
-
-    local root = self:GetRoot()
-    if not root then return false end
-    
-    local originalPos = root.Position
-    local wallPositions = {}
-    
-    for angle = 0, 360, 10 do
-        local rad = math.rad(angle)
-        local direction = Vector3.new(math.cos(rad), 0, math.sin(rad))
-        
-        local wallHit = self:Raycast(originalPos, direction, Radius)
-        
-        if wallHit then
-            local wallPos = wallHit.Position
-            local wallDistance = (wallPos - originalPos).Magnitude
-            
-            for offset = 2, 5 do
-                local behindWall = wallPos + (direction * offset)
-                
-                local groundHit = self:Raycast(behindWall, Vector3.new(0, -1, 0), 10)
-                if groundHit then
-                    local groundPos = groundHit.Position.Y
-                    local groundY = groundPos + 3
-                    
-                    local ceilingHit = self:Raycast(Vector3.new(behindWall.X, groundY + 5, behindWall.Z), Vector3.new(0, 1, 0), 8)
-                    
-                    if groundY > 0 and not ceilingHit then
-                        local finalPos = Vector3.new(behindWall.X, groundY, behindWall.Z)
-                        
-                        local character = self:GetCharacter()
-                        if character then
-                            local charSize = character:GetExtentsSize()
-                            local checkBox = self:Raycast(finalPos + Vector3.new(0, charSize.Y/2, 0), Vector3.new(0, 0, 0), 0)
-                            
-                            if not checkBox then
-                                table.insert(wallPositions, {
-                                    Position = finalPos,
-                                    Distance = wallDistance,
-                                    Direction = direction
-                                })
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    table.sort(wallPositions, function(a, b)
-        return a.Distance < b.Distance
-    end)
-    
-    for _, wallSpot in ipairs(wallPositions) do
-        if wallSpot.Position.Y > 0 then
-            local oldPos = root.Position
-            root.CFrame = CFrame.new(wallSpot.Position)
-            task.wait()
-            
-            if self:IsBehindWall() then
-                return true
-            end
-            
-            root.CFrame = CFrame.new(oldPos)
-        end
-    end
-    
-    for radius = 3, Radius, 5 do
-        for angle = 0, 360, 30 do
-            local rad = math.rad(angle)
-            local offset = Vector3.new(math.cos(rad) * radius, 0, math.sin(rad) * radius)
-            local testPos = originalPos + offset
-            
-            local groundHit = self:Raycast(testPos, Vector3.new(0, -1, 0), 10)
-            if groundHit then
-                local groundPos = groundHit.Position.Y + 3
-                
-                if groundPos > 0 then
-                    local finalPos = Vector3.new(testPos.X, groundPos, testPos.Z)
-                    
-                    local oldPos = root.Position
-                    root.CFrame = CFrame.new(finalPos)
-                    task.wait()
-                    
-                    if self:IsBehindWall() then
-                        return true
-                    end
-                    
-                    root.CFrame = CFrame.new(oldPos)
-                end
-            end
-        end
-    end
-    
-    root.CFrame = CFrame.new(originalPos)
-    return false
-end
-
 function API:IsTeamMate(Target)
     return self:GetTeam() == Target.Team
 end
@@ -1905,6 +1806,261 @@ function API:Verify(Options)
     return false, nil, nil
 end
 
+function API:SafeCall(Func, ...)
+    if not (Func and typeof(Func) == "function") then return end
+
+    local Success, err = xpcall(Func, debug.traceback, ...)
+    if not Success then
+        task.defer(error, err)
+        print("[Loop Manager] Error in callback:", err)
+    end
+    return Success
+end
+
+function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
+    Wait = WaitBoy or 0
+    Name = Name or self:RandomString(8)
+
+    local thread
+    local func = function()
+        if WaitBefore and Wait then
+            task.wait(Wait)
+        end
+
+        while task.wait(Wait) do
+            if self.Unloaded then break end
+            self:SafeCall(Callback)
+        end
+    end
+
+    thread = task.spawn(func)
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = {
+        Type = "thread",
+        Thread = thread,
+        Func = func,
+        Running = true
+    }
+
+    return thread
+end
+
+function API:RenderStep(Callback, Name)
+    Name = Name or self:RandomString(8)
+    
+    local func = function(dt)
+        if self.Unloaded then return end
+        self:SafeCall(Callback, dt)
+    end
+
+    local conn = RunService.RenderStepped:Connect(func)
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = {
+        Type = "RBXScriptConnection",
+        Connection = conn,
+        Service = "RenderStepped",
+        Func = func,
+        Running = true
+    }
+
+    return conn
+end
+
+function API:BindRender(Callback, Name, Priority)
+    Name = Name or self:RandomString(8)
+
+    local func = function(dt)
+        if self.Unloaded then return end
+        self:SafeCall(Callback, dt)
+    end
+
+    RunService:BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, func)
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = {
+        Type = "BindToRenderStep",
+        Name = Name,
+        Func = func,
+        Running = true
+    }
+
+    return {Type = "BindToRenderStep", Name = Name}
+end
+
+function API:Stepped(Callback, Name)
+    Name = Name or self:RandomString(8)
+
+    local func = function(time, dt) 
+        self:SafeCall(Callback, time, dt) 
+    end
+
+    local conn = RunService.Stepped:Connect(func)
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = {
+        Type = "RBXScriptConnection", 
+        Connection = conn, 
+        Service = "Stepped", 
+        Func = func, 
+        Running = true
+    }
+    return conn
+end
+
+function API:Heartbeat(Callback, Name)
+    Name = Name or self:RandomString(8)
+    
+    local func = function(dt) 
+        self:SafeCall(Callback, dt) 
+    end
+
+    local conn = RunService.Heartbeat:Connect(func)
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = {
+        Type = "RBXScriptConnection", 
+        Connection = conn, 
+        Service = "Heartbeat", 
+        Func = func, 
+        Running = true
+    }
+    return conn
+end
+
+function API:ForceStop(Name)
+    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
+    if not Entry then
+        return false
+    end
+
+    if Entry.Running == false then
+        return true
+    end
+
+    if Entry.Type == "thread" then
+        if Entry.Thread and coroutine.status(Entry.Thread) ~= "dead" then
+            task.cancel(Entry.Thread)
+        end
+    elseif Entry.Type == "RBXScriptConnection" then
+        if Entry.Connection and Entry.Connection.Connected then
+            Entry.Connection:Disconnect()
+        end
+    elseif Entry.Type == "BindToRenderStep" then
+        pcall(function()
+            RunService:UnbindFromRenderStep(Entry.Name or Name)
+        end)
+    end
+
+    Entry.Running = false
+    return true
+end
+
+function API:ForceStart(Name)
+    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
+    if not Entry then
+        return nil
+    end
+
+    if Entry.Running then
+        self:ForceStop(Name)
+    end
+
+    if Entry.Type == "thread" then
+        local thread = task.spawn(Entry.Func)
+        Entry.Thread = thread
+        Entry.Running = true
+        return thread
+
+    elseif Entry.Type == "RBXScriptConnection" then
+        local conn
+        if Entry.Service == "RenderStepped" then
+            conn = RunService.RenderStepped:Connect(Entry.Func)
+        elseif Entry.Service == "Heartbeat" then
+            conn = RunService.Heartbeat:Connect(Entry.Func)
+        elseif Entry.Service == "Stepped" then
+            conn = RunService.Stepped:Connect(Entry.Func)
+        end
+        Entry.Connection = conn
+        Entry.Running = true
+        return conn
+
+    elseif Entry.Type == "BindToRenderStep" then
+        RunService:BindToRenderStep(Entry.Name or Name, Enum.RenderPriority.Last.Value, Entry.Func)
+        Entry.Running = true
+        return Entry
+    end
+end
+
+function API:Get(Name)
+    local Floop = self.ActiveConnections and self.ActiveConnections[Name]
+    if Floop then
+        if Floop.Running == false then return false end
+        if Floop.Type == "thread" then
+            return coroutine.status(Floop.Thread) ~= "dead"
+        elseif Floop.Type == "RBXScriptConnection" then
+            return Floop.Connection and Floop.Connection.Connected
+        end
+        return Floop.Running == true
+    end
+
+    local Task = self.ActiveTasks and self.ActiveTasks[Name]
+    if Task then
+        return Task.Running == true
+    end
+    
+    return nil
+end
+
+function API:AddTask(Signal, Callback, Name)
+    self.ActiveTasks = self.ActiveTasks or {}
+
+    if self.ActiveTasks[Name] then
+        return self.ActiveTasks[Name]
+    end
+
+    local Data = {Signal = Signal, Callback = Callback, Connection = nil, Running = true}
+
+    local function wrapper()
+        Data.Connection = Signal:Connect(function(...)
+            if Data.Running and not self.Unloaded then
+                self:SafeCall(Callback, ...)
+            end
+        end)
+    end
+
+    wrapper()
+    Data.Reconnect = wrapper
+    self.ActiveTasks[Name] = Data
+
+    return Data
+end
+
+function API:StopTask(Name)
+    local Data = self.ActiveTasks and self.ActiveTasks[Name]
+    if Data then
+        if not Data.Running then return end
+        Data.Running = false
+        if Data.Connection then
+            Data.Connection:Disconnect()
+            Data.Connection = nil
+        end
+    end
+end
+
+function API:RestartTask(Name)
+    local Data = self.ActiveTasks and self.ActiveTasks[Name]
+    if Data then
+        if Data.Running then return end
+        Data.Running = true
+        if not Data.Connection then
+            Data.Reconnect()
+        end
+    end
+end
+
+function API:Toggle(State)
+    if typeof(State) == "boolean" then
+        self.Unloaded = State
+    end
+end
+
 function API:OverrideFunction(Name, Function)
     if typeof(self[Name]) ~= "function" then
         warn("Function does not exist:", Name)
@@ -1915,6 +2071,45 @@ function API:OverrideFunction(Name, Function)
     self[Name] = Function
 
     return true
+end
+
+function API:Unload()
+    self.Unloaded = true
+    
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveTasks = self.ActiveTasks or {}
+
+    for name, _ in pairs(self.ActiveConnections) do
+        self:ForceStop(name)
+    end
+    for name, _ in pairs(self.ActiveTasks) do
+        self:StopTask(name)
+    end
+
+    if self.FlightData then
+        if self.FlightData.BodyVelocity then
+            pcall(function() self.FlightData.BodyVelocity:Destroy() end)
+        end
+        if self.FlightData.BodyGyro then
+            pcall(function() self.FlightData.BodyGyro:Destroy() end)
+        end
+        for _, conn in ipairs(self.FlightData.Connections or {}) do
+            pcall(function() conn:Disconnect() end)
+        end
+        self.FlightData = nil
+    end
+
+    self:StopClip()
+    self:StopFling()
+    
+    if self.XRayActive then
+        self:XRay(false)
+    end
+
+    self:ClearHighlights()
+
+    self:Flags()
+    warn("[Loop Manager]: Unloaded")
 end
 
 function API:Help()
@@ -1948,10 +2143,6 @@ function API:Merge(Module)
 end
 
 function API.Launch(Class)
-    local function set(data)
-        for k, v in pairs(data) do Class[k] = v end
-    end
-
     for key, value in pairs(API) do
         if type(value) ~= "function" and key ~= "__index" then
             Class[key] = value
@@ -1959,38 +2150,20 @@ function API.Launch(Class)
     end
 
     -- // Services
-    set({
-        Players = Players,
-        LocalPlayer = LocalPlayer,
-        RunService = RunService,
-        TweenService = TweenService,
-        MarketplaceService = MarketplaceService,
-        HttpService = HttpService,
-        TeleportService = TeleportService,
-        RbxAnalyticsService = RbxAnalyticsService,
-        UserInputService = UserInputService,
-        StarterGuiService = StarterGuiService,
-        RequestService = RequestService,
-        LightingService = LightingService,
-    })
+    Class.Players = Players
+    Class.LocalPlayer = LocalPlayer
+    Class.RunService = RunService
+    Class.TweenService = TweenService
+    Class.MarketplaceService = MarketplaceService
+    Class.HttpService = HttpService
+    Class.TeleportService = TeleportService
+    Class.RbxAnalyticsService = RbxAnalyticsService
+    Class.UserInputService = UserInputService
+    Class.StarterGuiService = StarterGuiService
+    Class.RequestService = RequestService
+    Class.LightingService = LightingService
 
-    -- // Caches
-    set({
-        AssetCache = {},
-        HighlightCache = {},
-        RecencyStores = {},
-        HistoryParts = Class.HistoryParts or {},
-        Origins = Class.Origins or {},
-        Timers = Class._Timers or {},
-        Stuffs = Class.Stuffs or {},
-    })
-
-    -- // States
-    set({
-        XRayActive = Class.XRayActive or false,
-        FlingActive = Class.FlingActive or false,
-        Clip = Class.Clip == nil and true or Class.Clip,
-    })
+    Class:Flags()
 
     return setmetatable(Class, API)
 end
