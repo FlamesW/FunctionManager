@@ -1817,6 +1817,42 @@ function API:Verify(Options)
     return false, nil, nil
 end
 
+-- // Developer Tool Scripts
+function API:Infinite_Yield()
+    return self:LoadFile("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
+end
+
+function API:Hydroxide()
+    local Repository = "https://raw.githubusercontent.com/Upbolt/Hydroxide/revision/"
+
+    local function Import(File)
+        return self:LoadFile(Repository .. File)
+    end
+
+    Import("init")
+    Import("ui/main")
+end
+
+function API:Cobalt_Spy()
+    return self:Gitport("notpoiu", "cobalt", "latest", "Cobalt.luau")
+end
+
+function API:Katemine_Spy()
+    return self:LoadFile("https://raw.githubusercontent.com/InfernusScripts/Ketamine/main/Ketamine.lua")
+end
+
+function API:Simple_Spy()
+    return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua")
+end
+
+function API:Dex_Explorer()
+    return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua")
+end
+
+function API:Audio_Logger()
+    return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
+end
+
 -- // >Loop Manager, Build: @1.24 by Mommy Flames
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     Wait = WaitBoy or 0
