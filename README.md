@@ -6,3 +6,5 @@ local CallThisWhatever = Class.Launch({});
 
 CallThisWhatever:Rejoin(); -- // Rejoins
 ```
+
+* More docs soon~
