@@ -2162,8 +2162,10 @@ function API.Launch(Class)
     Class.StarterGuiService = StarterGuiService
     Class.RequestService = RequestService
     Class.LightingService = LightingService
-
+    
+print('test')
     API.Flags(Class)
+
     return setmetatable(Class, API)
 end
 
