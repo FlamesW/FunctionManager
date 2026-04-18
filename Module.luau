@@ -1988,7 +1988,7 @@ function API:ForceStart(Name)
     end
 end
 
-function API:Get(Name)
+function API:GetState(Name)
     local Floop = self.ActiveConnections and self.ActiveConnections[Name]
     if Floop then
         if Floop.Running == false then return false end
@@ -2129,7 +2129,7 @@ function API:Help()
     warn("=======================")
 end
 
-function API:Merge(Module)
+function API:Merge(Module) -- // Merges with one another module 😉
     for MethodName, MethodFunc in pairs(Module) do
         if typeof(MethodFunc) == "function" then
             self[MethodName] = function(_, ...)
