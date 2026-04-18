@@ -20,12 +20,12 @@ local UserInputService: UsedInputService = cloneref(game:GetService("UserInputSe
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 
--- // Functions
 function API:Flags()
     self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}
     self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
 end
 
+-- // Functions
 function API:CreateInstance(ClassName, Properties)
     local InstanceObj = Instance.new(ClassName)
 
@@ -2098,18 +2098,17 @@ function API:Unload()
         end
         self.FlightData = nil
     end
+    if self.XRayActive then self:XRay(false) end
 
     self:StopClip()
     self:StopFling()
-    
-    if self.XRayActive then
-        self:XRay(false)
-    end
-
     self:ClearHighlights()
-
     self:Flags()
-    warn("[Loop Manager]: Unloaded")
+
+    for Instance in pairs(API) do
+        API[Instance] = nil -- // 💀
+    end
+    setmetatable(API, nil)
 end
 
 function API:Help()
@@ -2162,10 +2161,8 @@ function API.Launch(Class)
     Class.StarterGuiService = StarterGuiService
     Class.RequestService = RequestService
     Class.LightingService = LightingService
-    
-print('test')
-    API.Flags(Class)
 
+    API.Flags(Class)
     return setmetatable(Class, API)
 end
 
