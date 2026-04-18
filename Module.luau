@@ -26,6 +26,17 @@ function API:Flags()
 end
 
 -- // Functions
+function API:SafeCall(Func, ...)
+    if not (Func and typeof(Func) == "function") then return end
+
+    local Success, err = xpcall(Func, debug.traceback, ...)
+    if not Success then
+        task.defer(error, err)
+        print("[Loop Manager] Error in callback:", err)
+    end
+    return Success
+end
+
 function API:CreateInstance(ClassName, Properties)
     local InstanceObj = Instance.new(ClassName)
 
@@ -1806,17 +1817,7 @@ function API:Verify(Options)
     return false, nil, nil
 end
 
-function API:SafeCall(Func, ...)
-    if not (Func and typeof(Func) == "function") then return end
-
-    local Success, err = xpcall(Func, debug.traceback, ...)
-    if not Success then
-        task.defer(error, err)
-        print("[Loop Manager] Error in callback:", err)
-    end
-    return Success
-end
-
+-- // >Loop Manager, Build: @1.24 by Mommy Flames
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     Wait = WaitBoy or 0
     Name = Name or self:RandomString(8)
