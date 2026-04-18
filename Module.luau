@@ -1822,17 +1822,6 @@ function API:Infinite_Yield()
     return self:LoadFile("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
 end
 
-function API:Hydroxide()
-    local Repository = "https://raw.githubusercontent.com/Upbolt/Hydroxide/revision/"
-
-    local function Import(File)
-        return self:LoadFile(Repository .. File)
-    end
-
-    Import("init")
-    Import("ui/main")
-end
-
 function API:Cobalt_Spy()
     return self:Gitport("notpoiu", "cobalt", "latest", "Cobalt.luau")
 end
