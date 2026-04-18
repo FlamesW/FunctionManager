@@ -2163,8 +2163,7 @@ function API.Launch(Class)
     Class.RequestService = RequestService
     Class.LightingService = LightingService
 
-    Class:Flags()
-
+    API.Flags(Class)
     return setmetatable(Class, API)
 end
 
