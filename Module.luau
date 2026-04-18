@@ -1830,7 +1830,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
 
         while task.wait(Wait) do
             if self.Unloaded then break end
-            self:SafeCall(Callback)
+            self:SafeCall(Callback, self)
         end
     end
 
@@ -1851,7 +1851,7 @@ function API:RenderStep(Callback, Name)
     
     local func = function(dt)
         if self.Unloaded then return end
-        self:SafeCall(Callback, dt)
+        self:SafeCall(Callback, self, dt)
     end
 
     local conn = RunService.RenderStepped:Connect(func)
@@ -1872,7 +1872,7 @@ function API:BindRender(Callback, Name, Priority)
 
     local func = function(dt)
         if self.Unloaded then return end
-        self:SafeCall(Callback, dt)
+        self:SafeCall(Callback, self, dt)
     end
 
     RunService:BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, func)
@@ -1891,7 +1891,7 @@ function API:Stepped(Callback, Name)
     Name = Name or self:RandomString(8)
 
     local func = function(time, dt) 
-        self:SafeCall(Callback, time, dt) 
+        self:SafeCall(Callback, self, time, dt) 
     end
 
     local conn = RunService.Stepped:Connect(func)
@@ -1910,7 +1910,7 @@ function API:Heartbeat(Callback, Name)
     Name = Name or self:RandomString(8)
     
     local func = function(dt) 
-        self:SafeCall(Callback, dt) 
+        self:SafeCall(Callback, self, dt) 
     end
 
     local conn = RunService.Heartbeat:Connect(func)
@@ -2021,7 +2021,7 @@ function API:AddTask(Signal, Callback, Name)
     local function wrapper()
         Data.Connection = Signal:Connect(function(...)
             if Data.Running and not self.Unloaded then
-                self:SafeCall(Callback, ...)
+                self:SafeCall(Callback, self, ...)
             end
         end)
     end
