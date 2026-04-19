@@ -2229,6 +2229,7 @@ function API.Launch(Class)
     -- // Services
     Class.Players = Players
     Class.LocalPlayer = LocalPlayer
+    Class.Character = Character
     Class.RunService = RunService
     Class.TweenService = TweenService
     Class.MarketplaceService = MarketplaceService
