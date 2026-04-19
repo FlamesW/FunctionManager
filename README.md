@@ -38,6 +38,8 @@ task.wait(2)
 Utility:Rejoin() -- // Rejoins and ignores overwroted functions, FunctionModule always wins.
 ```
 
+-------------------------------------------------------------------------------------------------------------------------------------
+
 * Flag:
 
 ```lua
