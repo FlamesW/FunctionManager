@@ -38,4 +38,12 @@ task.wait(2)
 Utility:Rejoin() -- // Rejoins and ignores overwroted functions, FunctionModule always wins.
 ```
 
+* Flag:
+
+```lua
+if FunctionManager_Engine then --> Checks if function manager is loaded
+   print("Function Manager");
+end
+```
+
 * More docs soon~
