@@ -7,17 +7,21 @@ local API = {}
 API.__index = API
 
 -- // Variables
-local Project = {Name = "Function Manager", Build = "@1.19", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local game = game
+local Project = {Name = "Function Manager", Build = "@1.20", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer
-local RunService = game:GetService("RunService");
-local TweenService = cloneref(game:GetService("TweenService"));
+local RunService: RunService = game:GetService("RunService");
+local TweenService: TweenService = cloneref(game:GetService("TweenService"));
 local MarketplaceService: MarketplaceService = game:GetService("MarketplaceService");
 local HttpService: HttpService = cloneref(game:GetService("HttpService"));
 local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
 local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
+local VirtualInputManager: VirtualInputManager = cloneref(game:GetService("VirtualInputManager"));
 local RequestService = http and http.request or request or http_request or syn and syn.request;
+local GetConnections: GetConnections = getconnections or get_signal_cons;
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
+local VirtualUser: VirtualUser = cloneref(game:GetService("VirtualUser"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 getgenv().FunctionManager_Engine = true -- // Watermark
@@ -779,6 +783,40 @@ function API:RunPriorities()
         return Task.name
     end
     return nil
+end
+
+function API:Press(Key)
+    VirtualInputManager:SendKeyEvent(true, Key, false, game)
+end
+
+function API:Unpress(Key)
+    VirtualInputManager:SendKeyEvent(false, Key, false, game)
+end
+
+function API:Click()
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+end
+
+function API:AntiAFK()
+    if getgenv().AFK_Service then return end
+
+    if GetConnections then
+        for _, Con in pairs(GetConnections(LocalPlayer.Idled)) do
+            if Con.Disable then Con:Disable();
+            elseif Con.Disconnect then
+                Con:Disconnect();
+            end
+        end
+    else
+        LocalPlayer.Idled:Connect(function()
+            VirtualUser:CaptureController();
+            VirtualUser:ClickButton2(Vector2.new());
+        end)
+    end
+
+    getgenv().AFK_Service = true
 end
 
 function API:SetFOV(Num)
@@ -2201,10 +2239,13 @@ function API.Launch(Class)
     Class.HttpService = HttpService
     Class.TeleportService = TeleportService
     Class.RbxAnalyticsService = RbxAnalyticsService
+    Class.VirtualInputManager = VirtualInputManager
     Class.UserInputService = UserInputService
     Class.StarterGuiService = StarterGuiService
     Class.RequestService = RequestService
+    Class.GetConnections = GetConnections
     Class.LightingService = LightingService
+    Class.VirtualUser = VirtualUser
 
     API.Flags(Class)
     return setmetatable(Class, API)
