@@ -8,7 +8,8 @@ API.__index = API
 
 -- // Variables
 local game = game
-local Project = {Name = "Function Manager", Build = "@1.21", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local workspace = workspace
+local Project = {Name = "Function Manager", Build = "@1.22", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
