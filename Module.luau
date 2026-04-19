@@ -2156,12 +2156,16 @@ function API:Help()
 end
 
 function API:Merge(...) -- // Merges with one another module 😉
-    for _, Module in ipairs({...}) do
-        for MethodName, MethodFunc in pairs(Module) do
-            if typeof(MethodFunc) == "function" then
-                if rawget(self, MethodName) == nil then
-                    self[MethodName] = function(_, ...)
-                        return MethodFunc(self, ...)
+    for _, Modules in ipairs({...}) do
+        for Method, Func in pairs(Modules) do
+            if typeof(Func) == "function" then
+                if self.Core and self.Core[Method] then
+                    continue;
+                end
+
+                if self[Method] == nil then
+                    self[Method] = function(_, ...)
+                        return Func(self, ...)
                     end
                 end
             end
@@ -2171,9 +2175,13 @@ function API:Merge(...) -- // Merges with one another module 😉
 end
 
 function API.Launch(Class)
-    for key, value in pairs(API) do
-        if type(value) ~= "function" and key ~= "__index" then
-            Class[key] = value
+    Class.Core = {}
+
+    for Instance, Value in pairs(API) do
+        if Instance ~= "__index" then Class[Instance] = value
+            if type(Value) == "function" then
+                Class.Core[Value] = true
+            end
         end
     end
 
