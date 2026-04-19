@@ -1635,36 +1635,12 @@ function API:Verify(Options)
     Options = Options or {}
     
     local LPlayer = self:GetPlayer()
-    local OnFail = Options.OnFail or "Kick"
-    local OnSuccess = Options.OnSuccess
-    local FailCallback = Options.FailCallback
-    local Success = Options.SuccessCallback
-    local AllowedUsers, AllowedHWIDs = {}, {}
+    local AllowedList = {}
     
-    local Auth = nil
-    local Methods = Options.Method or {"Roblox"}
-    if type(Methods) ~= "table" then
-        Methods = {Methods}
-    end
-    
-    for _, method in ipairs(Methods) do
-        if method == "Executor" or method == "Roblox" then
-            local hwid = self:GetHWID(method)
-            if hwid then
-                Auth = hwid
-                break
-            end
-        elseif method == "IP" then
-            self:Kick("[Auth]: IP method is not allowed.")
-            return false, nil, nil
-        else
-            self:Kick("[Auth]: Invalid method '" .. tostring(method))
-            return false, nil, nil
-        end
-    end
-    
-    if not Auth then
-        self:Kick("[Auth]: Failed to get Hwid from any method! Tried: " .. table.concat(Methods, ", "))
+    local RobloxId = self:GetHWID("Roblox")
+    local ExecutorHwid = self:GetHWID("Executor")
+
+    if not RobloxId and not ExecutorHwid then
         return false, nil, nil
     end
 
@@ -1729,16 +1705,7 @@ function API:Verify(Options)
                 match = match:gsub("[{}%[%]()]", "")
                 
                 if match ~= "" then
-                    if match:match("%-") or #match > 20 or match:match("^[Hh][Ww][Ii][Dd]:") then
-                        local hwid = match:gsub("^[Hh][Ww][Ii][Dd]:", "")
-                        table.insert(AllowedHWIDs, hwid)
-                    else
-                        if tonumber(match) then
-                            table.insert(AllowedUsers, tonumber(match))
-                        else
-                            table.insert(AllowedUsers, match)
-                        end
-                    end
+                    table.insert(AllowedList, match)
                 end
             end
         else
@@ -1746,78 +1713,65 @@ function API:Verify(Options)
         end
     end
     
-    for _, user in ipairs(Options.AllowedUsers or {}) do
-        table.insert(AllowedUsers, user)
-    end
-    for _, hwid in ipairs(Options.AllowedHwids or {}) do
-        table.insert(AllowedHWIDs, hwid)
+    for _, item in ipairs(Options.Hwids or {}) do
+        if item and item ~= "" then
+            table.insert(AllowedList, tostring(item))
+        end
     end
     
     local function unique(t)
         local seen = {}
         local result = {}
         for _, v in ipairs(t) do
-            if not seen[tostring(v)] then
-                seen[tostring(v)] = true
+            if not seen[v] then
+                seen[v] = true
                 table.insert(result, v)
             end
         end
         return result
     end
     
-    AllowedUsers = unique(AllowedUsers)
-    AllowedHWIDs = unique(AllowedHWIDs)
+    AllowedList = unique(AllowedList)
     
     local IsWhitelisted = false
     local Type, Value = nil, nil
     
-    for _, Hwid in ipairs(AllowedHWIDs) do
-        if Auth and tostring(Auth):lower() == tostring(Hwid):lower() then
-            IsWhitelisted = true
-            Type = "HWID"
-            Value = Hwid
-            break
+    if RobloxId then
+        for _, item in ipairs(AllowedList) do
+            if tostring(RobloxId):lower() == tostring(item):lower() then
+                IsWhitelisted = true
+                Type = "Roblox HWID"
+                Value = RobloxId
+                break
+            end
+        end
+    end
+    
+    if not IsWhitelisted and ExecutorHwid then
+        for _, item in ipairs(AllowedList) do
+            if tostring(ExecutorHwid):lower() == tostring(item):lower() then
+                IsWhitelisted = true
+                Type = "Executor HWID"
+                Value = ExecutorHwid
+                break
+            end
         end
     end
     
     if not IsWhitelisted then
-        for _, AllowedUser in ipairs(AllowedUsers) do
-            local AllowedStr = tostring(AllowedUser):lower()
-            if AllowedStr == tostring(LPlayer.UserId) or AllowedStr == LPlayer.Name:lower() then
+        for _, item in ipairs(AllowedList) do
+            local itemStr = tostring(item):lower()
+            if itemStr == tostring(LPlayer.UserId) or itemStr == LPlayer.Name:lower() then
                 IsWhitelisted = true
                 Type = "User"
-                Value = AllowedUser
+                Value = item
                 break
             end
         end
     end
     
     if IsWhitelisted then
-        if Success or OnSuccess then
-            local Callback = Success or OnSuccess
-            if type(Callback) == "function" then
-                pcall(function()
-                    Callback(Type, Value, Auth)
-                end)
-            end
-        end
         return true, Type, Value
-    end
-
-    if OnFail == "Kick" then
-        self:Kick(Options.KickMessage or "[Auth]: Nothing is defined")
-    elseif OnFail == "Callback" then
-        if FailCallback and type(FailCallback) == "function" then
-            pcall(function()
-                FailCallback(Auth, LPlayer.Name, LPlayer.UserId)
-            end)
-        else
-            self:Kick("[Auth]: Nothing is defined")
-        end
-    elseif OnFail == "Return" then
-        return false, nil, nil
-    else
-        self:Kick("[Auth]: Nothing is defined")
     end
     
     return false, nil, nil
