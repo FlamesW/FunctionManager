@@ -2155,15 +2155,18 @@ function API:Help()
     warn("=======================")
 end
 
-function API:Merge(Module) -- // Merges with one another module 😉
-    for MethodName, MethodFunc in pairs(Module) do
-        if typeof(MethodFunc) == "function" then
-            self[MethodName] = function(_, ...)
-                return MethodFunc(self, ...)
+function API:Merge(...) -- // Merges with one another module 😉
+    for _, Module in ipairs({...}) do
+        for MethodName, MethodFunc in pairs(Module) do
+            if typeof(MethodFunc) == "function" then
+                if rawget(self, MethodName) == nil then
+                    self[MethodName] = function(_, ...)
+                        return MethodFunc(self, ...)
+                    end
+                end
             end
         end
     end
-
     return self
 end
 
