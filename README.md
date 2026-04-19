@@ -58,7 +58,26 @@ if Commit then
 end
 ```
 
+-------------------------------------------------------------------------------------------------------------------------------------
 
+* Verification:
+
+```lua
+local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local FunctionModule = Class.Launch({});
+
+local Success, Auth, Result = FunctionModule:Verify({
+    Url = "https://pastebin.com/raw/your_whitelist_id", --> Supports links in almost any format doesnt matter.
+    Hwids = {123456789, "Roblox_Username", 67, "Executor_Hwid", 0987654321, "Roblox_Hwid"}, --> Supports Both RobloxHwids, ExecutorHwids, User Ids, Roblox Usernames
+})
+
+if Success then
+    print("Verified! Type: " .. Auth .. ", Result: " .. tostring(Result))
+    -- ..Continue with your script
+else
+    warn("Verification failed...")
+end
+```
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
