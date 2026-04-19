@@ -1802,7 +1802,7 @@ function API:Audio_Logger()
     return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
 end
 
--- // >Loop Manager, Build: @1.24 | by Mommy Flames
+-- // >Loop Manager, Build: @1.25 | by Mommy Flames
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     Wait = WaitBoy or 0
     Name = Name or self:RandomString(8)
@@ -1910,6 +1910,56 @@ function API:Heartbeat(Callback, Name)
     return conn
 end
 
+function API:Bind(Key, Callback, BindName)
+    local Connection
+    Connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Key or input.UserInputType == Key then
+            Callback(input)
+        end
+    end)
+    
+    self.ActiveConnections = self.ActiveConnections or {}
+    local Name = BindName or self:RandomString(8)
+    
+    self.ActiveConnections[Name] = {
+        Type = "RBXScriptConnection",
+        Service = "InputBegan",
+        Connection = Connection,
+        Running = true,
+        Key = Key,
+        Func = Callback
+    }
+
+    return Connection, Name
+end
+
+function API:SetKeybind(Name, NewKey)
+    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
+    if not Entry then
+        return false
+    end
+    
+    if Entry.Type ~= "RBXScriptConnection" or Entry.Service ~= "InputBegan" then
+        return false
+    end
+    
+    local Running = Entry.Running
+
+    if Running then
+        self:ForceStop(Name)
+    end
+    
+    Entry.Key = NewKey
+    
+    if Running then
+        self:ForceStart(Name)
+    end
+    
+    return true
+end
+
 function API:ForceStop(Name)
     local Entry = self.ActiveConnections and self.ActiveConnections[Name]
     if not Entry then
@@ -1962,6 +2012,13 @@ function API:ForceStart(Name)
             conn = RunService.Heartbeat:Connect(Entry.Func)
         elseif Entry.Service == "Stepped" then
             conn = RunService.Stepped:Connect(Entry.Func)
+        elseif Entry.Service == "InputBegan" then
+            conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                if input.KeyCode == Entry.Key or input.UserInputType == Entry.Key then
+                    Entry.Func(input)
+                end
+            end)
         end
         Entry.Connection = conn
         Entry.Running = true
