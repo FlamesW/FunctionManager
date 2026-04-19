@@ -20,7 +20,6 @@ local RequestService = http and http.request or request or http_request or syn a
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
-function API:Version() return self.Project end;
 
 function API:Flags()
     self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}
@@ -290,6 +289,10 @@ function API:HowLong(Ago)
         local min = math.floor(Ago / 60)
         return min .. " minute" .. (min == 1 and "" or "s") .. " ago"
     end
+end
+
+function API:Version() 
+    return Project;
 end
 
 function API:LogCommit(Repo, Branch, Version) -- // Github Only
