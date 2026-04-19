@@ -14,10 +14,9 @@ CallThisWhatever:Rejoin(); -- // Rejoins
 
 ```lua
 local FunctionModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/home/Module.luau"))()
-local TestModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/AddonTest/refs/heads/home/Test.luau"))()
+local TestModule = loadstring(game:HttpGet("https://pastefy.app/gYqC5OUA/raw"))()
 
---[[ >>>>[Contents inside "TestModule"]
-
+--[[
 local Test = {}
 
 function Test:WhyAreYouHere()
