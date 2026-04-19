@@ -1,4 +1,4 @@
--- // >Function Manager, Build: @1.17 | by Mommy Flames~
+-- // FunctionManager.luau
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
@@ -7,6 +7,7 @@ local API = {}
 API.__index = API
 
 -- // Variables
+local Project = {Name = "Function Manager", Build = "@1.17", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer
 local RunService = game:GetService("RunService");
@@ -19,6 +20,7 @@ local RequestService = http and http.request or request or http_request or syn a
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
+function API:Version() return self.Project end;
 
 function API:Flags()
     self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}
