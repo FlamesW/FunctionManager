@@ -8,9 +8,10 @@ API.__index = API
 
 -- // Variables
 local game = game
-local Project = {Name = "Function Manager", Build = "@1.20", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.21", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
-local LocalPlayer: Player = Players.LocalPlayer
+local LocalPlayer: Player = Players.LocalPlayer;
+local Character: Model = LocalPlayer.Character
 local RunService: RunService = game:GetService("RunService");
 local TweenService: TweenService = cloneref(game:GetService("TweenService"));
 local MarketplaceService: MarketplaceService = game:GetService("MarketplaceService");
@@ -24,6 +25,8 @@ local UserInputService: UsedInputService = cloneref(game:GetService("UserInputSe
 local VirtualUser: VirtualUser = cloneref(game:GetService("VirtualUser"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
+--local Mouse: Mouse = LocalPlayer:GetMouse()
+
 getgenv().FunctionManager_Engine = true -- // Watermark
 
 function API:Flags()
@@ -464,30 +467,22 @@ function API:GetPlayer()
 end
 
 function API:GetCharacter()
-    local Plr = self:GetPlayer()
-    return Plr.Character or Plr.CharacterAdded:Wait()
+    return Character or LocalPlayer.CharacterAdded:Wait()
 end
 
 function API:GetRoot()
     local Char = self:GetCharacter()
-    return Char:WaitForChild("HumanoidRootPart", 5)
+    return Char and Char:WaitForChild("HumanoidRootPart", 5)
 end
 
 function API:GetHumanoid()
     local Char = self:GetCharacter()
-    return Char:FindFirstChildOfClass("Humanoid")
+    return Char and Char:FindFirstChildOfClass("Humanoid")
 end
 
 function API:GetHead()
-    local Char = self:GetCharacter()
-    if not Char then return nil end
-    
-    local Head = Char:FindFirstChild("Head")
-    if not Head then
-        Head = Char:WaitForChild("Head", 5)
-    end
-    
-    return Head
+    local Char = Character or LocalPlayer.CharacterAdded:Wait()
+    return Char and (Char:FindFirstChild("Head") or Char:WaitForChild("Head", 5))
 end
 
 function API:ForceReset()
