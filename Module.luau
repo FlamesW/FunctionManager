@@ -1,4 +1,4 @@
--- // Made by Mommy Flames
+-- // >Function Manager, Build: @1.17 | by Mommy Flames~
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
@@ -1842,7 +1842,7 @@ function API:Audio_Logger()
     return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
 end
 
--- // >Loop Manager, Build: @1.24 by Mommy Flames
+-- // >Loop Manager, Build: @1.24 | by Mommy Flames
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     Wait = WaitBoy or 0
     Name = Name or self:RandomString(8)
