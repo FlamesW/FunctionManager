@@ -78,7 +78,7 @@ else
     warn("Verification failed...")
 end
 
---[[
+--[[ Recommended format for Urls:
 {
   "Premium_User1": {
     "auth": ["Roblox_Hwid", "Executor_Hwid, "6767676767"],
