@@ -37,6 +37,28 @@ Utility:WhyAreYouHere() --> Func
 task.wait(2)
 Utility:Rejoin() -- // Rejoins and ignores overwroted functions, FunctionModule always wins.
 ```
+-------------------------------------------------------------------------------------------------------------------------------------
+
+* Log Github Commits (No api or ratelimit)
+
+```lua
+local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local FunctionModule = Class.Launch({});
+
+local Commit = FunctionModule:LogCommit("https://github.com/FlamesW/FunctionManager",
+    "home", --> Branch
+    1 --> Version (1 = latest commit)
+);
+
+if Commit then
+    print("Author:", Commit.Author)
+    print("Message:", Commit.Message)
+    print("Sha:", Commit.Sha)
+    print("Time Ago:", Commit.TimeAgo)
+end
+```
+
+
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
