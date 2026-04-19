@@ -20,6 +20,7 @@ local RequestService = http and http.request or request or http_request or syn a
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
+getgenv().FunctionManager_Engine = true; -- // Watermark
 
 function API:Flags()
     self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}
@@ -2105,8 +2106,9 @@ function API:OverrideFunction(Name, Function)
 end
 
 function API:Unload()
+    getgenv().FunctionManager_Engine = nil
     self.Unloaded = true
-    
+
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveTasks = self.ActiveTasks or {}
 
