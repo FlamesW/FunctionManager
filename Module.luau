@@ -1142,18 +1142,7 @@ function API:IsKeyPressed(Key)
     return UserInputService:IsKeyDown(Key)
 end
 
-function API:Bind(Key, Callback)
-    local Connection
-    Connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        
-        if input.KeyCode == Key or input.UserInputType == Key then
-            Callback(input)
-        end
-    end)
-    
-    return Connection
-end
+
 
 function API:Raycast(Origin, Direction, Distance, IgnoreList)
     local OriginPos = self:ResolvePosition(Origin)
@@ -1910,7 +1899,7 @@ function API:Heartbeat(Callback, Name)
     return conn
 end
 
-function API:Bind(Key, Callback, BindName)
+function API:BindKeybind(Key, Callback, BindName)
     local Connection
     Connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
