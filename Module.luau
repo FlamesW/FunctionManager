@@ -2818,7 +2818,12 @@ end
 
 getgenv().FunctionManager_Engine = true --> @Watermark
 
+local Functions = 0
+for _, v in pairs(API) do
+    if type(v) == "function" then Functions = Functions + 1 end
+end
+
 local EndTime = os.clock()
-warn(string.format("[Functions.luau]: Loaded in %.3fms, Build: %s | By: %s", (EndTime - LoadTime) * 1000, Project.Build, Project.Author))
+warn(string.format("[Functions.luau] Loaded in %.3f ms, Build: %s, Functions: %d | By: %s", (EndTime - LoadTime) * 1000, Project.Build, Functions, Project.Author))
 
 return API
