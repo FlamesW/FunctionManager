@@ -9,7 +9,7 @@ API.__index = API
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.26", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.27", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -24,6 +24,7 @@ local RequestService = http and http.request or request or http_request or syn a
 local GetConnections: GetConnections = getconnections or get_signal_cons;
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
+local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 
 getgenv().FunctionManager_Engine = true -- // Watermark
@@ -818,8 +819,32 @@ function API:SetFOV(Num)
     workspace.CurrentCamera.FieldOfView = Num
 end
 
+function API:SetCameraType(Type)
+    workspace.CurrentCamera.CameraType = Type
+end
+
 function API:SetGravity(Amount)
     workspace.Gravity = Amount
+end
+
+function API:SetCameraOcclusion(Mode)
+    local Plr = self:GetPlayer()
+    if Plr then
+        if Mode == "Invisicam" then
+            Plr.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
+        elseif Mode == "Zoom" then
+            Plr.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
+        else
+            Plr.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Off
+        end
+    end
+end
+
+function API:PurchasePrompts(State)
+    local Prompt = CoreGui:FindFirstChild("PurchasePromptApp")
+    if Prompt then
+        Prompt.Enabled = State
+    end
 end
 
 function API:SetSpeed(Amount)
@@ -1167,12 +1192,70 @@ function API:StopClip()
     self.Origins = {}
 end
 
+function API:IsStudio()
+    return RunService:IsStudio()
+end
+
+function API:GetScreenSize()
+    return workspace.CurrentCamera.ViewportSize
+end
+
 function API:GetMousePosition()
     return UserInputService:GetMouseLocation()
 end
 
+function API:SetMouseIcon(Icon)
+    local Plr = self:GetPlayer()
+    Plr.MouseIcon = Icon
+end
+
+function API:MouseVisibillity(State)
+    UserInputService.MouseIconEnabled = not State
+end
+
 function API:IsKeyPressed(Key)
     return UserInputService:IsKeyDown(Key)
+end
+
+function API:IsShiftLocked()
+    return UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
+end
+
+function API:GetFriends()
+    local LocalPlayer = self:GetPlayer()
+    if not LocalPlayer then return {} end
+
+    local UserId = LocalPlayer.UserId
+    local Success, Response = pcall(function()
+        return HttpService:HttpGet("https://friends.roblox.com/v1/users/" .. UserId .. "/friends")
+    end)
+    
+    if not Success then return {} end
+    
+    local Data = HttpService:JSONDecode(Response)
+    if not Data or not Data.data then return {} end
+    
+    local Friends = {}
+    
+    for _, Friend in pairs(Data.data) do
+        local Success, Response = pcall(function()
+            return HttpService:HttpGet("https://users.roblox.com/v1/users/" .. Friend.id)
+        end)
+        
+        if Success then
+            local UserData = HttpService:JSONDecode(Response)
+            if UserData and UserData.name then
+                table.insert(Friends, {
+                    UserId = Friend.id,
+                    Name = UserData.name,
+                    DisplayName = userData.displayName or userData.name
+                })
+            end
+        end
+        task.wait(0.1);
+    end
+
+    return Friends
 end
 
 function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, IgnoreWater, Callback)
