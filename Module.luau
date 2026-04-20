@@ -3,7 +3,7 @@ local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
 
---> Safeguard against skids :Unload();
+--> Prevents Runtime Duplicates, Use :Unload();
 -- if FunctionManager_Engine then warn("Function Manager.luau is already running") return end
 
 local API = {}
