@@ -1431,7 +1431,7 @@ function API:Aimbot(Options)
     local function AimbotLoop()
         if not Settings.Enabled then return end
         
-        if not IsLocalAlive() then
+        if not IsAliveAndWell() then
             if CurrentTarget then
                 CurrentTarget = nil
                 if Settings.OnTargetLost then Settings.OnTargetLost() end
