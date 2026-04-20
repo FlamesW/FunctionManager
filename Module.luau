@@ -9,7 +9,7 @@ API.__index = API
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.23", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.24", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -19,14 +19,12 @@ local MarketplaceService: MarketplaceService = game:GetService("MarketplaceServi
 local HttpService: HttpService = cloneref(game:GetService("HttpService"));
 local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
 local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
-local VirtualInputManager: VirtualInputManager = cloneref(game:GetService("VirtualInputManager"));
+local VirtualInputManager: VirtualInputManager = Instance.new("VirtualInputManager");
 local RequestService = http and http.request or request or http_request or syn and syn.request;
 local GetConnections: GetConnections = getconnections or get_signal_cons;
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
-local VirtualUser: VirtualUser = cloneref(game:GetService("VirtualUser"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
---local Mouse: Mouse = LocalPlayer:GetMouse()
 
 getgenv().FunctionManager_Engine = true -- // Watermark
 
@@ -807,8 +805,9 @@ function API:AntiAFK()
         end
     else
         LocalPlayer.Idled:Connect(function()
-            VirtualUser:CaptureController();
-            VirtualUser:ClickButton2(Vector2.new());
+            self:Press(Enum.KeyCode.Thumbstick1)
+            task.wait(0.05)
+            self:Unpress(Enum.KeyCode.Thumbstick1)
         end)
     end
 
@@ -1961,7 +1960,14 @@ end
 
 function API:Rejoin()
     local Plr = self:GetPlayer()
-    TeleportService:Teleport(game.PlaceId, Plr)
+
+    if #Players:GetPlayers() <= 1 then
+        Plr:Kick("Rejoining...")
+        task.wait(1);
+        TeleportService:Teleport(game.PlaceId, Plr)
+    else
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+    end
 end
 
 function API:ServerHop(MinPlayers, MaxPing)
@@ -2611,7 +2617,6 @@ function API.Launch(Class)
     Class.RequestService = RequestService
     Class.GetConnections = GetConnections
     Class.LightingService = LightingService
-    Class.VirtualUser = VirtualUser
 
     API.Flags(Class)
     return setmetatable(Class, API)
