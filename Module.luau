@@ -4,7 +4,7 @@ local cloneref = (cloneref or clonereference or function(instance: any)
 end)
 
 --> Safeguard against skids :Unload();
-if FunctionManager_Engine then warn("Function Manager.luau is already running") return end
+-- if FunctionManager_Engine then warn("Function Manager.luau is already running") return end
 
 local API = {}
 API.__index = API
