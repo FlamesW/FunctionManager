@@ -3,13 +3,16 @@ local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
 
+--> Safeguard against skids :Unload();
+if FunctionManager_Engine then warn("Function Manager.luau is already running") return end
+
 local API = {}
 API.__index = API
 
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.27", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.28", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -26,8 +29,6 @@ local UserInputService: UsedInputService = cloneref(game:GetService("UserInputSe
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
-
-getgenv().FunctionManager_Engine = true -- // Watermark
 
 function API:Flags()
     self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}self.CreatedBaseplates = {}
@@ -2811,5 +2812,7 @@ function API.Launch(Class)
     API.Flags(Class)
     return setmetatable(Class, API)
 end
+
+getgenv().FunctionManager_Engine = true --> Watermark
 
 return API
