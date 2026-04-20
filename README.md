@@ -10,7 +10,7 @@ CallThisWhatever:Rejoin(); -- // Rejoins
 ```
 -------------------------------------------------------------------------------------------------------------------------------------
 
-* Merges:
+* Merge Functions:
 
 ```lua
 local FunctionModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/home/Module.luau"))()
@@ -60,7 +60,7 @@ end
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
-* Verification:
+* Auth Verification:
 
 ```lua
 local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
@@ -92,7 +92,7 @@ end
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
-* Aimbot (Simpilified)
+* Aimbot (Simple) *Subject to change
 
 ```lua
 local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
