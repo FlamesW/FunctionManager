@@ -9,7 +9,7 @@ API.__index = API
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.22", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.23", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -1176,19 +1176,31 @@ function API:IsKeyPressed(Key)
     return UserInputService:IsKeyDown(Key)
 end
 
+function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, IgnoreWater, Callback)
+    local Origins = self:ResolvePosition(Origin)
+    if not Origins then return nil end
 
+    local Dir = Direction
+    if type(Direction) ~= "Vector3" then
+        Dir = self:ResolvePosition(Direction)
+        if not Dir then return nil end
+    end
 
-function API:Raycast(Origin, Direction, Distance, IgnoreList)
-    local OriginPos = self:ResolvePosition(Origin)
-    local Dir = self:ResolvePosition(Direction) or Direction
+    local RaycastParams = RaycastParams
+    local EnumFilterType = Enum.RaycastFilterType
     
-    if not OriginPos then return nil end
-
     local Params = RaycastParams.new()
-    Params.FilterType = Enum.RaycastFilterType.Blacklist
+    Params.FilterType = FilterType or EnumFilterType.Blacklist
     Params.FilterDescendantsInstances = IgnoreList or {}
+    Params.IgnoreWater = IgnoreWater or false
+    
+    local Result = workspace:Raycast(Origins, Dir.Unit * (Distance or 1000), Params)
 
-    return workspace:Raycast(OriginPos, Dir.Unit * Distance, Params)
+    if Callback and Result then
+        Callback(Result)
+    end
+
+    return Result
 end
 
 function API:WorldToScreen(Position)
@@ -1196,27 +1208,39 @@ function API:WorldToScreen(Position)
     return {X = Vector.X, Y = Vector.Y, Z = Vector.Z, OnScreen = OnScreen}
 end
 
-function API:IsBehindWall()
-    local Head = self:GetHead()
-    if not Head then return false end
-
-    local Origin = Head.Position
-
-    for _, v in ipairs(self:GetPlayers(false)) do
-        if v.Character then
-            local Target  = v.Character:FindFirstChild("Head") or v.Character:FindFirstChild("HumanoidRootPart")
-            if Target then
-                local Direction = Target.Position - Origin
-                local Hit = workspace:FindPartOnRayWithIgnoreList(Ray.new(Origin, Direction), {self:GetCharacter(), v.Character})
-
-                if Hit == nil then
-                    return false
-                end
-            end
-        end
+function API:IsBehindWall(Target, Character)
+    local Selected = Target
+    if typeof(Target) == "Instance" and Target:IsA("Player") then
+        Selected = Target.Character
     end
 
-    return true
+    if not Selected then return true end
+
+    Character = Character or self:GetCharacter()
+    if not Character then return true end
+
+    local Head = self:GetHead()
+    local Parts = Selected:FindFirstChild("Head") or Selected:FindFirstChild("HumanoidRootPart")
+    
+    if not Head or not Parts then return true end
+
+    local Direction = (Parts.Position - Head.Position)
+    local Distance = Direction.Magnitude
+
+    local Result = self:Raycast(Head.Position, Direction, Distance, {Character, Selected})
+
+    if Result and Result.Instance then
+        local Hit = Result.Instance:FindFirstAncestorWhichIsA("Model")
+        if Hit and Hit ~= Selected then
+            return true
+        end
+    end
+    
+    return false
+end
+
+function API:IsVisible(Target, Character)
+    return not self:IsBehindWall(Target, Character)
 end
 
 function API:IsTeamMate(Target)
@@ -1243,6 +1267,351 @@ function API:LookAt(Target, Part)
     if P and T then
         P.CFrame = CFrame.lookAt(P.Position, T)
     end
+end
+
+-- // @Aimbot.luau
+function API:Aimbot(Options)
+    Options = Options or {}
+
+    local LocalPlayer = game.Players.LocalPlayer
+    
+    local Settings = {
+        Enabled = false,
+        FOVRadius = Options.FOVRadius or 200,
+        StickyRadius = Options.StickyRadius or 300,
+        RenderDistance = Options.RenderDistance or 1000,
+        Smoothness = Options.Smoothness or 0.3,
+        CheckTeam = Options.CheckTeam ~= false,
+        RequireVisible = Options.RequireVisible or true,
+        TargetPart = Options.TargetPart or "Head",
+        AimMethod = Options.AimMethod or "Camera",
+
+        Flags = {
+            PreferLowHealth = false,
+            PreferDistance = false,
+            StickyAim = false,
+        },
+        
+        OnTargetLocked = Options.OnTargetLocked,
+        OnTargetLost = Options.OnTargetLost,
+        OnWallDetected = Options.OnWallDetected,
+        OnAim = Options.OnAim,
+    }
+
+    local function GetLocalCharacter()
+        return LocalPlayer.Character
+    end
+    
+    local function IsAliveAndWell()
+        local char = GetLocalCharacter()
+        if not char then return false end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        return hum and hum.Health > 0
+    end
+    
+    Settings.ValidateTarget = Options.ValidateTarget or function(player, targetChar)
+        if not targetChar or not targetChar.Parent then return false end
+        local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then return false end
+        if Settings.CheckTeam then
+            local myTeam = LocalPlayer.Team
+            local theirTeam = player.Team
+            if myTeam and theirTeam and myTeam == theirTeam then return false end
+        end
+        return true
+    end
+
+    Settings.CheckVisibility = Options.CheckVisibility or function(targetChar)
+        if not Settings.RequireVisible then return true end
+        if not targetChar or not targetChar.Parent then return false end
+        return not self:IsBehindWall(targetChar)
+    end
+    
+    Settings.ScoreTarget = Options.ScoreTarget or function(target, targetChar, mousePos, camera)
+        local targetPart = targetChar:FindFirstChild(Settings.TargetPart) or targetChar:FindFirstChild("Head")
+        if not targetPart then return math.huge end
+        
+        local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+        if not onScreen then return math.huge end
+        
+        local dx = screenPos.X - mousePos.X
+        local dy = screenPos.Y - mousePos.Y
+        local distanceToMouse = dx * dx + dy * dy
+        local dist = self:GetDistance(targetChar)
+        
+        local score = distanceToMouse + (dist / 50)
+        
+        if Settings.Flags.PreferLowHealth then
+            local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                score = score + ((humanoid.Health / humanoid.MaxHealth) * 100)
+            end
+        end
+        
+        if Settings.Flags.PreferDistance then
+            score = score + (dist / 10)
+        end
+        
+        return score
+    end
+
+    Settings.FilterTarget = Options.FilterTarget or function(player, targetChar)
+        if not targetChar or not targetChar.Parent then return false end
+        if self:GetDistance(targetChar) > Settings.RenderDistance then return false end
+        if not Settings.CheckVisibility(targetChar) then return false end
+        return true
+    end
+    
+    Settings.GetAimPosition = Options.GetAimPosition or function(targetChar)
+        if not targetChar or not targetChar.Parent then return nil end
+        return targetChar:FindFirstChild(Settings.TargetPart) or targetChar:FindFirstChild("Head")
+    end
+
+    Settings.ExecuteAim = Options.ExecuteAim or function(targetPos, camera)
+        local method = Settings.AimMethod
+        
+        if method == "Camera" then
+            local currentCFrame = camera.CFrame
+            local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
+            camera.CFrame = currentCFrame:Lerp(targetCFrame, Settings.Smoothness)
+        elseif method == "CFrame" then
+            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+        elseif method == "Mouse" then
+            local screenPos, onScreen = camera:WorldToViewportPoint(targetPos)
+            if onScreen then
+                local mousemoverel = mousemoverel or (syn and syn.mousemoverel) or (input and input.mouse_move)
+                if mousemoverel then
+                    local currentPos = self:GetMousePosition()
+                    mousemoverel((screenPos.X - currentPos.X) * Settings.Smoothness, (screenPos.Y - currentPos.Y) * Settings.Smoothness)
+                end
+            end
+        elseif method == "Slient" then
+            -- // Coming Soon~
+        end
+    end
+
+    local CurrentTarget = nil
+    local AimbotConnection = nil
+    local CacheValidTargets = {}
+    
+    local function GetValidTargets()
+        table.clear(CacheValidTargets)
+        
+        if not IsAliveAndWell() then return CacheValidTargets end
+
+        local players = self:GetPlayers(false)
+
+        for i = 1, #players do
+            local player = players[i]
+            local targetChar = player.Character
+            if targetChar and targetChar.Parent then
+                if Settings.FilterTarget(player, targetChar) and Settings.ValidateTarget(player, targetChar) then
+                    table.insert(CacheValidTargets, player)
+                end
+            end
+        end
+        
+        return CacheValidTargets
+    end
+
+    local function GetCursorDistanceToTarget(targetChar, camera, mousePos)
+        if not targetChar or not targetChar.Parent then return nil end
+        
+        local aimPart = Settings.GetAimPosition(targetChar)
+        if not aimPart then return nil end
+        
+        local screenPos, onScreen = camera:WorldToViewportPoint(aimPart.Position)
+        if not onScreen then return nil end
+        
+        local dx = screenPos.X - mousePos.X
+        local dy = screenPos.Y - mousePos.Y
+        return math.sqrt(dx * dx + dy * dy)
+    end
+    
+    local function AimbotLoop()
+        if not Settings.Enabled then return end
+        
+        if not IsLocalAlive() then
+            if CurrentTarget then
+                CurrentTarget = nil
+                if Settings.OnTargetLost then Settings.OnTargetLost() end
+            end
+            return
+        end
+        
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        
+        local mousePos = self:GetMousePosition()
+        
+        if CurrentTarget and CurrentTarget.Character and CurrentTarget.Character.Parent then
+            local targetChar = CurrentTarget.Character
+            
+            if Settings.FilterTarget(CurrentTarget, targetChar) and Settings.ValidateTarget(CurrentTarget, targetChar) then
+                local cursorDist = GetCursorDistanceToTarget(targetChar, camera, mousePos)
+
+                if cursorDist then
+                    if Settings.Flags.StickyAim and cursorDist > Settings.StickyRadius then
+                        CurrentTarget = nil
+                        if Settings.OnTargetLost then Settings.OnTargetLost() end
+                    else
+                        local aimPart = Settings.GetAimPosition(targetChar)
+                        if aimPart then
+                            if Settings.OnAim then
+                                local result = Settings.OnAim(aimPart.Position, camera, CurrentTarget)
+                                Settings.ExecuteAim(result or aimPart.Position, camera)
+                            else
+                                Settings.ExecuteAim(aimPart.Position, camera)
+                            end
+                        end
+                        return
+                    end
+                else
+                    CurrentTarget = nil
+                    if Settings.OnTargetLost then Settings.OnTargetLost() end
+                end
+            else
+                CurrentTarget = nil
+                if Settings.OnTargetLost then Settings.OnTargetLost() end
+            end
+        end
+        
+        local validTargets = GetValidTargets()
+        if #validTargets > 0 then
+            local bestTarget = nil
+            local bestScore = math.huge
+            
+            for i = 1, #validTargets do
+                local target = validTargets[i]
+                local targetChar = target.Character
+                if targetChar then
+                    local score = Settings.ScoreTarget(target, targetChar, mousePos, camera)
+                    if score < bestScore then
+                        bestScore = score
+                        bestTarget = target
+                    end
+                end
+            end
+            
+            if bestTarget then
+                CurrentTarget = bestTarget
+                if Settings.OnTargetLocked then Settings.OnTargetLocked(CurrentTarget) end
+                
+                local aimPart = Settings.GetAimPosition(CurrentTarget.Character)
+                if aimPart then
+                    Settings.ExecuteAim(aimPart.Position, camera)
+                end
+            end
+        end
+    end
+    
+    local AimbotAPI = {
+        SetEnabled = function(enabled)
+            Settings.Enabled = enabled
+            if not enabled and CurrentTarget then
+                CurrentTarget = nil
+                if Settings.OnTargetLost then Settings.OnTargetLost() end
+            end
+            return AimbotAPI
+        end,
+        
+        IsEnabled = function() return Settings.Enabled end,
+        GetTarget = function() return CurrentTarget end,
+        
+        UpdateSettings = function(NewSettings)
+            for k, v in pairs(NewSettings) do
+                if Settings[k] ~= nil then
+                    Settings[k] = v
+                end
+            end
+            return AimbotAPI
+        end,
+        
+        OverrideFunction = function(Func, New)
+            if Settings[Func] ~= nil then
+                Settings[Func] = New
+            end
+            return AimbotAPI
+        end,
+        
+        SetFlag = function(Flag, value)
+            if Settings.Flags[Flag] ~= nil then
+                Settings.Flags[Flag] = value
+            end
+            return AimbotAPI
+        end,
+        
+        GetFlag = function(Flag)
+            return Settings.Flags[Flag]
+        end,
+        
+        SetStickyRadius = function(Radius)
+            Settings.StickyRadius = Radius
+            return AimbotAPI
+        end,
+        
+        ForceTarget = function(player)
+            if player and player.Character and player.Character.Parent then
+                CurrentTarget = player
+                if Settings.OnTargetLocked then Settings.OnTargetLocked(CurrentTarget) end
+            end
+            return AimbotAPI
+        end,
+        
+        ClearTarget = function()
+            CurrentTarget = nil
+            if Settings.OnTargetLost then Settings.OnTargetLost() end
+            return AimbotAPI
+        end,
+        
+        SetAimMethod = function(method)
+            local validMethods = {Camera = true, Mouse = true, CFrame = true, MouseAbs = true, Silent = true}
+            if validMethods[method] then
+                Settings.AimMethod = method
+            end
+            return AimbotAPI
+        end,
+        
+        SetRenderDistance = function(distance)
+            Settings.RenderDistance = distance
+            return AimbotAPI
+        end,
+        
+        SetSmoothness = function(smoothness)
+            Settings.Smoothness = smoothness
+            return AimbotAPI
+        end,
+        
+        SetFOV = function(fov)
+            Settings.FOVRadius = fov
+            return AimbotAPI
+        end,
+        
+        Start = function()
+            if AimbotConnection then return AimbotAPI end
+            Settings.Enabled = true
+            AimbotConnection = self:RenderStep(AimbotLoop, "Aimbot.Luau")
+            return AimbotAPI
+        end,
+        
+        Stop = function()
+            Settings.Enabled = false
+            if AimbotConnection then
+                self:ForceStop("Aimbot.Luau")
+                AimbotConnection = nil
+            end
+            CurrentTarget = nil
+            return AimbotAPI
+        end,
+        
+        GetSettings = function() return Settings end
+    }
+
+    if Options.AutoStart then
+        AimbotAPI:Start()
+    end
+    
+    return AimbotAPI
 end
 
 function API:CreateHighlight(Target, Options)
