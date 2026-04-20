@@ -1248,7 +1248,7 @@ function API:GetFriends()
                 table.insert(Friends, {
                     UserId = Friend.id,
                     Name = UserData.name,
-                    DisplayName = userData.displayName or userData.name
+                    DisplayName = UserData.displayName or UserData.name
                 })
             end
         end
