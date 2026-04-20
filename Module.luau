@@ -9,7 +9,7 @@ API.__index = API
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.24", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.25", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -29,7 +29,7 @@ local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 getgenv().FunctionManager_Engine = true -- // Watermark
 
 function API:Flags()
-    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}
+    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}self.CreatedBaseplates = {}
     self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
 end
 
@@ -2175,6 +2175,114 @@ function API:Verify(Options)
     return false, nil, nil
 end
 
+function API:CreateBaseplate(Options)
+    Options = Options or {}
+
+    local Size = Options.Size or Vector3.new(10, 1, 10)
+    local Color = Options.Color or Color3.fromRGB(170, 170, 170)
+    local Transparency = Options.Transparency or 0
+    local Material = Options.Material or Enum.Material.Plastic
+    local Offset = Options.Offset or Vector3.new(0, -3.7245, 0)
+    local Parent = Options.Parent or workspace
+    local CanCollide = Options.CanCollide ~= false
+    local Anchored = Options.Anchored ~= false
+
+    local Baseplate = self:CreateInstance("Part", {
+        Name = Options.Name or self:RandomString(8),
+        Size = Size,
+        Color = Color,
+        Transparency = Transparency,
+        Material = Material,
+        CanCollide = CanCollide,
+        Anchored = Anchored,
+        Parent = Parent
+    })
+    
+    local function UpdatePosition()
+        local HumanoidRoot = Character:WaitForChild("HumanoidRootPart")
+        Baseplate.CFrame = HumanoidRoot.CFrame + Offset
+    end
+    
+    UpdatePosition()
+    
+    local Connection = nil
+    
+    local API = {
+        Baseplate = Baseplate,
+        
+        SetSize = function(_, NewSize)
+            Baseplate.Size = NewSize
+            return API
+        end,
+        
+        SetColor = function(_, NewColor)
+            Baseplate.Color = NewColor
+            return API
+        end,
+        
+        SetTransparency = function(_, NewTrans)
+            Baseplate.Transparency = NewTrans
+            return API
+        end,
+        
+        SetFollow = function(_, Followed)
+            if Connection then
+                Connection:Disconnect()
+                Connection = nil
+            end
+            
+            if Followed then
+                Connection = self:RenderStep(UpdatePosition, self:RandomString(8))
+            end
+            return API
+        end,
+        
+        SetOffset = function(_, NewOffset)
+            Offset = NewOffset
+            UpdatePosition()
+            return API
+        end,
+
+        GetOffset = function(_)
+            return Offset
+        end,
+        
+        Destroy = function(_)
+            if Connection then
+                Connection:Disconnect()
+            end
+            Baseplate:Destroy()
+            return API
+        end
+    }
+
+    self.CreatedBaseplates = self.CreatedBaseplates or {}
+    table.insert(self.CreatedBaseplates, {
+        Baseplate = Baseplate,
+        Connection = Connection,
+        API = API
+    })
+    
+    return API
+end
+
+function API:ClearBaseplates()
+    self.CreatedBaseplates = self.CreatedBaseplates or {}
+
+    for _, Data in ipairs(self.CreatedBaseplates) do
+        pcall(function()
+            if Data.Baseplate then
+                Data.Baseplate:Destroy()
+            end
+            if Data.Connection then
+                Data.Connection:Disconnect()
+            end
+        end)
+    end
+
+    self.CreatedBaseplates = {}
+end
+
 -- // Developer Tool Scripts
 function API:Infinite_Yield()
     return self:LoadFile("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
@@ -2541,10 +2649,11 @@ function API:Unload()
         self.FlightData = nil
     end
     if self.XRayActive then self:XRay(false) end
-
+    
     self:StopClip()
     self:StopFling()
     self:ClearHighlights()
+    self:ClearBaseplates()
     self:Flags()
 
     for Instance in pairs(API) do
