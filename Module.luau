@@ -9,7 +9,7 @@ API.__index = API
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.25", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.26", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -1776,11 +1776,10 @@ function API:GetNPC(Model)
         local Original = self[Name]
 
         if typeof(Original) ~= "function" then
-            warn("Function does not exist:", Name)
             return false
         end
 
-        self["[Overide Function] - " .. Name] = Original
+        self[self:RandomString(8)] = Original
         self[Name] = Func
         return true
     end
@@ -2612,11 +2611,10 @@ end
 
 function API:OverrideFunction(Name, Function)
     if typeof(self[Name]) ~= "function" then
-        warn("Function does not exist:", Name)
         return false
     end
 
-    self["[0x0x0x0] - " .. Name] = self[Name]
+    self[self:RandomString(8)] = self[Name]
     self[Name] = Function
 
     return true
@@ -2629,11 +2627,11 @@ function API:Unload()
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveTasks = self.ActiveTasks or {}
 
-    for name, _ in pairs(self.ActiveConnections) do
-        self:ForceStop(name)
+    for Instance, _ in pairs(self.ActiveConnections) do
+        self:ForceStop(Instance)
     end
-    for name, _ in pairs(self.ActiveTasks) do
-        self:StopTask(name)
+    for Instance, _ in pairs(self.ActiveTasks) do
+        self:StopTask(Instance)
     end
 
     if self.FlightData then
@@ -2648,14 +2646,14 @@ function API:Unload()
         end
         self.FlightData = nil
     end
+
     if self.XRayActive then self:XRay(false) end
-    
     self:StopClip()
     self:StopFling()
     self:ClearHighlights()
     self:ClearBaseplates()
-    self:Flags()
 
+    self:Flags()
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
     end
