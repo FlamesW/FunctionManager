@@ -3,6 +3,9 @@
 * Simple Rejoin:
 
 ```lua
+-- >> @Prevents Runtime Duplicates
+if FunctionManager_Engine then warn("Function Manager.luau is already running") return end
+
 local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
 local CallThisWhatever = Class.Launch({});
 
