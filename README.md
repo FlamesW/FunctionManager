@@ -92,6 +92,34 @@ end
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
+* Aimbot (Simpilified)
+
+```lua
+local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local FunctionModule = Class.Launch({});
+
+local Aimbot = FunctionModule:Aimbot({
+    AimMethod = "Camera",
+    Smoothness = 0.3,
+    FOVRadius = 200,
+    StickyRadius = 300,
+    AutoStart = false,
+    Flags = {
+        StickyAim = true,
+    },
+})
+
+FunctionModule:BindKeybind(Enum.KeyCode.V, function() --> Keybind is "V"
+    if Aimbot:IsEnabled() then
+        Aimbot:Stop()
+        print("🔴 Aimbot OFF")
+    else
+        Aimbot:Start()
+        print("🟢 Aimbot ON")
+    end
+end, "AimbotToggle")
+```
+
 * Flag:
 
 ```lua
