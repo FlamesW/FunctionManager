@@ -126,7 +126,7 @@ end, "AimbotToggle")
 * Flag:
 
 ```lua
-if FunctionManager_Engine then --> Checks if function manager is loaded
+if FunctionManager_Engine then --> Checks if function manager is loaded or exists
    print("Function Manager");
 end
 ```
