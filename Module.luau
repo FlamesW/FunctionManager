@@ -9,10 +9,12 @@ end)
 local API = {}
 API.__index = API
 
+local LoadTime = os.clock()
+
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.28", Author = "Mommy Flames~", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.29", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -2742,6 +2744,7 @@ function API:Unload()
         API[Instance] = nil -- // 💀
     end
     setmetatable(API, nil)
+    warn("[Functions.luau]: Unloaded")
 end
 
 function API:Help()
@@ -2814,5 +2817,8 @@ function API.Launch(Class)
 end
 
 getgenv().FunctionManager_Engine = true --> @Watermark
+
+local EndTime = os.clock()
+warn(string.format("[Functions.luau]: Loaded in %.3fms, Build: %s | By: %s", (EndTime - LoadTime) * 1000, Project.Build, Project.Author))
 
 return API
