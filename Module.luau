@@ -14,7 +14,7 @@ local LoadTime = os.clock()
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.29", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.30", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -28,13 +28,14 @@ local VirtualInputManager: VirtualInputManager = Instance.new("VirtualInputManag
 local RequestService = http and http.request or request or http_request or syn and syn.request;
 local GetConnections: GetConnections = getconnections or get_signal_cons;
 local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
+local SoundService: SoundService = cloneref(game:GetService("SoundService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 
 function API:Flags()
     self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}self.CreatedBaseplates = {}
-    self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
+    self.SoundRegistry={}self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
 end
 
 -- // Functions
@@ -61,6 +62,59 @@ function API:CreateInstance(ClassName, Properties)
     end
 
     return InstanceObj
+end
+
+function API:Sound(Id, Options)
+    Options = Options or {}
+    self.SoundRegistry = self.SoundRegistry or {}
+
+    local SoundId = Id
+    if type(Id) == "number" or (type(Id) == "string" and Id:match("^%d+$")) then
+        SoundId = "rbxassetid://" .. tostring(Id)
+    end
+    
+    local SoundInstance = self.SoundRegistry[SoundId]
+    if not SoundInstance then
+        SoundInstance = self:CreateInstance("Sound", {
+            SoundId = SoundId,
+            Parent = SoundService
+        })
+        self.SoundRegistry[SoundId] = SoundInstance
+    end
+    
+    if SoundInstance.Playing then
+        SoundInstance:Stop()
+    end
+    
+    SoundInstance.TimePosition = 0
+    SoundInstance.Volume = Options.Volume or 1
+    SoundInstance.Looped = Options.Looped or false
+    SoundInstance:Play()
+    
+    return SoundInstance
+end
+
+function API:Preload(...)
+    self.SoundRegistry = self.SoundRegistry or {}
+
+    for _, Id in ipairs({...}) do
+        local SoundId = Id
+        if type(Id) == "number" or (type(Id) == "string" and Id:match("^%d+$")) then
+            SoundId = "rbxassetid://" .. tostring(Id)
+        end
+
+        if not self.SoundRegistry[SoundId] then
+            local SoundInstance = self:CreateInstance("Sound", {
+                SoundId = SoundId,
+                Volume = 0,
+                Parent = SoundService
+            })
+            SoundInstance:Play()
+            task.wait(0.05)
+            SoundInstance:Stop()
+            self.SoundRegistry[SoundId] = SoundInstance
+        end
+    end
 end
 
 function API:LoadCustomAsset(Asset, Url)
@@ -2807,10 +2861,12 @@ function API.Launch(Class)
     Class.RbxAnalyticsService = RbxAnalyticsService
     Class.VirtualInputManager = VirtualInputManager
     Class.UserInputService = UserInputService
+    Class.SoundService = SoundService
     Class.StarterGuiService = StarterGuiService
+    Class.LightingService = LightingService
     Class.RequestService = RequestService
     Class.GetConnections = GetConnections
-    Class.LightingService = LightingService
+    Class.CoreGui = CoreGui
 
     API.Flags(Class)
     return setmetatable(Class, API)
