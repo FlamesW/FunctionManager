@@ -123,6 +123,23 @@ FunctionModule:BindKeybind(Enum.KeyCode.V, function() --> Keybind is "V"
 end, "AimbotToggle")
 ```
 
+-------------------------------------------------------------------------------------------------------------------------------------
+
+* Sound Manager
+
+```lua
+local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local FunctionModule = Class.Launch({});
+
+FunctionModule:SoundsAssets({
+    ["Sans"] = 140692796870442,
+})
+
+FunctionModule:PlaySound("Sans", {OnEnded = function() print("Sound Ended.") end})
+```
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
 * Flag:
 
 ```lua
