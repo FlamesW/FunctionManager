@@ -14,7 +14,7 @@ local LoadTime = os.clock()
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.30", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.31", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -34,8 +34,8 @@ local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 
 function API:Flags()
-    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}self.CreatedBaseplates = {}
-    self.SoundRegistry={}self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
+    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}self.CreatedBaseplates={}
+    self.Sounds={}self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
 end
 
 -- // Functions
@@ -64,47 +64,113 @@ function API:CreateInstance(ClassName, Properties)
     return InstanceObj
 end
 
-function API:Sound(Id, Options)
+function API:PlaySound(Id, Options)
     Options = Options or {}
-    self.SoundRegistry = self.SoundRegistry or {}
+    self.Sounds = self.Sounds or {}
 
     local SoundId = Id
-    if type(Id) == "number" or (type(Id) == "string" and Id:match("^%d+$")) then
-        SoundId = "rbxassetid://" .. tostring(Id)
+    if self.Sounds.Assets and self.Sounds.Assets[Id] then
+        SoundId = self.Sounds.Assets[Id]
     end
     
-    local SoundInstance = self.SoundRegistry[SoundId]
-    if not SoundInstance then
-        SoundInstance = self:CreateInstance("Sound", {
+    if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+        SoundId = "rbxassetid://" .. tostring(SoundId)
+    end
+    
+    local SoundData = self.Sounds[SoundId]
+    if not SoundData then
+        local SoundInstance = self:CreateInstance("Sound", {
+            Name = self:RandomString(15),
             SoundId = SoundId,
             Parent = SoundService
         })
-        self.SoundRegistry[SoundId] = SoundInstance
+        SoundData = {Instance = SoundInstance}
+        self.Sounds[SoundId] = SoundData
     end
     
-    if SoundInstance.Playing then
-        SoundInstance:Stop()
+    if not Options.Stack then
+        if SoundData.Connection then
+            SoundData.Connection:Disconnect()
+            SoundData.Connection = nil
+        end
+        
+        if SoundData.Instance.Playing then
+            SoundData.Instance:Stop()
+        end
     end
-    
-    SoundInstance.TimePosition = 0
-    SoundInstance.Volume = Options.Volume or 1
-    SoundInstance.Looped = Options.Looped or false
-    SoundInstance:Play()
-    
-    return SoundInstance
+
+    SoundData.Instance.TimePosition = 0
+    SoundData.Instance.Volume = Options.Volume or 1
+    SoundData.Instance.Looped = Options.Looped or false
+    SoundData.Instance:Play()
+
+    if Options.OnEnded then
+        SoundData.Connection = SoundData.Instance.Ended:Connect(function()
+            Options.OnEnded(SoundData.Instance)
+            SoundData.Connection = nil
+        end)
+    end
+
+    return SoundData.Instance
 end
 
-function API:Preload(...)
-    self.SoundRegistry = self.SoundRegistry or {}
+function API:StopSound(...)
+    self.Sounds = self.Sounds or {}
 
     for _, Id in ipairs({...}) do
         local SoundId = Id
-        if type(Id) == "number" or (type(Id) == "string" and Id:match("^%d+$")) then
-            SoundId = "rbxassetid://" .. tostring(Id)
+        if self.Sounds.Assets and self.Sounds.Assets[Id] then
+            SoundId = self.Sounds.Assets[Id]
+        end
+        
+        if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+            SoundId = "rbxassetid://" .. tostring(SoundId)
+        end
+        
+        local SoundData = self.Sounds[SoundId]
+        if SoundData and SoundData.Instance then
+            SoundData.Instance:Stop()
+        end
+    end
+end
+
+function API:SetVolume(Id, Volume)
+    self.Sounds = self.Sounds or {}
+
+    local SoundId = Id
+    if self.Sounds.Assets and self.Sounds.Assets[Id] then
+        SoundId = self.Sounds.Assets[Id]
+    end
+
+    if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+        SoundId = "rbxassetid://" .. tostring(SoundId)
+    end
+
+    local SoundData = self.Sounds[SoundId]
+    if SoundData and SoundData.Instance then
+        SoundData.Instance.Volume = Volume
+        return true
+    end
+    
+    return false
+end
+
+function API:Preload(...)
+    self.Sounds = self.Sounds or {}
+
+    for _, Id in ipairs({...}) do
+        local SoundId = Id
+        if self.Sounds.Assets and self.Sounds.Assets[Id] then
+            SoundId = self.Sounds.Assets[Id]
+        end
+        
+        if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+            SoundId = "rbxassetid://" .. tostring(SoundId)
         end
 
-        if not self.SoundRegistry[SoundId] then
+        if not self.Sounds[SoundId] then
             local SoundInstance = self:CreateInstance("Sound", {
+                Name = self:RandomString(15),
                 SoundId = SoundId,
                 Volume = 0,
                 Parent = SoundService
@@ -112,9 +178,14 @@ function API:Preload(...)
             SoundInstance:Play()
             task.wait(0.05)
             SoundInstance:Stop()
-            self.SoundRegistry[SoundId] = SoundInstance
+            self.Sounds[SoundId] = {Instance = SoundInstance}
         end
     end
+end
+
+function API:SoundsAssets(Assets)
+    self.Sounds = self.Sounds or {}
+    self.Sounds.Assets = Assets
 end
 
 function API:LoadCustomAsset(Asset, Url)
@@ -1919,7 +1990,7 @@ function API:GetNPC(Model)
             return false
         end
 
-        self[self:RandomString(8)] = Original
+        self[self:RandomString(15)] = Original
         self[Name] = Func
         return true
     end
@@ -2327,7 +2398,7 @@ function API:CreateBaseplate(Options)
     local Anchored = Options.Anchored ~= false
 
     local Baseplate = self:CreateInstance("Part", {
-        Name = Options.Name or self:RandomString(8),
+        Name = Options.Name or self:RandomString(15),
         Size = Size,
         Color = Color,
         Transparency = Transparency,
@@ -2371,7 +2442,7 @@ function API:CreateBaseplate(Options)
             end
             
             if Followed then
-                Connection = self:RenderStep(UpdatePosition, self:RandomString(8))
+                Connection = self:RenderStep(UpdatePosition, self:RandomString(15))
             end
             return API
         end,
@@ -2450,7 +2521,7 @@ end
 -- // >Loop Manager, Build: @1.25 | by Mommy Flames
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     Wait = WaitBoy or 0
-    Name = Name or self:RandomString(8)
+    Name = Name or self:RandomString(15)
 
     local thread
     local func = function()
@@ -2477,7 +2548,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
 end
 
 function API:RenderStep(Callback, Name)
-    Name = Name or self:RandomString(8)
+    Name = Name or self:RandomString(15)
     
     local func = function(dt)
         if self.Unloaded then return end
@@ -2498,7 +2569,7 @@ function API:RenderStep(Callback, Name)
 end
 
 function API:BindRender(Callback, Name, Priority)
-    Name = Name or self:RandomString(8)
+    Name = Name or self:RandomString(15)
 
     local func = function(dt)
         if self.Unloaded then return end
@@ -2518,7 +2589,7 @@ function API:BindRender(Callback, Name, Priority)
 end
 
 function API:Stepped(Callback, Name)
-    Name = Name or self:RandomString(8)
+    Name = Name or self:RandomString(15)
 
     local func = function(time, dt) 
         self:SafeCall(Callback, self, time, dt) 
@@ -2537,7 +2608,7 @@ function API:Stepped(Callback, Name)
 end
 
 function API:Heartbeat(Callback, Name)
-    Name = Name or self:RandomString(8)
+    Name = Name or self:RandomString(15)
     
     local func = function(dt) 
         self:SafeCall(Callback, self, dt) 
@@ -2566,7 +2637,7 @@ function API:BindKeybind(Key, Callback, BindName)
     end)
     
     self.ActiveConnections = self.ActiveConnections or {}
-    local Name = BindName or self:RandomString(8)
+    local Name = BindName or self:RandomString(15)
     
     self.ActiveConnections[Name] = {
         Type = "RBXScriptConnection",
@@ -2754,7 +2825,7 @@ function API:OverrideFunction(Name, Function)
         return false
     end
 
-    self[self:RandomString(8)] = self[Name]
+    self[self:RandomString(15)] = self[Name]
     self[Name] = Function
 
     return true
