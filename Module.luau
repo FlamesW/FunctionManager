@@ -34,7 +34,7 @@ local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 
 function API:Flags()
-    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.Stuffs={}self.ActiveConnections={}self.CreatedBaseplates={}
+    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.self.Priorities={}self.ActiveConnections={}self.CreatedBaseplates={}
     self.Sounds={}self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
 end
 
@@ -891,31 +891,49 @@ function API:GetHeldTool()
 end
 
 function API:AddPriority(Name, Priority, Condition, Action)
-    table.insert(self.Stuffs, {
-        name = Name,
-        priority = Priority,
-        condition = Condition,
-        action = Action
+    table.insert(self.Priorities, {
+        Name = Name,
+        Priority = Priority,
+        Condition = Condition,
+        Action = Action,
+        Flags = {}
     })
     
-    table.sort(self.Stuffs, function(a, b)
-        return a.priority > b.priority
+    table.sort(self.Priorities, function(a, b)
+        return a.Priority > b.Priority
     end)
 end
 
-function API:GetPriority()
-    for _, task in ipairs(self.Stuffs) do
-        if task.condition() then
+function API:GetTasks()
+    for _, Task in ipairs(self.Priorities) do
+        if Task.Condition() then
             return task
         end
     end
     return nil
 end
 
-function API:RunPriorities()
+function API:Once(Name, Callback)
+    local Selected = self.TaskOnce
+    if not Selected then
+        Callback()
+        return
+    end
+    
+    if not Selected.Flags[Name] then
+        Selected.Flags[Name] = true
+        Callback()
+    end
+end
+
+function API:RunTasks()
     local Task = self:GetPriority()
     if Task then
-        Task.action()
+        self.TaskOnce = Task
+
+        Task.Action()
+
+        self.TaskOnce = nil
         return Task.name
     end
     return nil
@@ -2926,7 +2944,7 @@ function API.Launch(Class)
     Class.Core = {}
 
     for Instance, Value in pairs(API) do
-        if Instance ~= "__index" then Class[Instance] = value
+        if Instance ~= "__index" then Class[Instance] = Value
             if type(Value) == "function" then
                 Class.Core[Value] = true
             end
