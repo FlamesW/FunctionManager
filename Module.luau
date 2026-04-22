@@ -14,7 +14,7 @@ local LoadTime = os.clock()
 -- // Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.31", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.32", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character
@@ -552,6 +552,19 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
         
         return {FileName = FileName, Changed = Changed, New = not Exists, Content = Remote, StoredSize = #StoredContent}
     end)
+end
+
+function API:AbbreviateNumber(Number)
+    local Abbrev = { "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "De" }
+
+    for i = #Abbrev, 1, -1 do
+        local Value = 10 ^ (i * 3)
+        if Number >= Value then
+            return string.format("%.1f%s", Number / Value, Abbrev[i])
+        end
+    end
+
+    return tostring(Number)
 end
 
 function API:Chance(Percent)
