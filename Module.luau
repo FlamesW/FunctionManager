@@ -927,7 +927,7 @@ function API:Once(Name, Callback)
 end
 
 function API:RunTasks()
-    local Task = self:GetPriority()
+    local Task = self:GetTasks()
     if Task then
         self.TaskOnce = Task
 
