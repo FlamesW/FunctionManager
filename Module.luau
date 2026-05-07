@@ -1,63 +1,113 @@
--- // FunctionManager.luau
+-- // @FunctionManager.luau
+(getgenv().FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
+
 local cloneref = (cloneref or clonereference or function(instance: any)
-    return instance
+    return instance;
 end)
 
---> Prevents Runtime Duplicates, Use :Unload();
--- if FunctionManager_Engine then warn("Function Manager.luau is already running") return end
+-- // @Performance.vars
+local type, typeof, pcall, tick, warn, print, loadstring, setmetatable =
+    type, typeof, pcall, tick, warn, print, loadstring, setmetatable
 
+local math_floor, math_random, math_clamp, math_min, math_huge =
+    math.floor, math.random, math.clamp, math.min, math.huge
+
+local string_format, string_sub, string_match, string_gsub, string_gmatch =
+    string.format, string.sub, string.match, string.gsub, string.gmatch
+
+local table_insert, table_clear, table_sort, table_create, table_concat =
+    table.insert, table.clear, table.sort, table.create, table.concat
+
+local task_wait, task_spawn, task_cancel = task.wait, task.spawn, task.cancel
+local os_clock, os_time, os_date = os.clock, os.time, os.date
+local pairs, ipairs = pairs, ipairs
+
+local Vector3_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CFrame_lookAt, Instance_new =
+    Vector3.new, Vector3.zero, Color3.fromRGB, Color3.fromHSV, CFrame.lookAt, Instance.new
+
+-- // @API.module
 local API = {}
 API.__index = API
 
-local LoadTime = os.clock()
+local LoadTime = os_clock()
 
--- // Variables
+-- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.32", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.49", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
-local Character: Model = LocalPlayer.Character
+local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
+local Roots = Character:WaitForChild("HumanoidRootPart");
+local Humanoid = Character:WaitForChild("Humanoid");
 local RunService: RunService = game:GetService("RunService");
 local TweenService: TweenService = cloneref(game:GetService("TweenService"));
 local MarketplaceService: MarketplaceService = game:GetService("MarketplaceService");
 local HttpService: HttpService = cloneref(game:GetService("HttpService"));
 local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
 local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
-local VirtualInputManager: VirtualInputManager = Instance.new("VirtualInputManager");
-local RequestService = http and http.request or request or http_request or syn and syn.request;
+local VirtualInputManager: VirtualInputManager = Instance_new("VirtualInputManager");
+local RequestService = (http and http.request) or request or http_request or (syn and syn.request)
 local GetConnections: GetConnections = getconnections or get_signal_cons;
-local UserInputService: UsedInputService = cloneref(game:GetService("UserInputService"));
+local UserInputService: UserInputService = cloneref(game:GetService("UserInputService"));
 local SoundService: SoundService = cloneref(game:GetService("SoundService"));
 local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
 local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
+local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
+local AssetTypes = {
+    [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
+    [8] = "Hat", [9] = "Place", [10] = "Model", [11] = "Shirt", [12] = "Pants",
+    [13] = "Decal", [17] = "Head", [18] = "Face", [19] = "Gear", [21] = "Badge",
+    [24] = "Animation", [27] = "Torso", [28] = "RightArm", [29] = "LeftArm",
+    [30] = "LeftLeg", [31] = "RightLeg", [32] = "Package", [34] = "GamePass",
+    [38] = "Plugin", [41] = "MeshPart", [42] = "Video", [43] = "Tool"
+}
+
+getgenv().FunctionManager_Engine = LocalPlayer.CharacterAdded:Connect(function(Running)
+    Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart"), Running:WaitForChild("Humanoid");
+end)
+
+local Internal = function(packet)
+    if packet.PacketId == 0x1B then
+        local data = packet.AsBuffer
+        buffer.writeu32(data, 1, 0xFFFFFFFF)
+        packet:SetData(data)
+    end
+end
 
 function API:Flags()
-    self.AssetCache={}self.HighlightCache={}self.RecencyStores={}self.HistoryParts={}self.Origins={}self.Timers={}self.self.Priorities={}self.ActiveConnections={}self.CreatedBaseplates={}
-    self.Sounds={}self.ActiveTasks={}self.XRayActive=false;self.FlingActive=false;self.Clip=true;self.Unloaded=false;self.FlightData=nil;self.FlingLoop=nil;self.Noclipping=nil;self.EndPoint=nil
-end
+    local Tables = {
+        "AssetCache", "HighlightCache", "RecencyStores", "HistoryParts", 
+        "Origins", "Timers", "Priorities", "ActiveConnections", 
+        "CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses"
+    }
 
--- // Functions
-function API:SafeCall(Func, ...)
-    if not (Func and typeof(Func) == "function") then return end
-
-    local Success, err = xpcall(Func, debug.traceback, ...)
-    if not Success then
-        task.defer(error, err)
-        print("[Loop Manager] Error in callback:", err)
+    for _, Name in ipairs(Tables) do
+        self[Name] = {}
     end
-    return Success
+
+    self.XRayActive = false
+    self.FlingActive = false
+    self.Clip = true
+    self.Unloaded = false
+
+    self.FlightData = nil
+    self.FlingLoop = nil
+    self.Noclipping = nil
+    self.EndPoint = nil
+    self.TaskOnce = nil
+    self.Websocket = nil
+    self.LogConnection = nil
 end
 
+-- // @Functions.module
 function API:CreateInstance(ClassName, Properties)
-    local InstanceObj = Instance.new(ClassName)
+    local InstanceObj = Instance_new(ClassName)
 
     if Properties then
         for Property, Value in pairs(Properties) do
-            pcall(function()
-                InstanceObj[Property] = Value
-            end)
+            InstanceObj[Property] = Value
         end
     end
 
@@ -77,41 +127,41 @@ function API:PlaySound(Id, Options)
         SoundId = "rbxassetid://" .. tostring(SoundId)
     end
     
-    local SoundData = self.Sounds[SoundId]
-    if not SoundData then
+    local Data = self.Sounds[SoundId]
+    if not Data then
         local SoundInstance = self:CreateInstance("Sound", {
             Name = self:RandomString(15),
             SoundId = SoundId,
             Parent = SoundService
         })
-        SoundData = {Instance = SoundInstance}
-        self.Sounds[SoundId] = SoundData
+        Data = {Instance = SoundInstance}
+        self.Sounds[SoundId] = Data
     end
     
     if not Options.Stack then
-        if SoundData.Connection then
-            SoundData.Connection:Disconnect()
-            SoundData.Connection = nil
+        if Data.Connection then
+            Data.Connection:Disconnect()
+            Data.Connection = nil
         end
         
-        if SoundData.Instance.Playing then
-            SoundData.Instance:Stop()
+        if Data.Instance.Playing then
+            Data.Instance:Stop()
         end
     end
 
-    SoundData.Instance.TimePosition = 0
-    SoundData.Instance.Volume = Options.Volume or 1
-    SoundData.Instance.Looped = Options.Looped or false
-    SoundData.Instance:Play()
+    Data.Instance.TimePosition = 0
+    Data.Instance.Volume = Options.Volume or 1
+    Data.Instance.Looped = Options.Looped or false
+    Data.Instance:Play()
 
     if Options.OnEnded then
-        SoundData.Connection = SoundData.Instance.Ended:Connect(function()
-            Options.OnEnded(SoundData.Instance)
-            SoundData.Connection = nil
+        Data.Connection = Data.Instance.Ended:Connect(function()
+            Options.OnEnded(Data.Instance)
+            Data.Connection = nil
         end)
     end
 
-    return SoundData.Instance
+    return Data.Instance
 end
 
 function API:StopSound(...)
@@ -127,9 +177,9 @@ function API:StopSound(...)
             SoundId = "rbxassetid://" .. tostring(SoundId)
         end
         
-        local SoundData = self.Sounds[SoundId]
-        if SoundData and SoundData.Instance then
-            SoundData.Instance:Stop()
+        local Data = self.Sounds[SoundId]
+        if Data and Data.Instance then
+            Data.Instance:Stop()
         end
     end
 end
@@ -146,9 +196,9 @@ function API:SetVolume(Id, Volume)
         SoundId = "rbxassetid://" .. tostring(SoundId)
     end
 
-    local SoundData = self.Sounds[SoundId]
-    if SoundData and SoundData.Instance then
-        SoundData.Instance.Volume = Volume
+    local Data = self.Sounds[SoundId]
+    if Data and Data.Instance then
+        Data.Instance.Volume = Volume
         return true
     end
     
@@ -176,7 +226,7 @@ function API:Preload(...)
                 Parent = SoundService
             })
             SoundInstance:Play()
-            task.wait(0.05)
+            task_wait(0.05)
             SoundInstance:Stop()
             self.Sounds[SoundId] = {Instance = SoundInstance}
         end
@@ -186,6 +236,21 @@ end
 function API:SoundsAssets(Assets)
     self.Sounds = self.Sounds or {}
     self.Sounds.Assets = Assets
+end
+
+function API:ClearSounds()
+    if not self.Sounds then return end
+    
+    for _, Data in pairs(self.Sounds) do
+        if type(Data) == "table" and Data.Instance then
+            pcall(function()
+                Data.Instance:Stop()
+                Data.Instance:Destroy()
+            end)
+        end
+    end
+    
+    self.Sounds = nil
 end
 
 function API:LoadCustomAsset(Asset, Url)
@@ -215,45 +280,13 @@ function API:GetAssetInfo(Id)
     if Cached then
         return Cached
     end
-
-    local Success, Info = pcall(function()
-        return MarketplaceService:GetProductInfo(Id)
-    end)
+    
+    local Success, Info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, Id)
 
     if not Success or not Info then
         return nil
     end
-
-    local AssetTypes = {
-        [1] = "Image",
-        [2] = "TShirt",
-        [3] = "Audio",
-        [4] = "Mesh",
-        [5] = "Lua",
-        [8] = "Hat",
-        [9] = "Place",
-        [10] = "Model",
-        [11] = "Shirt",
-        [12] = "Pants",
-        [13] = "Decal",
-        [17] = "Head",
-        [18] = "Face",
-        [19] = "Gear",
-        [21] = "Badge",
-        [24] = "Animation",
-        [27] = "Torso",
-        [28] = "RightArm",
-        [29] = "LeftArm",
-        [30] = "LeftLeg",
-        [31] = "RightLeg",
-        [32] = "Package",
-        [34] = "GamePass",
-        [38] = "Plugin",
-        [41] = "MeshPart",
-        [42] = "Video",
-        [43] = "Tool"
-    }
-
+    
     local Result = {
         Id = Id,
         Name = Info.Name,
@@ -287,11 +320,11 @@ function API:ToPlace(Place)
 end
 
 function API:Time()
-    return os.date("%H:%M:%S")
+    return os_date("%H:%M:%S")
 end
 
 function API:Date()
-    return os.date("%Y/%m/%d")
+    return os_date("%Y/%m/%d")
 end
 
 function API:Request(url)
@@ -304,28 +337,163 @@ end
 
 function API:LoadFile(Url)
     local Success, Result = pcall(function()
-        return loadstring(game:HttpGet(Url .. "?nocache=" .. tostring(os.clock())))()
+        return loadstring(game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())))()
     end)
 
     return Success and Result or nil
 end
 
+function API:GetWebSocket()
+    return (pcall(function() return WebSocket end) and WebSocket) or nil
+end
+
+function API:ConnectSocket(Url)
+    local WebSocketLib = self:GetWebSocket()
+    
+    if not WebSocketLib then
+        warn("WebSocket is not available on this executor")
+        return false, "WebSocket not available"
+    end
+    
+    if self.Websocket and self.Websocket.Connected then
+        return true, "Already connected"
+    end
+    
+    local Success, Connection = pcall(function()
+        return WebSocketLib.connect(Url)
+    end)
+    
+    if Success and Connection then
+        self.Websocket = {
+            Connection = Connection,
+            Connected = true,
+            Url = Url,
+            Handlers = {},
+            OnDisconnect = nil,
+            OnError = nil
+        }
+        
+        Connection.OnMessage:Connect(function(message)
+            if self.Websocket and self.Websocket.Handlers then
+                for _, handler in ipairs(self.Websocket.Handlers) do
+                    pcall(handler, message)
+                end
+            end
+        end)
+        
+        Connection.OnClose:Connect(function()
+            if self.Websocket then
+                self.Websocket.Connected = false
+                if self.Websocket.OnDisconnect then
+                    pcall(self.Websocket.OnDisconnect)
+                end
+            end
+        end)
+        
+        if Connection.OnError then
+            Connection.OnError:Connect(function(Err)
+                if self.Websocket and self.Websocket.OnError then
+                    pcall(self.Websocket.OnError, Err)
+                end
+            end)
+        end
+        
+        return true, "Connected"
+    end
+
+    return false, "Connection failed: " .. tostring(Success)
+end
+
+function API:OnSocketMessage(Callback)
+    if not self.Websocket then
+        self.Websocket = { Handlers = {} }
+    end
+    if not self.Websocket.Handlers then
+        self.Websocket.Handlers = {}
+    end
+    table_insert(self.Websocket.Handlers, Callback)
+end
+
+function API:SendSocket(Message)
+    if not self.Websocket or not self.Websocket.Connection or not self.Websocket.Connected then
+        return false, "Not connected"
+    end
+    
+    local Success, Err = pcall(function()
+        self.Websocket.Connection:Send(Message)
+    end)
+    
+    if Success then
+        return true, "Message sent"
+    else
+        return false, "Send failed: " .. tostring(Err)
+    end
+end
+
+function API:DisconnectSocket()
+    if not self.Websocket or not self.Websocket.Connection then
+        return false, "Not connected"
+    end
+
+    local Success, Err = pcall(function()
+        self.Websocket.Connection:Close()
+        self.Websocket.Connected = false
+        self.Websocket = nil
+    end)
+    
+    if Success then
+        return true, "Disconnected"
+    else
+        return false, "Disconnect failed: " .. tostring(Err)
+    end
+end
+
+function API:IsSocketConnected()
+    return self.Websocket and self.Websocket.Connected or false
+end
+
+function API:OnSocketDisconnect(Callback)
+    if not self.Websocket then
+        self.Websocket = {}
+    end
+    self.Websocket.OnDisconnect = Callback
+end
+
+function API:OnSocketError(Callback)
+    if not self.Websocket then
+        self.Websocket = {}
+    end
+    self.Websocket.OnError = Callback
+end
+
+function API:ClearWebSockets()
+    if not self.Websocket then return end
+
+    if self.Websocket.Connection then
+        pcall(function()
+            self.Websocket.Connection:Close()
+        end)
+    end
+
+    self.Websocket = nil
+end
+
 function API:StringToRGB(String)
     if not String then return nil end
     
-    local R = tonumber(string.match(String, "(%d+)[%s]*,[%s]*%d+[%s]*,[%s]*%d+"))
-    local G = tonumber(string.match(String, "%d+[%s]*,[%s]*(%d+)[%s]*,[%s]*%d+"))
-    local B = tonumber(string.match(String, "%d+[%s]*,[%s]*%d+[%s]*,[%s]*(%d+)"))
+    local R = tonumber(string_match(String, "(%d+)[%s]*,[%s]*%d+[%s]*,[%s]*%d+"))
+    local G = tonumber(string_match(String, "%d+[%s]*,[%s]*(%d+)[%s]*,[%s]*%d+"))
+    local B = tonumber(string_match(String, "%d+[%s]*,[%s]*%d+[%s]*,[%s]*(%d+)"))
     
     if R and G and B then
-        return Color3.fromRGB(R, G, B)
+        return Color3_fromRGB(R, G, B)
     end
     
     return nil
 end
 
 function API:RGBToString(Rgb)
-    return math.floor(Rgb.R * 255) .. ", " .. math.floor(Rgb.G * 255) .. ", " .. math.floor(Rgb.B * 255)
+    return math_floor(Rgb.R * 255) .. ", " .. math_floor(Rgb.G * 255) .. ", " .. math_floor(Rgb.B * 255)
 end
 
 function API:HexToRGB(Hex)
@@ -333,18 +501,18 @@ function API:HexToRGB(Hex)
     local R = tonumber(Hex:sub(1, 2), 16)
     local G = tonumber(Hex:sub(3, 4), 16)
     local B = tonumber(Hex:sub(5, 6), 16)
-    return Color3.fromRGB(R, G, B)
+    return Color3_fromRGB(R, G, B)
 end
 
 function API:RGBToHex(Rgb)
-    local R = math.floor(Rgb.R * 255)
-    local G = math.floor(Rgb.G * 255)
-    local B = math.floor(Rgb.B * 255)
-    return string.format("#%02X%02X%02X", R, G, B)
+    local R = math_floor(Rgb.R * 255)
+    local G = math_floor(Rgb.G * 255)
+    local B = math_floor(Rgb.B * 255)
+    return string_format("#%02X%02X%02X", R, G, B)
 end
 
 function API:HSVToRGB(H, S, V)
-    return Color3.fromHSV(H, S, V)
+    return Color3_fromHSV(H, S, V)
 end
 
 function API:RGBToHSV(Rgb)
@@ -354,7 +522,7 @@ end
 function API:Rainbowify(Speed)
     Speed = Speed or 1
     local Time = tick() * Speed
-    return Color3.fromHSV(Time % 1, 1, 1)
+    return Color3_fromHSV(Time % 1, 1, 1)
 end
 
 function API:Gitport(Owner, Repo, Version, File)
@@ -369,27 +537,27 @@ function API:ControlF9(State)
 end
 
 function API:RandomString(Length)
-    Length = Length or 10
+    Length = Length or 15
     local Characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    local Result = ""
+    local t = table_create(Length)
     
     for i = 1, Length do
-        local RandomIndex = math.random(1, #Characters)
-        Result = Result .. string.sub(Characters, RandomIndex, RandomIndex)
+        local RandomIndex = math_random(1, #Characters)
+        t[i] = string_sub(Characters, RandomIndex, RandomIndex)
     end
     
-    return Result
+    return table_concat(t)
 end
 
 function API:SpeedTest(Func, Iterations, ...)
     Iterations = Iterations or 100
     local args = {...}
     
-    local Start = os.clock()
+    local Start = os_clock()
     for i = 1, Iterations do
         pcall(function() Func(unpack(args)) end)
     end
-    local TotalMs = (os.clock() - Start) * 1000
+    local TotalMs = (os_clock() - Start) * 1000
     
     local Result = {
         Total = TotalMs,
@@ -397,7 +565,7 @@ function API:SpeedTest(Func, Iterations, ...)
         Iterations = Iterations
     }
     
-    print(string.format("[SpeedTest] %d iterations: %.2f ms total (avg: %.3f ms)", 
+    print(string_format("[SpeedTest] %d iterations: %.2f ms total (avg: %.3f ms)", 
         Iterations, TotalMs, Result.Average))
     
     return Result
@@ -407,22 +575,22 @@ function API:HowLong(Ago)
     if Ago < 60 then
         return "Just now"
     elseif Ago >= 31536000 then
-        local y = math.floor(Ago / 31536000)
+        local y = math_floor(Ago / 31536000)
         return y .. " year" .. (y == 1 and "" or "s") .. " ago"
     elseif Ago >= 2592000 then
-        local m = math.floor(Ago / 2592000)
+        local m = math_floor(Ago / 2592000)
         return m .. " month" .. (m == 1 and "" or "s") .. " ago"
     elseif Ago >= 604800 then
-        local w = math.floor(Ago / 604800)
+        local w = math_floor(Ago / 604800)
         return w .. " week" .. (w == 1 and "" or "s") .. " ago"
     elseif Ago >= 86400 then
-        local d = math.floor(Ago / 86400)
+        local d = math_floor(Ago / 86400)
         return d .. " day" .. (d == 1 and "" or "s") .. " ago"
     elseif Ago >= 3600 then
-        local h = math.floor(Ago / 3600)
+        local h = math_floor(Ago / 3600)
         return h .. " hour" .. (h == 1 and "" or "s") .. " ago"
      else
-        local min = math.floor(Ago / 60)
+        local min = math_floor(Ago / 60)
         return min .. " minute" .. (min == 1 and "" or "s") .. " ago"
     end
 end
@@ -440,7 +608,6 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
         RepoName = Matches[2]
         RepoName = RepoName:gsub("%.git$", "")
     else
-        warn("Invalid GitHub URL")
         return nil
     end
 
@@ -455,7 +622,7 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
     local Github = "https://github.com/" .. Owner .. "/" .. RepoName .. "/commits/" .. Selected .. ".atom"
 
     local Success, Response = pcall(function()
-        return self:Request(Github .. "?nocache=" .. os.clock())
+        return self:Request(Github .. "?nocache=" .. os_clock())
     end)
 
     if not Success then warn("Failed to fetch commit logs~") return nil end
@@ -478,7 +645,7 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
             local now = DateTime.now()
             local timeAgo = self:HowLong(now.UnixTimestamp - commitTime.UnixTimestamp)
 
-            table.insert(Commits, {
+            table_insert(Commits, {
                 Author = author,
                 Message = message,
                 Sha = sha,
@@ -512,9 +679,9 @@ function API:IsMobile()
 end
 
 function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
-    task.spawn(function()
+    task_spawn(function()
         Options = Options or {}
-        local MaxSize = Options.MaxSize or math.huge
+        local MaxSize = Options.MaxSize or math_huge
         
         local FileName = FilePath:match("[^/]+$")
         local Dir = FilePath:match("^(.+)/[^/]+$")
@@ -527,7 +694,7 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
         end
         
         local Success, Remote = pcall(function()
-            return API:Request(RemoteUrl .. "?v=" .. os.time())
+            return API:Request(RemoteUrl .. "?v=" .. os_time())
         end)
         if not Success then return warn("Failed: " .. RemoteUrl) end
         
@@ -560,7 +727,7 @@ function API:AbbreviateNumber(Number)
     for i = #Abbrev, 1, -1 do
         local Value = 10 ^ (i * 3)
         if Number >= Value then
-            return string.format("%.1f%s", Number / Value, Abbrev[i])
+            return string_format("%.1f%s", Number / Value, Abbrev[i])
         end
     end
 
@@ -568,14 +735,14 @@ function API:AbbreviateNumber(Number)
 end
 
 function API:Chance(Percent)
-    return math.random(1, 100) <= Percent
+    return math_random(1, 100) <= Percent
 end
 
 function API:ResolvePosition(...)
     local args = {...}
     local arg = args[1]
     if typeof(arg) == "number" and args[2] and args[3] then
-        return Vector3.new(arg, args[2], args[3])
+        return Vector3_new(arg, args[2], args[3])
     end
     if typeof(arg) == "Vector3" then
         return arg
@@ -598,7 +765,7 @@ function API:ResolvePosition(...)
         end
     end
     if typeof(arg) == "table" and arg.x and arg.y and arg.z then
-        return Vector3.new(arg.x, arg.y, arg.z)
+        return Vector3_new(arg.x, arg.y, arg.z)
     end
     return nil
 end
@@ -608,22 +775,21 @@ function API:GetPlayer()
 end
 
 function API:GetCharacter()
-    return Character or LocalPlayer.CharacterAdded:Wait()
+    return Character
 end
 
 function API:GetRoot()
-    local Char = self:GetCharacter()
-    return Char and Char:WaitForChild("HumanoidRootPart", 5)
+    return Roots
 end
 
 function API:GetHumanoid()
-    local Char = self:GetCharacter()
-    return Char and Char:FindFirstChildOfClass("Humanoid")
+    return Humanoid
 end
 
 function API:GetHead()
-    local Char = Character or LocalPlayer.CharacterAdded:Wait()
-    return Char and (Char:FindFirstChild("Head") or Char:WaitForChild("Head", 5))
+    local Char = self:GetCharacter()
+    if not Char then return nil end
+    return Char:FindFirstChild("Head") or Char:WaitForChild("Head", 5)
 end
 
 function API:ForceReset()
@@ -650,6 +816,26 @@ function API:IsAlive()
     return Hum and Hum.Health > 0
 end
 
+function API:Raknet_Desync(State)
+    if not raknet then 
+        warn("[Raknet] Not supported on this executor")
+        return false 
+    end
+
+    if State then
+        raknet.add_send_hook(Internal)
+    else
+        raknet.remove_send_hook(Internal)
+    end
+    return true
+end
+
+function API:ClearRaknet()
+    if raknet then
+        pcall(function() raknet.remove_send_hook(Internal) end)
+    end
+end
+
 function API:SmartTimer(Name, Delay)
     self.Timers = self.Timers or {}
 
@@ -668,7 +854,7 @@ function API:WaitUntil(Condition, Out)
     local Time = 0
 
     while not Condition() do
-        task.wait(0.1)
+        task_wait(0.1)
         Time += 0.1
 
         if Out and Time >= Out then
@@ -690,7 +876,7 @@ function API:Resolve(Mode, Input, Key)
     if typeof(Input) == "table" then
         for k, v in pairs(Input) do
             if v == true then
-                table.insert(Result, k);
+                table_insert(Result, k);
             end
         end
     end
@@ -711,14 +897,14 @@ function API:Resolve(Mode, Input, Key)
         local __Seen = {}
         for _, Item in ipairs(Recency) do
             if Current[Item] and not __Seen[Item] then
-                table.insert(NewRec, Item);
+                table_insert(NewRec, Item);
                 __Seen[Item] = true;
             end
         end
 
         for _, Item in ipairs(Result) do
             if not __Seen[Item] then
-                table.insert(NewRec, Item);
+                table_insert(NewRec, Item);
             end
         end
 
@@ -726,7 +912,7 @@ function API:Resolve(Mode, Input, Key)
 
         local Prioritized = {}
         for i = #NewRec, 1, -1 do
-            table.insert(Prioritized, NewRec[i]);
+            table_insert(Prioritized, NewRec[i]);
         end
 
         return Prioritized;
@@ -737,10 +923,10 @@ function API:Resolve(Mode, Input, Key)
     elseif Mode == "Random" then
         local Shuffle = {}
         for _, v in ipairs(Result) do
-            table.insert(Shuffle, v)
+            table_insert(Shuffle, v)
         end
         for i = #Shuffle, 2, -1 do
-            local j = math.random(i)
+            local j = math_random(i)
             Shuffle[i], Shuffle[j] = Shuffle[j], Shuffle[i]
         end
         return Shuffle
@@ -776,7 +962,7 @@ function API:GetTools()
     
     for _, tool in ipairs(self:GetBackpack():GetChildren()) do
         if tool:IsA("Tool") then
-            table.insert(Tools, tool)
+            table_insert(Tools, tool)
         end
     end
     
@@ -784,7 +970,7 @@ function API:GetTools()
     if Char then
         for _, tool in ipairs(Char:GetChildren()) do
             if tool:IsA("Tool") then
-                table.insert(Tools, tool)
+                table_insert(Tools, tool)
             end
         end
     end
@@ -857,7 +1043,7 @@ function API:UseTool(Name)
 
     if HeldTool ~= Tool then
         self:EquipTool(Name)
-        task.wait(0.1)
+        task_wait(0.1)
     end
 
     HeldTool = self:GetHeldTool()
@@ -891,7 +1077,7 @@ function API:GetHeldTool()
 end
 
 function API:AddPriority(Name, Priority, Condition, Action)
-    table.insert(self.Priorities, {
+    table_insert(self.Priorities, {
         Name = Name,
         Priority = Priority,
         Condition = Condition,
@@ -899,7 +1085,7 @@ function API:AddPriority(Name, Priority, Condition, Action)
         Flags = {}
     })
     
-    table.sort(self.Priorities, function(a, b)
+    table_sort(self.Priorities, function(a, b)
         return a.Priority > b.Priority
     end)
 end
@@ -949,7 +1135,7 @@ end
 
 function API:Click()
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-    task.wait(0.1)
+    task_wait(0.1)
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
 end
 
@@ -966,7 +1152,7 @@ function API:AntiAFK()
     else
         LocalPlayer.Idled:Connect(function()
             self:Press(Enum.KeyCode.Thumbstick1)
-            task.wait(0.05)
+            task_wait(0.05)
             self:Unpress(Enum.KeyCode.Thumbstick1)
         end)
     end
@@ -975,11 +1161,11 @@ function API:AntiAFK()
 end
 
 function API:SetFOV(Num)
-    workspace.CurrentCamera.FieldOfView = Num
+    CurrentCamera.FieldOfView = Num
 end
 
 function API:SetCameraType(Type)
-    workspace.CurrentCamera.CameraType = Type
+    CurrentCamera.CameraType = Type
 end
 
 function API:SetGravity(Amount)
@@ -1029,25 +1215,22 @@ function API:Flight(State, Speed)
     Speed = Speed or 50
 
     self.FlightData = self.FlightData or 
-    {Active = false, Speed = Speed,Connections = {}, BodyVelocity = nil, BodyGyro = nil, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
+    {Active = false, Speed = Speed, Connections = {}, BodyVelocity = nil, BodyGyro = nil, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
 
     local function CleanUP()
         self.FlightData.Active = false
         
-        local Roots = self:GetRoot()
-        if Roots then
-            if self.FlightData.BodyVelocity then
-                self.FlightData.BodyVelocity:Destroy()
-            end
-            if self.FlightData.BodyGyro then
-                self.FlightData.BodyGyro:Destroy()
-            end
+        if self.FlightData.BodyVelocity then
+            self.FlightData.BodyVelocity:Destroy()
+        end
+        if self.FlightData.BodyGyro then
+            self.FlightData.BodyGyro:Destroy()
         end
         
-        for _, conn in ipairs(self.FlightData.Connections) do
-            pcall(function() conn:Disconnect() end)
+        for _, Connection in ipairs(self.FlightData.Connections) do
+            pcall(function() Connection:Disconnect() end)
         end
-        table.clear(self.FlightData.Connections)
+        table_clear(self.FlightData.Connections)
     end
     
     if not State then
@@ -1070,15 +1253,15 @@ function API:Flight(State, Speed)
     
     local BV = self:CreateInstance("BodyVelocity", {
         Name = "00x00x00x00x00",
-        MaxForce = Vector3.new(1e5, 1e5, 1e5),
-        Velocity = Vector3.zero,
+        MaxForce = Vector3_new(1e5, 1e5, 1e5),
+        Velocity = Vector3_zero,
         Parent = Roots
     })
     self.FlightData.BodyVelocity = BV
     
     local BG = self:CreateInstance("BodyGyro", {
         Name = "11x11x11x11x11",
-        MaxTorque = Vector3.new(1e5, 1e5, 1e5),
+        MaxTorque = Vector3_new(1e5, 1e5, 1e5),
         P = 3000,
         D = 500,
         CFrame = Roots.CFrame,
@@ -1086,14 +1269,22 @@ function API:Flight(State, Speed)
     })
     self.FlightData.BodyGyro = BG
     
-    local Camera = workspace.CurrentCamera
+    local Camera = CurrentCamera
     
     local Connection = RunService.RenderStepped:Connect(function()
+        local Roots = self:GetRoot()
         if not self.FlightData.Active or not Roots or not Camera then 
             return 
         end
         
-        local moveDirection = Vector3.zero
+        if self.FlightData.BodyVelocity and self.FlightData.BodyVelocity.Parent ~= Roots then
+            self.FlightData.BodyVelocity.Parent = Roots
+        end
+        if self.FlightData.BodyGyro and self.FlightData.BodyGyro.Parent ~= Roots then
+            self.FlightData.BodyGyro.Parent = Roots
+        end
+        
+        local moveDirection = Vector3_zero
         
         if self:IsKeyPressed(Enum.KeyCode.W) then
             moveDirection += Camera.CFrame.LookVector
@@ -1114,15 +1305,15 @@ function API:Flight(State, Speed)
         if self:IsKeyPressed(Enum.KeyCode.LeftControl) then
             moveDirection -= Camera.CFrame.UpVector
         end
-        
+
         if self:IsKeyPressed(Enum.KeyCode.Equals) then
-            self.FlightData.Speed = math.clamp(self.FlightData.Speed + self.FlightData.SpeedStep, 
+            self.FlightData.Speed = math_clamp(self.FlightData.Speed + self.FlightData.SpeedStep, 
                 self.FlightData.SpeedMin, self.FlightData.SpeedMax)
         elseif self:IsKeyPressed(Enum.KeyCode.Minus) then
-            self.FlightData.Speed = math.clamp(self.FlightData.Speed - self.FlightData.SpeedStep, 
+            self.FlightData.Speed = math_clamp(self.FlightData.Speed - self.FlightData.SpeedStep, 
                 self.FlightData.SpeedMin, self.FlightData.SpeedMax)
         end
-        
+
         if moveDirection.Magnitude > 0 then
             moveDirection = moveDirection.Unit * self.FlightData.Speed
         end
@@ -1136,42 +1327,8 @@ function API:Flight(State, Speed)
         end
     end)
 
-    table.insert(self.FlightData.Connections, Connection)
-
-    local NewConnection = self:GetPlayer().CharacterAdded:Connect(function()
-        task.wait(1)
-        if self.FlightData.Active then
-            if self.FlightData.BodyVelocity then
-                self.FlightData.BodyVelocity:Destroy()
-            end
-            if self.FlightData.BodyGyro then
-                self.FlightData.BodyGyro:Destroy()
-            end
-            
-            local New = self:GetRoot()
-            if New then
-                self.FlightData.BodyVelocity = self:CreateInstance("BodyVelocity", {
-                    Name = "00x00x00x00x00",
-                    MaxForce = Vector3.new(1e5, 1e5, 1e5),
-                    Velocity = Vector3.zero,
-                    Parent = New
-                })
-                
-                self.FlightData.BodyGyro = self:CreateInstance("BodyGyro", {
-                    Name = "11x11x11x11x11",
-                    MaxTorque = Vector3.new(1e5, 1e5, 1e5),
-                    P = 3000,
-                    D = 500,
-                    CFrame = New.CFrame,
-                    Parent = New
-                })
-
-                Roots = New
-            end
-        end
-    end)
-
-    table.insert(self.FlightData.Connections, NewConnection)
+    table_insert(self.FlightData.Connections, Connection)
+    
     return true
 end
 
@@ -1180,7 +1337,7 @@ function API:SetFlightSpeed(Speed)
         return false
     end
 
-    Speed = math.clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+    Speed = math_clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
     self.FlightData.Speed = Speed
 
     return true
@@ -1212,11 +1369,9 @@ function API:XRay(State)
 
         self.XRayActive = true
     else
-        if not self.XRayActive then return end
-
         for p, modifier in pairs(self.HistoryParts) do
             if p and p.Parent then
-                p.LocalTransparencyModifier = modifier
+                pcall(function() p.LocalTransparencyModifier = modifier end)
             end
         end
 
@@ -1226,50 +1381,42 @@ function API:XRay(State)
 end
 
 function API:AntiFling()
-    if self.FlingActive then
-        return
-    end
+    if self.FlingActive then return end
 
     self.FlingActive = true
     self.FlingLoop = RunService.Heartbeat:Connect(function()
-        pcall(function()
-            local Char = self:GetCharacter()
-            if not Char then return end
-            
-            local Hum = Char:FindFirstChild("HumanoidRootPart")
-            if not Hum then return end
-            
-            if not Hum:FindFirstChild("0x0x0x0x0") then
-                local AntiFling = self:CreateInstance("BodyVelocity", {
-                    Name = "0x0x0x0x0",
-                    Velocity = Vector3.new(0, 0, 0),
-                    MaxForce = Vector3.new(40000, 40000, 40000),
-                    Parent = Hum
-                })
-            end
+        local Char = self:GetCharacter()
+        if not Char then return end
 
-            Hum.Velocity = Vector3.new(0, 0, 0)
-            Hum.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            
-            local AntiFling = Hum:FindFirstChild("0x0x0x0x0")
-            if AntiFling then
-                AntiFling.Velocity = Vector3.new(0, 0, 0)
-            end
-        end)
+        local Hum = Char:FindFirstChild("HumanoidRootPart")
+        if not Hum then return end
+        
+        if not Hum:FindFirstChild("0x0x0x0x0") then
+            self:CreateInstance("BodyVelocity", {
+                Name = "0x0x0x0x0",
+                Velocity = Vector3_zero,
+                MaxForce = Vector3_new(40000, 40000, 40000),
+                Parent = Hum
+            })
+        end
+
+        Hum.Velocity = Vector3_zero
+        Hum.AssemblyLinearVelocity = Vector3_zero
+        
+        local AntiFling = Hum:FindFirstChild("0x0x0x0x0")
+        if AntiFling then
+            AntiFling.Velocity = Vector3_zero
+        end
     end)
 end
 
 function API:StopFling()
-    if not self.FlingActive then
-        return
-    end
+    if not self.FlingActive then return end
 
     self.FlingActive = false
     
     if self.FlingLoop then
-        pcall(function()
-            self.FlingLoop:Disconnect()
-        end)
+        self.FlingLoop:Disconnect()
         self.FlingLoop = nil
     end
 
@@ -1279,9 +1426,7 @@ function API:StopFling()
         if Hum then
             local AntiFling = Hum:FindFirstChild("0x0x0x0x0")
             if AntiFling then
-                pcall(function()
-                    AntiFling:Destroy()
-                end)
+                AntiFling:Destroy()
             end
         end
     end
@@ -1291,9 +1436,7 @@ function API:Noclip(Duration) -- // Noclip that must be used in loops at least f
     Duration = Duration or 0.45
 
     if self.Noclipping then
-        pcall(function()
-            self.Noclipping:Disconnect()
-        end)
+        self.Noclipping:Disconnect()
         self.Noclipping = nil
     end
 
@@ -1311,16 +1454,14 @@ function API:Noclip(Duration) -- // Noclip that must be used in loops at least f
         end
         
         if self.Clip == false and self:GetCharacter() ~= nil then
-            pcall(function()
-                for _, v in pairs(self:GetCharacter():GetDescendants()) do
-                    if v:IsA("BasePart") then
-                        if self.Origins[v] == nil then
-                            self.Origins[v] = v.CanCollide
-                        end
-                        v.CanCollide = false
+            for _, v in pairs(self:GetCharacter():GetDescendants()) do
+                if v:IsA("BasePart") then
+                    if self.Origins[v] == nil then
+                        self.Origins[v] = v.CanCollide
                     end
+                    v.CanCollide = false
                 end
-            end)
+            end
         end
     end
 
@@ -1329,23 +1470,20 @@ end
 
 function API:StopClip()
     if self.Noclipping then
-        pcall(function()
-            self.Noclipping:Disconnect()
-        end)
+        self.Noclipping:Disconnect()
         self.Noclipping = nil
     end
-    
+
     self.Clip = true
     self.EndPoint = nil
     
-    if self:GetCharacter() then
-        pcall(function()
-            for _, v in pairs(self:GetCharacter():GetDescendants()) do
-                if v:IsA("BasePart") and self.Origins[v] ~= nil then
-                    v.CanCollide = self.Origins[v]
-                end
+    local Character = self:GetCharacter()
+    if Character and self.Origins then
+        for _, v in pairs(Character:GetDescendants()) do
+            if v:IsA("BasePart") and self.Origins[v] ~= nil then
+                v.CanCollide = self.Origins[v]
             end
-        end)
+        end
     end
     
     self.Origins = {}
@@ -1356,7 +1494,7 @@ function API:IsStudio()
 end
 
 function API:GetScreenSize()
-    return workspace.CurrentCamera.ViewportSize
+    return CurrentCamera.ViewportSize
 end
 
 function API:GetMousePosition()
@@ -1368,7 +1506,7 @@ function API:SetMouseIcon(Icon)
     Plr.MouseIcon = Icon
 end
 
-function API:MouseVisibillity(State)
+function API:MouseVisibility(State)
     UserInputService.MouseIconEnabled = not State
 end
 
@@ -1404,14 +1542,14 @@ function API:GetFriends()
         if Success then
             local UserData = HttpService:JSONDecode(Response)
             if UserData and UserData.name then
-                table.insert(Friends, {
+                table_insert(Friends, {
                     UserId = Friend.id,
                     Name = UserData.name,
                     DisplayName = UserData.displayName or UserData.name
                 })
             end
         end
-        task.wait(0.1);
+        task_wait(0.1);
     end
 
     return Friends
@@ -1445,7 +1583,7 @@ function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, Ignore
 end
 
 function API:WorldToScreen(Position)
-    local Vector, OnScreen = workspace.CurrentCamera:WorldToScreenPoint(self:ResolvePosition(Position))
+    local Vector, OnScreen = CurrentCamera:WorldToScreenPoint(self:ResolvePosition(Position))
     return {X = Vector.X, Y = Vector.Y, Z = Vector.Z, OnScreen = OnScreen}
 end
 
@@ -1480,10 +1618,6 @@ function API:IsBehindWall(Target, Character)
     return false
 end
 
-function API:IsVisible(Target, Character)
-    return not self:IsBehindWall(Target, Character)
-end
-
 function API:IsTeamMate(Target)
     return self:GetTeam() == Target.Team
 end
@@ -1494,7 +1628,7 @@ function API:GetEnemies()
     
     for _, Player in ipairs(self:GetPlayers()) do
         if Player.Team ~= MyTeam then
-            table.insert(Enemies, Player)
+            table_insert(Enemies, Player)
         end
     end
     
@@ -1506,353 +1640,8 @@ function API:LookAt(Target, Part)
     local P = Part or self:GetRoot()
     
     if P and T then
-        P.CFrame = CFrame.lookAt(P.Position, T)
+        P.CFrame = CFrame_lookAt(P.Position, T)
     end
-end
-
--- // @Aimbot.luau
-function API:Aimbot(Options)
-    Options = Options or {}
-
-    local LocalPlayer = game.Players.LocalPlayer
-    
-    local Settings = {
-        Enabled = false,
-        FOVRadius = Options.FOVRadius or 200,
-        StickyRadius = Options.StickyRadius or 300,
-        RenderDistance = Options.RenderDistance or 1000,
-        Smoothness = Options.Smoothness or 0.3,
-        CheckTeam = Options.CheckTeam ~= false,
-        RequireVisible = Options.RequireVisible or true,
-        TargetPart = Options.TargetPart or "Head",
-        AimMethod = Options.AimMethod or "Camera",
-
-        Flags = {
-            PreferLowHealth = false,
-            PreferDistance = false,
-            StickyAim = false,
-        },
-        
-        OnTargetLocked = Options.OnTargetLocked,
-        OnTargetLost = Options.OnTargetLost,
-        OnWallDetected = Options.OnWallDetected,
-        OnAim = Options.OnAim,
-    }
-
-    local function GetLocalCharacter()
-        return LocalPlayer.Character
-    end
-    
-    local function IsAliveAndWell()
-        local char = GetLocalCharacter()
-        if not char then return false end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        return hum and hum.Health > 0
-    end
-    
-    Settings.ValidateTarget = Options.ValidateTarget or function(player, targetChar)
-        if not targetChar or not targetChar.Parent then return false end
-        local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then return false end
-        if Settings.CheckTeam then
-            local myTeam = LocalPlayer.Team
-            local theirTeam = player.Team
-            if myTeam and theirTeam and myTeam == theirTeam then return false end
-        end
-        return true
-    end
-
-    Settings.CheckVisibility = Options.CheckVisibility or function(targetChar)
-        if not Settings.RequireVisible then return true end
-        if not targetChar or not targetChar.Parent then return false end
-        return not self:IsBehindWall(targetChar)
-    end
-    
-    Settings.ScoreTarget = Options.ScoreTarget or function(target, targetChar, mousePos, camera)
-        local targetPart = targetChar:FindFirstChild(Settings.TargetPart) or targetChar:FindFirstChild("Head")
-        if not targetPart then return math.huge end
-        
-        local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
-        if not onScreen then return math.huge end
-        
-        local dx = screenPos.X - mousePos.X
-        local dy = screenPos.Y - mousePos.Y
-        local distanceToMouse = dx * dx + dy * dy
-        local dist = self:GetDistance(targetChar)
-        
-        local score = distanceToMouse + (dist / 50)
-        
-        if Settings.Flags.PreferLowHealth then
-            local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                score = score + ((humanoid.Health / humanoid.MaxHealth) * 100)
-            end
-        end
-        
-        if Settings.Flags.PreferDistance then
-            score = score + (dist / 10)
-        end
-        
-        return score
-    end
-
-    Settings.FilterTarget = Options.FilterTarget or function(player, targetChar)
-        if not targetChar or not targetChar.Parent then return false end
-        if self:GetDistance(targetChar) > Settings.RenderDistance then return false end
-        if not Settings.CheckVisibility(targetChar) then return false end
-        return true
-    end
-    
-    Settings.GetAimPosition = Options.GetAimPosition or function(targetChar)
-        if not targetChar or not targetChar.Parent then return nil end
-        return targetChar:FindFirstChild(Settings.TargetPart) or targetChar:FindFirstChild("Head")
-    end
-
-    Settings.ExecuteAim = Options.ExecuteAim or function(targetPos, camera)
-        local method = Settings.AimMethod
-        
-        if method == "Camera" then
-            local currentCFrame = camera.CFrame
-            local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
-            camera.CFrame = currentCFrame:Lerp(targetCFrame, Settings.Smoothness)
-        elseif method == "CFrame" then
-            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
-        elseif method == "Mouse" then
-            local screenPos, onScreen = camera:WorldToViewportPoint(targetPos)
-            if onScreen then
-                local mousemoverel = mousemoverel or (syn and syn.mousemoverel) or (input and input.mouse_move)
-                if mousemoverel then
-                    local currentPos = self:GetMousePosition()
-                    mousemoverel((screenPos.X - currentPos.X) * Settings.Smoothness, (screenPos.Y - currentPos.Y) * Settings.Smoothness)
-                end
-            end
-        elseif method == "Slient" then
-            -- // Coming Soon~
-        end
-    end
-
-    local CurrentTarget = nil
-    local AimbotConnection = nil
-    local CacheValidTargets = {}
-    
-    local function GetValidTargets()
-        table.clear(CacheValidTargets)
-        
-        if not IsAliveAndWell() then return CacheValidTargets end
-
-        local players = self:GetPlayers(false)
-
-        for i = 1, #players do
-            local player = players[i]
-            local targetChar = player.Character
-            if targetChar and targetChar.Parent then
-                if Settings.FilterTarget(player, targetChar) and Settings.ValidateTarget(player, targetChar) then
-                    table.insert(CacheValidTargets, player)
-                end
-            end
-        end
-        
-        return CacheValidTargets
-    end
-
-    local function GetCursorDistanceToTarget(targetChar, camera, mousePos)
-        if not targetChar or not targetChar.Parent then return nil end
-        
-        local aimPart = Settings.GetAimPosition(targetChar)
-        if not aimPart then return nil end
-        
-        local screenPos, onScreen = camera:WorldToViewportPoint(aimPart.Position)
-        if not onScreen then return nil end
-        
-        local dx = screenPos.X - mousePos.X
-        local dy = screenPos.Y - mousePos.Y
-        return math.sqrt(dx * dx + dy * dy)
-    end
-    
-    local function AimbotLoop()
-        if not Settings.Enabled then return end
-        
-        if not IsAliveAndWell() then
-            if CurrentTarget then
-                CurrentTarget = nil
-                if Settings.OnTargetLost then Settings.OnTargetLost() end
-            end
-            return
-        end
-        
-        local camera = workspace.CurrentCamera
-        if not camera then return end
-        
-        local mousePos = self:GetMousePosition()
-        
-        if CurrentTarget and CurrentTarget.Character and CurrentTarget.Character.Parent then
-            local targetChar = CurrentTarget.Character
-            
-            if Settings.FilterTarget(CurrentTarget, targetChar) and Settings.ValidateTarget(CurrentTarget, targetChar) then
-                local cursorDist = GetCursorDistanceToTarget(targetChar, camera, mousePos)
-
-                if cursorDist then
-                    if Settings.Flags.StickyAim and cursorDist > Settings.StickyRadius then
-                        CurrentTarget = nil
-                        if Settings.OnTargetLost then Settings.OnTargetLost() end
-                    else
-                        local aimPart = Settings.GetAimPosition(targetChar)
-                        if aimPart then
-                            if Settings.OnAim then
-                                local result = Settings.OnAim(aimPart.Position, camera, CurrentTarget)
-                                Settings.ExecuteAim(result or aimPart.Position, camera)
-                            else
-                                Settings.ExecuteAim(aimPart.Position, camera)
-                            end
-                        end
-                        return
-                    end
-                else
-                    CurrentTarget = nil
-                    if Settings.OnTargetLost then Settings.OnTargetLost() end
-                end
-            else
-                CurrentTarget = nil
-                if Settings.OnTargetLost then Settings.OnTargetLost() end
-            end
-        end
-        
-        local validTargets = GetValidTargets()
-        if #validTargets > 0 then
-            local bestTarget = nil
-            local bestScore = math.huge
-            
-            for i = 1, #validTargets do
-                local target = validTargets[i]
-                local targetChar = target.Character
-                if targetChar then
-                    local score = Settings.ScoreTarget(target, targetChar, mousePos, camera)
-                    if score < bestScore then
-                        bestScore = score
-                        bestTarget = target
-                    end
-                end
-            end
-            
-            if bestTarget then
-                CurrentTarget = bestTarget
-                if Settings.OnTargetLocked then Settings.OnTargetLocked(CurrentTarget) end
-                
-                local aimPart = Settings.GetAimPosition(CurrentTarget.Character)
-                if aimPart then
-                    Settings.ExecuteAim(aimPart.Position, camera)
-                end
-            end
-        end
-    end
-    
-    local AimbotAPI = {
-        SetEnabled = function(enabled)
-            Settings.Enabled = enabled
-            if not enabled and CurrentTarget then
-                CurrentTarget = nil
-                if Settings.OnTargetLost then Settings.OnTargetLost() end
-            end
-            return AimbotAPI
-        end,
-        
-        IsEnabled = function() return Settings.Enabled end,
-        GetTarget = function() return CurrentTarget end,
-        
-        UpdateSettings = function(NewSettings)
-            for k, v in pairs(NewSettings) do
-                if Settings[k] ~= nil then
-                    Settings[k] = v
-                end
-            end
-            return AimbotAPI
-        end,
-        
-        OverrideFunction = function(Func, New)
-            if Settings[Func] ~= nil then
-                Settings[Func] = New
-            end
-            return AimbotAPI
-        end,
-        
-        SetFlag = function(Flag, value)
-            if Settings.Flags[Flag] ~= nil then
-                Settings.Flags[Flag] = value
-            end
-            return AimbotAPI
-        end,
-        
-        GetFlag = function(Flag)
-            return Settings.Flags[Flag]
-        end,
-        
-        SetStickyRadius = function(Radius)
-            Settings.StickyRadius = Radius
-            return AimbotAPI
-        end,
-        
-        ForceTarget = function(player)
-            if player and player.Character and player.Character.Parent then
-                CurrentTarget = player
-                if Settings.OnTargetLocked then Settings.OnTargetLocked(CurrentTarget) end
-            end
-            return AimbotAPI
-        end,
-        
-        ClearTarget = function()
-            CurrentTarget = nil
-            if Settings.OnTargetLost then Settings.OnTargetLost() end
-            return AimbotAPI
-        end,
-        
-        SetAimMethod = function(method)
-            local validMethods = {Camera = true, Mouse = true, CFrame = true, MouseAbs = true, Silent = true}
-            if validMethods[method] then
-                Settings.AimMethod = method
-            end
-            return AimbotAPI
-        end,
-        
-        SetRenderDistance = function(distance)
-            Settings.RenderDistance = distance
-            return AimbotAPI
-        end,
-        
-        SetSmoothness = function(smoothness)
-            Settings.Smoothness = smoothness
-            return AimbotAPI
-        end,
-        
-        SetFOV = function(fov)
-            Settings.FOVRadius = fov
-            return AimbotAPI
-        end,
-        
-        Start = function()
-            if AimbotConnection then return AimbotAPI end
-            Settings.Enabled = true
-            AimbotConnection = self:RenderStep(AimbotLoop, "Aimbot.Luau")
-            return AimbotAPI
-        end,
-        
-        Stop = function()
-            Settings.Enabled = false
-            if AimbotConnection then
-                self:ForceStop("Aimbot.Luau")
-                AimbotConnection = nil
-            end
-            CurrentTarget = nil
-            return AimbotAPI
-        end,
-        
-        GetSettings = function() return Settings end
-    }
-
-    if Options.AutoStart then
-        AimbotAPI:Start()
-    end
-    
-    return AimbotAPI
 end
 
 function API:CreateHighlight(Target, Options)
@@ -1869,8 +1658,8 @@ function API:CreateHighlight(Target, Options)
         Name = Options.Name or self:RandomString(15),
         Adornee = Target,
         Enabled = Options.Enabled ~= false,
-        FillColor = Options.FillColor or Color3.fromRGB(255, 0, 0),
-        OutlineColor = Options.OutlineColor or Color3.fromRGB(255, 255, 255),
+        FillColor = Options.FillColor or Color3_fromRGB(255, 0, 0),
+        OutlineColor = Options.OutlineColor or Color3_fromRGB(255, 255, 255),
         FillTransparency = Options.FillTransparency or 0.5,
         OutlineTransparency = Options.OutlineTransparency or 0,
         DepthMode = Options.DepthMode or Enum.HighlightDepthMode.AlwaysOnTop,
@@ -1913,7 +1702,7 @@ function API:ClearHighlights()
         end
     end
 
-    table.clear(self.HighlightCache)
+    table_clear(self.HighlightCache)
 end
 
 function API:GetPlayers(SelfIncluded)
@@ -1921,10 +1710,10 @@ function API:GetPlayers(SelfIncluded)
 
     for _, Plr in pairs(Players:GetPlayers()) do
         if SelfIncluded then
-            table.insert(List, Plr)
+            table_insert(List, Plr)
         else
             if Plr ~= Players.LocalPlayer then
-                table.insert(List, Plr)
+                table_insert(List, Plr)
             end
         end
     end
@@ -1934,7 +1723,7 @@ end
 
 function API:GetDistance(Target)
     local Roots = self:GetRoot()
-    if not Roots or not Target then return math.huge end
+    if not Roots or not Target then return math_huge end
 
     local Part
     if typeof(Target) == "Instance" then
@@ -1945,7 +1734,7 @@ function API:GetDistance(Target)
         end
     end
 
-    if not Part then return math.huge end
+    if not Part then return math_huge end
     return (Roots.Position - Part.Position).Magnitude
 end
 
@@ -1978,7 +1767,7 @@ function API:IsMobAlive(Model)
 end
 
 function API:GetClosestPlayer(Radius)
-    Radius = Radius or math.huge
+    Radius = Radius or math_huge
     local Closest = nil
     local ClosestDist = Radius
 
@@ -2126,8 +1915,8 @@ function API:FakeTP(Speed, ...)
     local Roots = self:GetRoot();
     if not Roots then return end
 
-    Roots.Velocity = Vector3.zero
-    Roots.AssemblyLinearVelocity = Vector3.zero
+    Roots.Velocity = Vector3_zero
+    Roots.AssemblyLinearVelocity = Vector3_zero
 
     local Current = Roots.Position
     local Delta = Position - Current;
@@ -2136,20 +1925,20 @@ function API:FakeTP(Speed, ...)
     
     if Distance < 0.05 then return end
 
-    local Num = tonumber(Speed) or math.huge
+    local Num = tonumber(Speed) or math_huge
     local dt = RunService.Heartbeat:Wait();
 
-    local Step = math.min(Num * dt, Distance)
-    local Direction = (Distance > 0 and Delta.Unit) or Vector3.zero
+    local Step = math_min(Num * dt, Distance)
+    local Direction = (Distance > 0 and Delta.Unit) or Vector3_zero
     local NewPos = Current + Direction * Step;                
 
-    local cf = CFrame.lookAt(NewPos, LookAt or (NewPos + Direction));
+    local cf = CFrame_lookAt(NewPos, LookAt or (NewPos + Direction));
     self:GetCharacter():PivotTo(cf);
 end
 
-function API:IsColor(Target, __Colors)
-    if __Colors == "Nigger" then
-        __Colors = {["Really black"] = true,["Black"] = true,["Dark brown"] = true,["Reddish brown"] = true,
+function API:IsColor(Target, Colors)
+    if Colors == "Nigger" then
+        Colors = {["Really black"] = true,["Black"] = true,["Dark brown"] = true,["Reddish brown"] = true,
             ["Dark orange"] = true,["Earth orange"] = true,["Burnt Sienna"] = true,["Dirt brown"] = true,
             ["Medium brown"] = true,["CGA brown"] = true,["Pine Cone"] = true,["Dark taupe"] = true,
             ["Brown"] = true,["Rust"] = true,["Dark"] = true,["Brownish"] = true,
@@ -2169,7 +1958,66 @@ function API:IsColor(Target, __Colors)
     local HeadColor = BodyColors.HeadColor;
     local TorsoColor = BodyColors.TorsoColor;
 
-    return __Colors[HeadColor.Name] and __Colors[TorsoColor.Name] or false
+    return Colors[HeadColor.Name] and Colors[TorsoColor.Name] or false
+end
+
+function API:LogGamepasses(State)
+    if State == true then
+        if self.LogConnection then return end
+
+        if not self.LoggedGamepasses then self.LoggedGamepasses = {} end
+        
+        local function capture(Type, Asset)
+            local Data = {
+                Signal = Type,
+                ID = Asset,
+                Time = os_date("%H:%M:%S")
+            }
+            table_insert(self.LoggedGamepasses, Data)
+            print("Successfully Logged [" .. Type .. "]: " .. tostring(Asset))
+            return Data
+        end
+        
+        self.LogConnection = {
+            MarketplaceService.PromptProductPurchaseFinished:Connect(function(_, id) capture("Product", id) end),
+            MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(_, id) capture("Gamepass", id) end),
+            MarketplaceService.PromptPurchaseFinished:Connect(function(_, id) capture("Purchase", id) end),
+            MarketplaceService.PromptBulkPurchaseFinished:Connect(function(_, id) capture("Bulk", id) end)
+        }
+        
+    elseif State == false then
+        if self.LogConnection then
+            for _, Connection in ipairs(self.LogConnection) do
+                Connection:Disconnect()
+            end
+            self.LogConnection = nil
+        end
+    end
+end
+
+function API:GetGamepass(Type, Asset)
+    pcall(function()
+        if Type == "Product" then
+            MarketplaceService:SignalPromptProductPurchaseFinished(LocalPlayer.UserId, Asset, true)
+        elseif Type == "Gamepass" then
+            MarketplaceService:SignalPromptGamePassPurchaseFinished(LocalPlayer.UserId, Asset, true)
+        elseif Type == "Purchase" then
+            MarketplaceService:SignalPromptPurchaseFinished(LocalPlayer.UserId, Asset, true)
+        elseif Type == "Bulk" then
+            MarketplaceService:SignalPromptBulkPurchaseFinished(LocalPlayer.UserId, Asset, true)
+        end
+    end)
+end
+
+function API:ClearGamepasses()
+    if not self.LogConnection then return end
+    
+    for _, Connection in ipairs(self.LogConnection) do
+        pcall(function() Connection:Disconnect() end)
+    end
+    
+    self.LogConnection = nil
+    self.LoggedGamepasses = nil
 end
 
 function API:SelectEverything(Dropdown, List) -- // Obsidian Only
@@ -2204,7 +2052,7 @@ function API:Rejoin()
 
     if #Players:GetPlayers() <= 1 then
         Plr:Kick("Rejoining...")
-        task.wait(1);
+        task_wait(1);
         TeleportService:Teleport(game.PlaceId, Plr)
     else
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
@@ -2249,13 +2097,12 @@ function API:GetHWID(Method)
         end
         return nil
     elseif Method == "Roblox" then
-        local RbxAnalytics = game:GetService("RbxAnalyticsService")
-        return RbxAnalytics:GetClientId()
+        return RbxAnalyticsService:GetClientId()
     elseif Method == "IP" then
         local Success, IP = pcall(function()
             return game:HttpGet("https://api.ipify.org")
         end)
-        
+
         if Success and IP then
             return IP
         end
@@ -2299,16 +2146,16 @@ function API:Verify(Options)
                 local function extractFromTable(t)
                     for k, v in pairs(t) do
                         if type(v) == "string" then
-                            table.insert(allMatches, v)
+                            table_insert(allMatches, v)
                         elseif type(v) == "number" then
-                            table.insert(allMatches, tostring(v))
+                            table_insert(allMatches, tostring(v))
                         elseif type(v) == "table" then
                             extractFromTable(v)
                         end
                         if type(k) == "string" then
-                            table.insert(allMatches, k)
+                            table_insert(allMatches, k)
                         elseif type(k) == "number" then
-                            table.insert(allMatches, tostring(k))
+                            table_insert(allMatches, tostring(k))
                         end
                     end
                 end
@@ -2319,20 +2166,20 @@ function API:Verify(Options)
                 local results = {}
                 local delimiters = {",", ";", "|", "\t", "\n", "\r", "  "}
                 for _, delim in ipairs(delimiters) do
-                    text = string.gsub(text, delim, " ")
+                    text = string_gsub(text, delim, " ")
                 end
-                for word in string.gmatch(text, "[^%s]+") do
-                    table.insert(results, word)
+                for word in string_gmatch(text, "[^%s]+") do
+                    table_insert(results, word)
                 end
                 return results
             end
             
-            for line in string.gmatch(Content, "[^\r\n]+") do
+            for line in string_gmatch(Content, "[^\r\n]+") do
                 line = line:gsub("^%s+", ""):gsub("%s+$", "")
                 if line ~= "" and not line:match("^%s*%-%-") and not line:match("^%s*#") and not line:match("^%s*//") then
                     local words = splitByAnyDelimiter(line)
                     for _, word in ipairs(words) do
-                        table.insert(allMatches, word)
+                        table_insert(allMatches, word)
                     end
                 end
             end
@@ -2344,7 +2191,7 @@ function API:Verify(Options)
                 match = match:gsub("[{}%[%]()]", "")
                 
                 if match ~= "" then
-                    table.insert(AllowedList, match)
+                    table_insert(AllowedList, match)
                 end
             end
         else
@@ -2354,7 +2201,7 @@ function API:Verify(Options)
     
     for _, item in ipairs(Options.Hwids or {}) do
         if item and item ~= "" then
-            table.insert(AllowedList, tostring(item))
+            table_insert(AllowedList, tostring(item))
         end
     end
     
@@ -2364,7 +2211,7 @@ function API:Verify(Options)
         for _, v in ipairs(t) do
             if not seen[v] then
                 seen[v] = true
-                table.insert(result, v)
+                table_insert(result, v)
             end
         end
         return result
@@ -2419,11 +2266,11 @@ end
 function API:CreateBaseplate(Options)
     Options = Options or {}
 
-    local Size = Options.Size or Vector3.new(10, 1, 10)
-    local Color = Options.Color or Color3.fromRGB(170, 170, 170)
+    local Size = Options.Size or Vector3_new(10, 1, 10)
+    local Color = Options.Color or Color3_fromRGB(170, 170, 170)
     local Transparency = Options.Transparency or 0
     local Material = Options.Material or Enum.Material.Plastic
-    local Offset = Options.Offset or Vector3.new(0, -3.7245, 0)
+    local Offset = Options.Offset or Vector3_new(0, -3.7245, 0)
     local Parent = Options.Parent or workspace
     local CanCollide = Options.CanCollide ~= false
     local Anchored = Options.Anchored ~= false
@@ -2440,10 +2287,15 @@ function API:CreateBaseplate(Options)
     })
     
     local function UpdatePosition()
-        local HumanoidRoot = Character:WaitForChild("HumanoidRootPart")
-        Baseplate.CFrame = HumanoidRoot.CFrame + Offset
+        local Char = self:GetCharacter()
+        if not Char then return end
+
+        local Hum = Char:FindFirstChild("HumanoidRootPart")
+        if Hum then
+            Baseplate.CFrame = Hum.CFrame + Offset
+        end
     end
-    
+
     UpdatePosition()
     
     local Connection = nil
@@ -2498,7 +2350,7 @@ function API:CreateBaseplate(Options)
     }
 
     self.CreatedBaseplates = self.CreatedBaseplates or {}
-    table.insert(self.CreatedBaseplates, {
+    table_insert(self.CreatedBaseplates, {
         Baseplate = Baseplate,
         Connection = Connection,
         API = API
@@ -2549,268 +2401,251 @@ function API:Audio_Logger()
     return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
 end
 
--- // >Loop Manager, Build: @1.25 | by Mommy Flames
+-- // >Loop Manager, Build: @1.32 | by Mommy Flames
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     Wait = WaitBoy or 0
     Name = Name or self:RandomString(15)
 
-    local thread
-    local func = function()
+    local Local = self
+    local Data = {
+        Type = "thread",
+        Running = true,
+        Paused = false,
+        Pause = function(S) S.Paused = true end,
+        Unpause = function(S) S.Paused = false end,
+        Kill = function(S) Local:ForceStop(Name) end
+    }
+
+    local Func = function()
         if WaitBefore and Wait then
-            task.wait(Wait)
+            task_wait(Wait)
         end
 
-        while task.wait(Wait) do
-            if self.Unloaded then break end
-            self:SafeCall(Callback, self)
+        while task_wait(Wait) do
+            if Local.Unloaded or not Data.Running then break end
+            if Data.Paused then 
+                repeat task_wait(0.1) until not Data.Paused or Local.Unloaded 
+            end
+
+            Callback(Local)
         end
     end
 
-    thread = task.spawn(func)
+    Data.Thread = task_spawn(Func)
     self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = {
-        Type = "thread",
-        Thread = thread,
-        Func = func,
-        Running = true
-    }
+    self.ActiveConnections[Name] = Data
 
-    return thread
+    return Data
 end
 
 function API:RenderStep(Callback, Name)
     Name = Name or self:RandomString(15)
+    local Local = self
     
-    local func = function(dt)
-        if self.Unloaded then return end
-        self:SafeCall(Callback, self, dt)
-    end
-
-    local conn = RunService.RenderStepped:Connect(func)
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = {
+    local Data = {
         Type = "RBXScriptConnection",
-        Connection = conn,
         Service = "RenderStepped",
-        Func = func,
-        Running = true
+        Running = true,
+        Paused = false,
+        Pause = function(S) S.Paused = true end,
+        Unpause = function(S) S.Paused = false end,
+        Kill = function(S) Local:ForceStop(Name) end
     }
 
-    return conn
+    local Func = function(dt)
+        if Local.Unloaded or not Data.Running or Data.Paused then return end
+        Callback(Local, dt)
+    end
+
+    Data.Connection = RunService.RenderStepped:Connect(Func)
+    Data.Func = Func
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = Data
+
+    return Data
 end
 
 function API:BindRender(Callback, Name, Priority)
     Name = Name or self:RandomString(15)
+    local Local = self
 
-    local func = function(dt)
-        if self.Unloaded then return end
-        self:SafeCall(Callback, self, dt)
-    end
-
-    RunService:BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, func)
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = {
+    local Data = {
         Type = "BindToRenderStep",
         Name = Name,
-        Func = func,
-        Running = true
+        Running = true,
+        Paused = false,
+        Pause = function(S) S.Paused = true end,
+        Unpause = function(S) S.Paused = false end,
+        Kill = function(S) Local:ForceStop(Name) end
     }
 
-    return {Type = "BindToRenderStep", Name = Name}
+    local Func = function(dt)
+        if Local.Unloaded or not Data.Running or Data.Paused then return end
+        Callback(Local, dt)
+    end
+
+    Data.Func = Func
+    RunService:BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, Func)
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = Data
+
+    return Data
 end
 
 function API:Stepped(Callback, Name)
     Name = Name or self:RandomString(15)
+    local Local = self
 
-    local func = function(time, dt) 
-        self:SafeCall(Callback, self, time, dt) 
+    local Data = {
+        Type = "RBXScriptConnection", 
+        Service = "Stepped",
+        Running = true,
+        Paused = false,
+        Pause = function(S) S.Paused = true end,
+        Unpause = function(S) S.Paused = false end,
+        Kill = function(S) Local:ForceStop(Name) end
+    }
+
+    local Func = function(time, dt) 
+        if Local.Unloaded or not Data.Running or Data.Paused then return end
+        Callback(Local, time, dt) 
     end
 
-    local conn = RunService.Stepped:Connect(func)
+    Data.Connection = RunService.Stepped:Connect(Func)
+    Data.Func = Func
     self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = {
-        Type = "RBXScriptConnection", 
-        Connection = conn, 
-        Service = "Stepped", 
-        Func = func, 
-        Running = true
-    }
-    return conn
+    self.ActiveConnections[Name] = Data
+
+    return Data
 end
 
 function API:Heartbeat(Callback, Name)
     Name = Name or self:RandomString(15)
+    local Local = self
     
+    local Data = {
+        Type = "RBXScriptConnection", 
+        Service = "Heartbeat",
+        Running = true,
+        Paused = false,
+        Pause = function(S) S.Paused = true end,
+        Unpause = function(S) S.Paused = false end,
+        Kill = function(S) Local:ForceStop(Name) end
+    }
+
     local func = function(dt) 
-        self:SafeCall(Callback, self, dt) 
+        if Local.Unloaded or not Data.Running or Data.Paused then return end
+        Callback(Local, dt) 
     end
 
-    local conn = RunService.Heartbeat:Connect(func)
+    Data.Connection = RunService.Heartbeat:Connect(func)
+    Data.Func = func
     self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = {
-        Type = "RBXScriptConnection", 
-        Connection = conn, 
-        Service = "Heartbeat", 
-        Func = func, 
-        Running = true
-    }
-    return conn
+    self.ActiveConnections[Name] = Data
+
+    return Data
 end
 
 function API:BindKeybind(Key, Callback, BindName)
-    local Connection
-    Connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        
-        if input.KeyCode == Key or input.UserInputType == Key then
-            Callback(input)
-        end
-    end)
-    
-    self.ActiveConnections = self.ActiveConnections or {}
+    local Local = self
     local Name = BindName or self:RandomString(15)
-    
-    self.ActiveConnections[Name] = {
+
+    local Data = {
         Type = "RBXScriptConnection",
         Service = "InputBegan",
-        Connection = Connection,
         Running = true,
+        Paused = false,
         Key = Key,
-        Func = Callback
+        Pause = function(S) S.Paused = true end,
+        Unpause = function(S) S.Paused = false end,
+        Kill = function(S) Local:ForceStop(Name) end
     }
 
-    return Connection, Name
-end
+    local Func = function(Input, Processed)
+        if Processed or Local.Unloaded or not Data.Running or Data.Paused then return end
+        if Input.KeyCode == Data.Key or Input.UserInputType == Data.Key then
+            Callback(Input)
+        end
+    end
 
-function API:SetKeybind(Name, NewKey)
-    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
-    if not Entry then
-        return false
-    end
+    Data.Connection = UserInputService.InputBegan:Connect(Func)
+    Data.Func = Callback
+    Data.InternalFunc = Func
     
-    if Entry.Type ~= "RBXScriptConnection" or Entry.Service ~= "InputBegan" then
-        return false
-    end
-    
-    local Running = Entry.Running
+    self.ActiveConnections = self.ActiveConnections or {}
+    self.ActiveConnections[Name] = Data
 
-    if Running then
-        self:ForceStop(Name)
-    end
-    
-    Entry.Key = NewKey
-    
-    if Running then
-        self:ForceStart(Name)
-    end
-    
-    return true
+    return Data
 end
 
 function API:ForceStop(Name)
     local Entry = self.ActiveConnections and self.ActiveConnections[Name]
-    if not Entry then
-        return false
-    end
-
-    if Entry.Running == false then
-        return true
-    end
-
-    if Entry.Type == "thread" then
-        if Entry.Thread and coroutine.status(Entry.Thread) ~= "dead" then
-            task.cancel(Entry.Thread)
-        end
-    elseif Entry.Type == "RBXScriptConnection" then
-        if Entry.Connection and Entry.Connection.Connected then
-            Entry.Connection:Disconnect()
-        end
-    elseif Entry.Type == "BindToRenderStep" then
-        pcall(function()
-            RunService:UnbindFromRenderStep(Entry.Name or Name)
-        end)
-    end
+    if not Entry then return false end
 
     Entry.Running = false
+
+    if Entry.Type == "thread" then
+        if Entry.Thread then task_cancel(Entry.Thread) end
+    elseif Entry.Type == "RBXScriptConnection" then
+        if Entry.Connection then Entry.Connection:Disconnect() end
+    elseif Entry.Type == "BindToRenderStep" then
+        pcall(function() RunService:UnbindFromRenderStep(Entry.Name or Name) end)
+    end
+
+    self.ActiveConnections[Name] = nil
     return true
 end
 
-function API:ForceStart(Name)
-    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
-    if not Entry then
-        return nil
+function API:GetState(Name)
+    local Entry = (self.ActiveConnections and self.ActiveConnections[Name]) or (self.ActiveTasks and self.ActiveTasks[Name])
+    
+    if not Entry then 
+        return nil 
     end
 
-    if Entry.Running then
-        self:ForceStop(Name)
+    if Entry.Running == false then 
+        return false 
+    end
+
+    if Entry.Paused then 
+        return "Paused" 
     end
 
     if Entry.Type == "thread" then
-        local thread = task.spawn(Entry.Func)
-        Entry.Thread = thread
-        Entry.Running = true
-        return thread
-
+        return coroutine.status(Entry.Thread) ~= "dead"
     elseif Entry.Type == "RBXScriptConnection" then
-        local conn
-        if Entry.Service == "RenderStepped" then
-            conn = RunService.RenderStepped:Connect(Entry.Func)
-        elseif Entry.Service == "Heartbeat" then
-            conn = RunService.Heartbeat:Connect(Entry.Func)
-        elseif Entry.Service == "Stepped" then
-            conn = RunService.Stepped:Connect(Entry.Func)
-        elseif Entry.Service == "InputBegan" then
-            conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                if gameProcessed then return end
-                if input.KeyCode == Entry.Key or input.UserInputType == Entry.Key then
-                    Entry.Func(input)
-                end
-            end)
-        end
-        Entry.Connection = conn
-        Entry.Running = true
-        return conn
-
-    elseif Entry.Type == "BindToRenderStep" then
-        RunService:BindToRenderStep(Entry.Name or Name, Enum.RenderPriority.Last.Value, Entry.Func)
-        Entry.Running = true
-        return Entry
-    end
-end
-
-function API:GetState(Name)
-    local Floop = self.ActiveConnections and self.ActiveConnections[Name]
-    if Floop then
-        if Floop.Running == false then return false end
-        if Floop.Type == "thread" then
-            return coroutine.status(Floop.Thread) ~= "dead"
-        elseif Floop.Type == "RBXScriptConnection" then
-            return Floop.Connection and Floop.Connection.Connected
-        end
-        return Floop.Running == true
+        return Entry.Connection and Entry.Connection.Connected
     end
 
-    local Task = self.ActiveTasks and self.ActiveTasks[Name]
-    if Task then
-        return Task.Running == true
-    end
-    
-    return nil
+    return Entry.Running
 end
 
 function API:AddTask(Signal, Callback, Name)
     self.ActiveTasks = self.ActiveTasks or {}
+    local Name = Name or self:RandomString(15)
+    local Local = self
 
     if self.ActiveTasks[Name] then
         return self.ActiveTasks[Name]
     end
 
-    local Data = {Signal = Signal, Callback = Callback, Connection = nil, Running = true}
+    local Data = {
+        Signal = Signal, 
+        Callback = Callback, 
+        Connection = nil, 
+        Running = true,
+        Paused = false,
+        Type = "Task"
+    }
+
+    Data.Pause = function(S) S.Paused = true end
+    Data.Unpause = function(S) S.Paused = false end
+    Data.Kill = function(S) Local:StopTask(Name) end
 
     local function wrapper()
         Data.Connection = Signal:Connect(function(...)
-            if Data.Running and not self.Unloaded then
-                self:SafeCall(Callback, self, ...)
+            if Data.Running and not Data.Paused and not Local.Unloaded then
+                Callback(Local, ...)
             end
         end)
     end
@@ -2825,23 +2660,25 @@ end
 function API:StopTask(Name)
     local Data = self.ActiveTasks and self.ActiveTasks[Name]
     if Data then
-        if not Data.Running then return end
         Data.Running = false
         if Data.Connection then
             Data.Connection:Disconnect()
             Data.Connection = nil
         end
+        self.ActiveTasks[Name] = nil
     end
 end
 
 function API:RestartTask(Name)
     local Data = self.ActiveTasks and self.ActiveTasks[Name]
     if Data then
-        if Data.Running then return end
-        Data.Running = true
-        if not Data.Connection then
-            Data.Reconnect()
+        if Data.Running then 
+            Data.Connection:Disconnect() 
         end
+        
+        Data.Running = true
+        Data.Paused = false
+        Data.Reconnect()
     end
 end
 
@@ -2863,7 +2700,8 @@ function API:OverrideFunction(Name, Function)
 end
 
 function API:Unload()
-    getgenv().FunctionManager_Engine = nil
+    -- // @Unload.module~
+    (getgenv().FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
     self.Unloaded = true
 
     self.ActiveConnections = self.ActiveConnections or {}
@@ -2876,26 +2714,20 @@ function API:Unload()
         self:StopTask(Instance)
     end
 
-    if self.FlightData then
-        if self.FlightData.BodyVelocity then
-            pcall(function() self.FlightData.BodyVelocity:Destroy() end)
-        end
-        if self.FlightData.BodyGyro then
-            pcall(function() self.FlightData.BodyGyro:Destroy() end)
-        end
-        for _, conn in ipairs(self.FlightData.Connections or {}) do
-            pcall(function() conn:Disconnect() end)
-        end
-        self.FlightData = nil
-    end
+    self:XRay(false);
+    self:Flight(false, nil);
+    self:StopClip();
+    self:StopFling();
 
-    if self.XRayActive then self:XRay(false) end
-    self:StopClip()
-    self:StopFling()
-    self:ClearHighlights()
-    self:ClearBaseplates()
+    self:ClearHighlights();
+    self:ClearBaseplates();
+    self:ClearWebSockets();
+    self:ClearGamepasses();
 
-    self:Flags()
+    self:ClearSounds();
+    self:ClearRaknet();
+
+    getgenv().FunctionManager_Engine = nil
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
     end
@@ -2909,11 +2741,11 @@ function API:Help()
 
     for k, v in pairs(API) do
         if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "Req" and k ~= "OverrideFunction" and k ~= "Merge" and k ~= "Launch" and k ~= "SelectEverything" then
-            table.insert(List, k)
+            table_insert(List, k)
         end
     end
 
-    table.sort(List)
+    table_sort(List)
     for _, k in ipairs(List) do
         print("• " .. k)
     end
@@ -2942,15 +2774,7 @@ end
 
 function API.Launch(Class)
     Class.Core = {}
-
-    for Instance, Value in pairs(API) do
-        if Instance ~= "__index" then Class[Instance] = Value
-            if type(Value) == "function" then
-                Class.Core[Value] = true
-            end
-        end
-    end
-
+    
     -- // Services
     Class.Players = Players
     Class.LocalPlayer = LocalPlayer
@@ -2968,20 +2792,19 @@ function API.Launch(Class)
     Class.LightingService = LightingService
     Class.RequestService = RequestService
     Class.GetConnections = GetConnections
+    Class.CurrentCamera = CurrentCamera
     Class.CoreGui = CoreGui
 
     API.Flags(Class)
     return setmetatable(Class, API)
 end
 
-getgenv().FunctionManager_Engine = true --> @Watermark
-
 local Functions = 0
 for _, v in pairs(API) do
     if type(v) == "function" then Functions = Functions + 1 end
 end
 
-local EndTime = os.clock()
-warn(string.format("[Functions.luau] Loaded in %.3f ms, Build: %s, Functions: %d | By: %s", (EndTime - LoadTime) * 1000, Project.Build, Functions, Project.Author))
+local EndTime = os_clock()
+warn(string_format("[Functions.luau] Loaded in %.3f ms, Build: %s, Functions: %d | By: %s", (EndTime - LoadTime) * 1000, Project.Build, Functions, Project.Author))
 
 return API
