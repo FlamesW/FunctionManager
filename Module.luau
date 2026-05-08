@@ -2568,8 +2568,10 @@ function API:RenderStep(Callback, Name)
         Running = true,
         Paused = false,
         Callback = Callback,
+
         Pause = function(s) s.Paused = true end,
         Unpause = function(s) s.Paused = false end,
+
         Kill = function(s) 
             s.Running = false
             if self.Stacks.RenderStep.Functions then
@@ -2592,8 +2594,10 @@ function API:Heartbeat(Callback, Name)
         Running = true,
         Paused = false,
         Callback = Callback,
+
         Pause = function(s) s.Paused = true end,
         Unpause = function(s) s.Paused = false end,
+
         Kill = function(s) 
             s.Running = false
             if self.Stacks.Heartbeat.Functions then
@@ -2616,8 +2620,10 @@ function API:Stepped(Callback, Name)
         Running = true,
         Paused = false,
         Callback = Callback,
+
         Pause = function(s) s.Paused = true end,
         Unpause = function(s) s.Paused = false end,
+
         Kill = function(s) 
             s.Running = false
             if self.Stacks.Stepped.Functions then
@@ -2640,8 +2646,10 @@ function API:BindRender(Callback, Name, Priority)
         Name = Name,
         Running = true,
         Paused = false,
+
         Pause = function(s) s.Paused = true end,
         Unpause = function(s) s.Paused = false end,
+
         Kill = function(s) 
             s.Running = false
             pcall(function() 
@@ -2680,8 +2688,10 @@ function API:BindKeybind(Key, Callback, BindName)
         Key = Key,
         Running = true,
         Paused = false,
+        
         Pause = function(s) s.Paused = true end,
         Unpause = function(s) s.Paused = false end,
+        
         Kill = function(s) 
             s.Running = false
             if s.Connection then
@@ -2697,18 +2707,47 @@ function API:BindKeybind(Key, Callback, BindName)
         if Processed or self.Unloaded or not Data.Running or Data.Paused then 
             return 
         end
+        
         if Input.KeyCode == Key or Input.UserInputType == Key then
-            Callback(Input)
+            Callback(self, Input)
         end
     end
 
     Data.Connection = InputBegan:Connect(Func)
     Data.Callback = Callback
+    Data.InternalFunc = Func
     
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveConnections[Name] = Data
-    
+   
     return Data
+end
+
+function API:SetKeybind(Name, NewKey)
+    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
+    if not Entry or Entry.Type ~= "Keybind" then
+        return false, "Invalid keybind"
+    end
+
+    if Entry.Connection then
+        Entry.Connection:Disconnect()
+    end
+
+    Entry.Key = NewKey
+
+    local Func = function(Input, Processed)
+        if Processed or self.Unloaded or not Entry.Running or Entry.Paused then 
+            return 
+        end
+        if Input.KeyCode == NewKey or Input.UserInputType == NewKey then
+            Entry.Callback(self, Input)
+        end
+    end
+
+    Entry.Connection = InputBegan:Connect(Func)
+    Entry.InternalFunc = Func
+
+    return true
 end
 
 function API:ForceStop(Name)
