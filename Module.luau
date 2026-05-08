@@ -2474,13 +2474,7 @@ local function AddService(self, Name, ServiceSignal)
     if Stack.Connection then return end
 
     Stack.Connection = ServiceSignal:Connect(function(...)
-        if self.UnloadedLM then 
-            if Stack.Connection then
-                Stack.Connection:Disconnect()
-                Stack.Connection = nil
-            end
-            return 
-        end
+        if self.UnloadedLM then return end
 
         local Funcs = Stack.Functions
         for Name, Data in pairs(Funcs) do
@@ -2508,12 +2502,15 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
         self.Stacks.While[Wait] = Stack_Data
 
         Stack_Data.Thread = task_spawn(function()
-            while Stack_Data.Running and not Local.UnloadedLM do
-                local dt = task_wait(Wait)
-
-                for _, Data in pairs(Stack_Data.Functions) do
-                    if Data.Running and not Data.Paused then
-                        task_spawn(Data.Callback, Local, dt)
+            while Stack_Data.Running do
+                if Local.UnloadedLM then
+                    task_wait()
+                else
+                    local dt = task_wait(Wait)
+                    for _, Data in pairs(Stack_Data.Functions) do
+                        if Data.Running and not Data.Paused then
+                            task_spawn(Data.Callback, Local, dt)
+                        end
                     end
                 end
             end
@@ -2546,13 +2543,15 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     if WaitBefore then
         task_spawn(function()
             task_wait(Wait)
-            if Data.Running and not Local.UnloadedLM then
+            if Data.Running then
                 Stack_Data.Functions[Name] = Data
             end
         end)
     else
         Stack_Data.Functions[Name] = Data
-        task_spawn(Callback, Local)
+        if not self.UnloadedLM then
+            task_spawn(Callback, Local)
+        end
     end
 
     return Data
