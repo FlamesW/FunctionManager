@@ -111,6 +111,8 @@ function API:Flags()
         self[Name] = {}
     end
 
+    self:CreateStacks()
+
     -- @Booleans / States
     self.XRayActive = false
     self.FlingActive = false
@@ -2452,14 +2454,16 @@ function API:Audio_Logger()
     return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
 end
 
--- // >Loop Manager, Build: @1.41 | by Mommy Flames
+-- // >Loop Manager, Build: @1.42 | by Mommy Flames
 function API:CreateStacks()
-    if not self.Stacks then
-        self.Stacks = { 
+    if type(self.Stacks) ~= "table" then
+        self.Stacks = {
             While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
             RenderStep = {Connection = nil, Functions = {}, Active = true},
             Stepped = {Connection = nil, Functions = {}, Active = true},
         }
+    elseif type(self.Stacks.While) ~= "table" then
+        self.Stacks.While = {}
     end
 end
 
