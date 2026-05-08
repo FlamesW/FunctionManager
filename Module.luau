@@ -9,11 +9,11 @@ end)
 local type, typeof, pcall, tick, warn, print, loadstring, setmetatable =
     type, typeof, pcall, tick, warn, print, loadstring, setmetatable
 
-local math_floor, math_random, math_clamp, math_min, math_huge =
-    math.floor, math.random, math.clamp, math.min, math.huge
+local math_floor, math_random, math_clamp, math_min, math_sqrt, math_huge =
+    math.floor, math.random, math.clamp, math.min, math.sqrt, math.huge
 
-local string_format, string_sub, string_match, string_gsub, string_gmatch =
-    string.format, string.sub, string.match, string.gsub, string.gmatch
+local string_format, string_sub, string_match, string_gsub, string_gmatch, string_lower =
+    string.format, string.sub, string.match, string.gsub, string.gmatch, string.lower
 
 local table_insert, table_clear, table_sort, table_create, table_concat =
     table.insert, table.clear, table.sort, table.create, table.concat
@@ -22,8 +22,8 @@ local task_wait, task_spawn, task_cancel = task.wait, task.spawn, task.cancel
 local os_clock, os_time, os_date = os.clock, os.time, os.date
 local pairs, ipairs = pairs, ipairs
 
-local Vector3_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CFrame_lookAt, Instance_new =
-    Vector3.new, Vector3.zero, Color3.fromRGB, Color3.fromHSV, CFrame.lookAt, Instance.new
+local Vector3_new, Vector2_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CFrame_lookAt, CFrame_new, Instance_new =
+    Vector3.new, Vector2.new, Vector3.zero, Color3.fromRGB, Color3.fromHSV, CFrame.lookAt, CFrame.new, Instance.new
 
 -- // @API.module
 local API = {}
@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.49", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.51", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -55,6 +55,28 @@ local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGu
 local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
 local LightingService: LightingService = cloneref(game:GetService("Lighting"));
 local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
+
+-- // @Caches
+local HttpGet = HttpService.HttpGet;
+local HttpJSONDecode = HttpService.JSONDecode;
+local gameHttpGet = game.HttpGet;
+
+local RenderStepped = RunService.RenderStepped;
+local Heartbeat = RunService.Heartbeat;
+local Stepped = RunService.Stepped;
+local BindToRenderStep = RunService.BindToRenderStep;
+local UnbindFromRenderStep = RunService.UnbindFromRenderStep;
+
+local IsKeyDown = UserInputService.IsKeyDown;
+local GetMouseLocation = UserInputService.GetMouseLocation;
+local GetPlatform = UserInputService.GetPlatform;
+
+local WorkspaceRaycast = workspace.Raycast;
+local RaycastParamsNew = RaycastParams.new;
+
+local GamePlaceId = game.PlaceId;
+local GameJobId = game.JobId;
+
 local AssetTypes = {
     [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
     [8] = "Hat", [9] = "Place", [10] = "Model", [11] = "Shirt", [12] = "Pants",
@@ -66,6 +88,7 @@ local AssetTypes = {
 
 getgenv().FunctionManager_Engine = LocalPlayer.CharacterAdded:Connect(function(Running)
     Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart"), Running:WaitForChild("Humanoid");
+    CurrentCamera = workspace.CurrentCamera;
 end)
 
 local Internal = function(packet)
@@ -256,7 +279,7 @@ end
 function API:LoadCustomAsset(Asset, Url)
     if not isfile(Asset) then
         local Succ, Cont = pcall(function()
-            return game:HttpGet(Url, true)
+            return gameHttpGet(Url, true)
         end)
 
         if Succ then 
@@ -312,7 +335,7 @@ function API:GetAssetInfo(Id)
 end
 
 function API:GetDevice()
-    return UserInputService:GetPlatform()
+    return GetPlatform(UserInputService)
 end
 
 function API:ToPlace(Place)
@@ -331,13 +354,13 @@ function API:Request(url)
     if RequestService then
         return RequestService({Url = url, Method = "GET"}).Body
     else
-        return HttpService:HttpGet(url, true)
+        return HttpGet(url, true)
     end
 end
 
 function API:LoadFile(Url)
     local Success, Result = pcall(function()
-        return loadstring(game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())))()
+        return loadstring(gameHttpGet(Url .. "?nocache=" .. tostring(os_clock())))()
     end)
 
     return Success and Result or nil
@@ -983,9 +1006,10 @@ function API:GetToolCount()
 end
 
 function API:FindTool(Name)
-    for _, tool in ipairs(self:GetTools()) do
-        if tool.Name:lower() == Name:lower() then
-            return tool
+    local Lower = string_lower(Name)
+    for _, Tool in ipairs(self:GetTools()) do
+        if string_lower(Tool.Name) == Lower then
+            return Tool
         end
     end
     return nil
@@ -1093,7 +1117,7 @@ end
 function API:GetTasks()
     for _, Task in ipairs(self.Priorities) do
         if Task.Condition() then
-            return task
+            return Task
         end
     end
     return nil
@@ -1271,7 +1295,7 @@ function API:Flight(State, Speed)
     
     local Camera = CurrentCamera
     
-    local Connection = RunService.RenderStepped:Connect(function()
+    local Connection = RenderStepped:Connect(function()
         local Roots = self:GetRoot()
         if not self.FlightData.Active or not Roots or not Camera then 
             return 
@@ -1384,7 +1408,7 @@ function API:AntiFling()
     if self.FlingActive then return end
 
     self.FlingActive = true
-    self.FlingLoop = RunService.Heartbeat:Connect(function()
+    self.FlingLoop = Heartbeat:Connect(function()
         local Char = self:GetCharacter()
         if not Char then return end
 
@@ -1465,7 +1489,7 @@ function API:Noclip(Duration) -- // Noclip that must be used in loops at least f
         end
     end
 
-    self.Noclipping = RunService.Stepped:Connect(NoclipLoop)
+    self.Noclipping = Stepped:Connect(NoclipLoop)
 end
 
 function API:StopClip()
@@ -1494,11 +1518,11 @@ function API:IsStudio()
 end
 
 function API:GetScreenSize()
-    return CurrentCamera.ViewportSize
+    return CurrentCamera and CurrentCamera.ViewportSize or Vector2_new(0, 0)
 end
 
 function API:GetMousePosition()
-    return UserInputService:GetMouseLocation()
+    return GetMouseLocation(UserInputService)
 end
 
 function API:SetMouseIcon(Icon)
@@ -1511,7 +1535,7 @@ function API:MouseVisibility(State)
 end
 
 function API:IsKeyPressed(Key)
-    return UserInputService:IsKeyDown(Key)
+    return IsKeyDown(UserInputService, Key)
 end
 
 function API:IsShiftLocked()
@@ -1524,23 +1548,23 @@ function API:GetFriends()
 
     local UserId = LocalPlayer.UserId
     local Success, Response = pcall(function()
-        return HttpService:HttpGet("https://friends.roblox.com/v1/users/" .. UserId .. "/friends")
+        return HttpGet("https://friends.roblox.com/v1/users/" .. UserId .. "/friends")
     end)
     
     if not Success then return {} end
     
-    local Data = HttpService:JSONDecode(Response)
+    local Data = HttpJSONDecode(Response)
     if not Data or not Data.data then return {} end
     
     local Friends = {}
     
     for _, Friend in pairs(Data.data) do
         local Success, Response = pcall(function()
-            return HttpService:HttpGet("https://users.roblox.com/v1/users/" .. Friend.id)
+            return HttpGet("https://users.roblox.com/v1/users/" .. Friend.id)
         end)
         
         if Success then
-            local UserData = HttpService:JSONDecode(Response)
+            local UserData = HttpJSONDecode(Response)
             if UserData and UserData.name then
                 table_insert(Friends, {
                     UserId = Friend.id,
@@ -1565,15 +1589,12 @@ function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, Ignore
         if not Dir then return nil end
     end
 
-    local RaycastParams = RaycastParams
-    local EnumFilterType = Enum.RaycastFilterType
-    
-    local Params = RaycastParams.new()
-    Params.FilterType = FilterType or EnumFilterType.Blacklist
+    local Params = RaycastParamsNew()
+    Params.FilterType = FilterType or Enum.RaycastFilterType.Blacklist
     Params.FilterDescendantsInstances = IgnoreList or {}
     Params.IgnoreWater = IgnoreWater or false
     
-    local Result = workspace:Raycast(Origins, Dir.Unit * (Distance or 1000), Params)
+    local Result = WorkspaceRaycast(workspace, Origins, Dir.Unit * (Distance or 1000), Params)
 
     if Callback and Result then
         Callback(Result)
@@ -1583,7 +1604,9 @@ function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, Ignore
 end
 
 function API:WorldToScreen(Position)
-    local Vector, OnScreen = CurrentCamera:WorldToScreenPoint(self:ResolvePosition(Position))
+    local CCamera = CurrentCamera
+    if not CCamera then return nil end
+    local Vector, OnScreen = CCamera:WorldToScreenPoint(self:ResolvePosition(Position))
     return {X = Vector.X, Y = Vector.Y, Z = Vector.Z, OnScreen = OnScreen}
 end
 
@@ -1721,21 +1744,40 @@ function API:GetPlayers(SelfIncluded)
     return List
 end
 
-function API:GetDistance(Target)
+function API:GetDistance(Target, UseSquared)
     local Roots = self:GetRoot()
     if not Roots or not Target then return math_huge end
 
     local Part
-    if typeof(Target) == "Instance" then
+    local targetType = typeof(Target)
+    
+    if targetType == "Instance" then
         if Target:IsA("Model") then
-            Part = Target:FindFirstChild("HumanoidRootPart") or Target:FindFirstChildWhichIsA("BasePart")
+            Part = Target.HumanoidRootPart or Target:FindFirstChildWhichIsA("BasePart")
         elseif Target:IsA("BasePart") then
             Part = Target
         end
+    elseif targetType == "Vector3" then
+        local rootPos = Roots.Position
+        local dx = rootPos.X - Target.X
+        local dy = rootPos.Y - Target.Y
+        local dz = rootPos.Z - Target.Z
+        return UseSquared and (dx*dx + dy*dy + dz*dz) or math_sqrt(dx*dx + dy*dy + dz*dz)
     end
 
     if not Part then return math_huge end
-    return (Roots.Position - Part.Position).Magnitude
+    
+    local rootPos = Roots.Position
+    local partPos = Part.Position
+    local dx = rootPos.X - partPos.X
+    local dy = rootPos.Y - partPos.Y
+    local dz = rootPos.Z - partPos.Z
+    
+    if UseSquared then
+        return dx*dx + dy*dy + dz*dz
+    end
+    
+    return math_sqrt(dx*dx + dy*dy + dz*dz)
 end
 
 function API:IsNPC(Model)
@@ -1769,19 +1811,22 @@ end
 function API:GetClosestPlayer(Radius)
     Radius = Radius or math_huge
     local Closest = nil
-    local ClosestDist = Radius
+    local ClosestDistSquared = Radius * Radius
 
     for _, v in ipairs(self:GetPlayers(false)) do
         if v.Character then
-            local Distance = self:GetDistance(v.Character)
-            if Distance < ClosestDist then
-                ClosestDist = Distance
+            local DistanceSquared = self:GetDistance(v.Character, true)  -- Use squared distance
+            if DistanceSquared < ClosestDistSquared then
+                ClosestDistSquared = DistanceSquared
                 Closest = v
             end
         end
     end
     
-    return Closest, ClosestDist
+    if Closest then
+        return Closest, math_sqrt(ClosestDistSquared)
+    end
+    return Closest, ClosestDistSquared
 end
 
 function API:GetNPC(Model)
@@ -1899,7 +1944,7 @@ function API:GetNPC(Model)
             end
         end
 
-        self.Model:PivotTo(CFrame.new(self.Root.Position))
+        self.Model:PivotTo(CFrame_new(self.Root.Position))
     end
 
     return Status
@@ -1926,7 +1971,7 @@ function API:FakeTP(Speed, ...)
     if Distance < 0.05 then return end
 
     local Num = tonumber(Speed) or math_huge
-    local dt = RunService.Heartbeat:Wait();
+    local dt = Heartbeat:Wait();
 
     local Step = math_min(Num * dt, Distance)
     local Direction = (Distance > 0 and Delta.Unit) or Vector3_zero
@@ -2053,9 +2098,9 @@ function API:Rejoin()
     if #Players:GetPlayers() <= 1 then
         Plr:Kick("Rejoining...")
         task_wait(1);
-        TeleportService:Teleport(game.PlaceId, Plr)
+        TeleportService:Teleport(GamePlaceId, Plr)
     else
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+        TeleportService:TeleportToPlaceInstance(GamePlaceId, GameJobId, Plr)
     end
 end
 
@@ -2063,7 +2108,7 @@ function API:ServerHop(MinPlayers, MaxPing)
     local Plr = self:GetPlayer()
 
     local Success, Result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" ..game.PlaceId .."/servers/Public?sortOrder=Asc&limit=100"))
+        return HttpJSONDecode(gameHttpGet("https://games.roblox.com/v1/games/" ..GamePlaceId .."/servers/Public?sortOrder=Asc&limit=100"))
     end)
 
     if not Success or not Result then
@@ -2073,7 +2118,7 @@ function API:ServerHop(MinPlayers, MaxPing)
 
     for _, Server in next, Result.data do
         if Server.id and Server.playing < Server.maxPlayers and Server.playing > (MinPlayers or 0) and (not MaxPing or Server.ping <= MaxPing) then
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id, Plr)
+            TeleportService:TeleportToPlaceInstance(GamePlaceId, Server.id, Plr)
             return
         end
     end
@@ -2100,7 +2145,7 @@ function API:GetHWID(Method)
         return RbxAnalyticsService:GetClientId()
     elseif Method == "IP" then
         local Success, IP = pcall(function()
-            return game:HttpGet("https://api.ipify.org")
+            return gameHttpGet("https://api.ipify.org")
         end)
 
         if Success and IP then
@@ -2132,14 +2177,14 @@ function API:Verify(Options)
 
     if Options.Url then
         local Success, Content = pcall(function()
-            return game:HttpGet(Options.Url)
+            return gameHttpGet(Options.Url)
         end)
     
         if Success then
             local allMatches = {}
             
             local success, decoded = pcall(function()
-                return HttpService:JSONDecode(Content)
+                return HttpJSONDecode(Content)
             end)
             
             if success and type(decoded) == "table" then
@@ -2457,7 +2502,7 @@ function API:RenderStep(Callback, Name)
         Callback(Local, dt)
     end
 
-    Data.Connection = RunService.RenderStepped:Connect(Func)
+    Data.Connection = RenderStepped:Connect(Func)
     Data.Func = Func
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveConnections[Name] = Data
@@ -2485,7 +2530,7 @@ function API:BindRender(Callback, Name, Priority)
     end
 
     Data.Func = Func
-    RunService:BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, Func)
+    BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, Func)
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveConnections[Name] = Data
 
@@ -2511,7 +2556,7 @@ function API:Stepped(Callback, Name)
         Callback(Local, time, dt) 
     end
 
-    Data.Connection = RunService.Stepped:Connect(Func)
+    Data.Connection = Stepped:Connect(Func)
     Data.Func = Func
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveConnections[Name] = Data
@@ -2538,7 +2583,7 @@ function API:Heartbeat(Callback, Name)
         Callback(Local, dt) 
     end
 
-    Data.Connection = RunService.Heartbeat:Connect(func)
+    Data.Connection = Heartbeat:Connect(func)
     Data.Func = func
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveConnections[Name] = Data
@@ -2589,7 +2634,7 @@ function API:ForceStop(Name)
     elseif Entry.Type == "RBXScriptConnection" then
         if Entry.Connection then Entry.Connection:Disconnect() end
     elseif Entry.Type == "BindToRenderStep" then
-        pcall(function() RunService:UnbindFromRenderStep(Entry.Name or Name) end)
+        pcall(function() UnbindFromRenderStep(Entry.Name or Name) end)
     end
 
     self.ActiveConnections[Name] = nil
