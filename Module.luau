@@ -104,7 +104,7 @@ function API:Flags()
     local Tables = {
 		"AssetCache", "HighlightCache", "RecencyStores", 
         "HistoryParts", "Origins", "Timers", "Priorities", "ActiveConnections", 
-		"CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses","Stacks",
+		"CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses",
     }
 
     for _, Name in ipairs(Tables) do
