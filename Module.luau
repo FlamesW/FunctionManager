@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.51", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.52", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -64,6 +64,7 @@ local gameHttpGet = game.HttpGet;
 local RenderStepped = RunService.RenderStepped;
 local Heartbeat = RunService.Heartbeat;
 local Stepped = RunService.Stepped;
+local InputBegan = UserInputService.InputBegan;
 local BindToRenderStep = RunService.BindToRenderStep;
 local UnbindFromRenderStep = RunService.UnbindFromRenderStep;
 
@@ -101,20 +102,22 @@ end
 
 function API:Flags()
     local Tables = {
-        "AssetCache", "HighlightCache", "RecencyStores", "HistoryParts", 
-        "Origins", "Timers", "Priorities", "ActiveConnections", 
-        "CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses"
+		"AssetCache", "HighlightCache", "RecencyStores", 
+        "HistoryParts", "Origins", "Timers", "Priorities", "ActiveConnections", 
+		"CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses","Stacks",
     }
 
     for _, Name in ipairs(Tables) do
         self[Name] = {}
     end
 
+    -- @Booleans / States
     self.XRayActive = false
     self.FlingActive = false
     self.Clip = true
     self.Unloaded = false
 
+    -- @Objects / Data
     self.FlightData = nil
     self.FlingLoop = nil
     self.Noclipping = nil
@@ -122,6 +125,9 @@ function API:Flags()
     self.TaskOnce = nil
     self.Websocket = nil
     self.LogConnection = nil
+
+    self.ActiveTasks = self.ActiveTasks or {}
+    self.ActiveConnections = self.ActiveConnections or {}
 end
 
 -- // @Functions.module
@@ -1310,30 +1316,30 @@ function API:Flight(State, Speed)
         
         local moveDirection = Vector3_zero
         
-        if self:IsKeyPressed(Enum.KeyCode.W) then
+        if IsKeyDown(UserInputService, Enum.KeyCode.W) then
             moveDirection += Camera.CFrame.LookVector
         end
-        if self:IsKeyPressed(Enum.KeyCode.S) then
+        if IsKeyDown(UserInputService, Enum.KeyCode.S) then
             moveDirection -= Camera.CFrame.LookVector
         end
-        if self:IsKeyPressed(Enum.KeyCode.A) then
+        if IsKeyDown(UserInputService, Enum.KeyCode.A) then
             moveDirection -= Camera.CFrame.RightVector
         end
-        if self:IsKeyPressed(Enum.KeyCode.D) then
+        if IsKeyDown(UserInputService, Enum.KeyCode.D) then
             moveDirection += Camera.CFrame.RightVector
         end
         
-        if self:IsKeyPressed(Enum.KeyCode.Space) then
+        if IsKeyDown(UserInputService, Enum.KeyCode.Space) then
             moveDirection += Camera.CFrame.UpVector
         end
-        if self:IsKeyPressed(Enum.KeyCode.LeftControl) then
+        if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
             moveDirection -= Camera.CFrame.UpVector
         end
 
-        if self:IsKeyPressed(Enum.KeyCode.Equals) then
+        if IsKeyDown(UserInputService, Enum.KeyCode.Equals) then
             self.FlightData.Speed = math_clamp(self.FlightData.Speed + self.FlightData.SpeedStep, 
                 self.FlightData.SpeedMin, self.FlightData.SpeedMax)
-        elseif self:IsKeyPressed(Enum.KeyCode.Minus) then
+        elseif IsKeyDown(UserInputService, Enum.KeyCode.Minus) then
             self.FlightData.Speed = math_clamp(self.FlightData.Speed - self.FlightData.SpeedStep, 
                 self.FlightData.SpeedMin, self.FlightData.SpeedMax)
         end
@@ -2446,223 +2452,342 @@ function API:Audio_Logger()
     return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
 end
 
--- // >Loop Manager, Build: @1.32 | by Mommy Flames
-function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
-    Wait = WaitBoy or 0
-    Name = Name or self:RandomString(15)
+-- // >Loop Manager, Build: @1.39 | by Mommy Flames
+function API:CreateStacks()
+    if self.Stacks then return end
 
-    local Local = self
-    local Data = {
-        Type = "thread",
-        Running = true,
-        Paused = false,
-        Pause = function(S) S.Paused = true end,
-        Unpause = function(S) S.Paused = false end,
-        Kill = function(S) Local:ForceStop(Name) end
+    self.Stacks = { 
+		While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
+        RenderStep = {Connection = nil, Functions = {}, Active = true},
+        Stepped = {Connection = nil, Functions = {}, Active = true},
     }
+end
 
-    local Func = function()
-        if WaitBefore and Wait then
-            task_wait(Wait)
-        end
+local function AddService(self, Name, ServiceSignal)
+    local Stack = self.Stacks[Name]
+    if Stack.Connection then return end
 
-        while task_wait(Wait) do
-            if Local.Unloaded or not Data.Running then break end
-            if Data.Paused then 
-                repeat task_wait(0.1) until not Data.Paused or Local.Unloaded 
+    Stack.Connection = ServiceSignal:Connect(function(...)
+        if self.Unloaded then 
+            if Stack.Connection then
+                Stack.Connection:Disconnect()
+                Stack.Connection = nil
             end
-
-            Callback(Local)
+            return 
         end
+
+        local Funcs = Stack.Functions
+        for Name, Data in pairs(Funcs) do
+            if Data.Running and not Data.Paused then
+                task_spawn(Data.Callback, self, ...)
+            end
+        end
+    end)
+end
+
+function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
+    self:CreateStacks()
+
+    local Wait = WaitBoy or 0
+    local Name = Name or self:RandomString(15)
+    local Local = self
+
+    local Stack_Data = self.Stacks.While[Wait]
+    if not Stack_Data then
+        Stack_Data = {
+            Functions = {},
+            Running = true,
+            Thread = nil
+        }
+        self.Stacks.While[Wait] = Stack_Data
+
+        Stack_Data.Thread = task_spawn(function()
+            while Stack_Data.Running and not Local.Unloaded do
+                local dt = task_wait(Wait)
+
+                for _, Data in pairs(Stack_Data.Functions) do
+                    if Data.Running and not Data.Paused then
+                        task_spawn(Data.Callback, Local, dt)
+                    end
+                end
+            end
+        end)
     end
 
-    Data.Thread = task_spawn(Func)
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = Data
+    local Data = {
+        Running = true,
+        Paused = false,
+        Callback = Callback,
+
+        Pause = function(s) s.Paused = true end,
+        Unpause = function(s) s.Paused = false end,
+        
+        Kill = function(s) 
+            s.Running = false
+            if Stack_Data.Functions then
+                Stack_Data.Functions[Name] = nil
+            end
+            if Stack_Data.Functions and not next(Stack_Data.Functions) then
+                Stack_Data.Running = false
+                pcall(task_cancel, Stack_Data.Thread)
+                self.Stacks.While[Wait] = nil
+            end
+        end
+    }
+
+    if WaitBefore then
+        task_spawn(function()
+            task_wait(Wait)
+            if Data.Running and not Local.Unloaded then
+                Stack_Data.Functions[Name] = Data
+            end
+        end)
+    else
+        Stack_Data.Functions[Name] = Data
+        task_spawn(Callback, Local)
+    end
 
     return Data
 end
 
 function API:RenderStep(Callback, Name)
-    Name = Name or self:RandomString(15)
-    local Local = self
+    self:CreateStacks()
     
+    local Name = Name or self:RandomString(15)
+    AddService(self, "RenderStep", RenderStepped)
+
     local Data = {
-        Type = "RBXScriptConnection",
-        Service = "RenderStepped",
         Running = true,
         Paused = false,
-        Pause = function(S) S.Paused = true end,
-        Unpause = function(S) S.Paused = false end,
-        Kill = function(S) Local:ForceStop(Name) end
+        Callback = Callback,
+        Pause = function(s) s.Paused = true end,
+        Unpause = function(s) s.Paused = false end,
+        Kill = function(s) 
+            s.Running = false
+            if self.Stacks.RenderStep.Functions then
+                self.Stacks.RenderStep.Functions[Name] = nil
+            end
+        end
     }
+    
+    self.Stacks.RenderStep.Functions[Name] = Data
+    return Data
+end
 
-    local Func = function(dt)
-        if Local.Unloaded or not Data.Running or Data.Paused then return end
-        Callback(Local, dt)
-    end
+function API:Heartbeat(Callback, Name)
+    self:CreateStacks()
+    
+    local Name = Name or self:RandomString(15)
+    AddService(self, "Heartbeat", Heartbeat)
+    
+    local Data = {
+        Running = true,
+        Paused = false,
+        Callback = Callback,
+        Pause = function(s) s.Paused = true end,
+        Unpause = function(s) s.Paused = false end,
+        Kill = function(s) 
+            s.Running = false
+            if self.Stacks.Heartbeat.Functions then
+                self.Stacks.Heartbeat.Functions[Name] = nil
+            end
+        end
+    }
+    
+    self.Stacks.Heartbeat.Functions[Name] = Data
+    return Data
+end
 
-    Data.Connection = RenderStepped:Connect(Func)
-    Data.Func = Func
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = Data
-
+function API:Stepped(Callback, Name)
+    self:CreateStacks()
+    
+    local Name = Name or self:RandomString(15)
+    AddService(self, "Stepped", Stepped)
+    
+    local Data = {
+        Running = true,
+        Paused = false,
+        Callback = Callback,
+        Pause = function(s) s.Paused = true end,
+        Unpause = function(s) s.Paused = false end,
+        Kill = function(s) 
+            s.Running = false
+            if self.Stacks.Stepped.Functions then
+                self.Stacks.Stepped.Functions[Name] = nil
+            end
+        end
+    }
+    
+    self.Stacks.Stepped.Functions[Name] = Data
     return Data
 end
 
 function API:BindRender(Callback, Name, Priority)
-    Name = Name or self:RandomString(15)
-    local Local = self
-
+    self:CreateStacks()
+    
+    local Name = Name or self:RandomString(15)
+    
     local Data = {
         Type = "BindToRenderStep",
         Name = Name,
         Running = true,
         Paused = false,
-        Pause = function(S) S.Paused = true end,
-        Unpause = function(S) S.Paused = false end,
-        Kill = function(S) Local:ForceStop(Name) end
+        Pause = function(s) s.Paused = true end,
+        Unpause = function(s) s.Paused = false end,
+        Kill = function(s) 
+            s.Running = false
+            pcall(function() 
+                UnbindFromRenderStep(s.Name or Name)
+            end)
+            if self.ActiveConnections then
+                self.ActiveConnections[Name] = nil
+            end
+        end
     }
 
     local Func = function(dt)
-        if Local.Unloaded or not Data.Running or Data.Paused then return end
-        Callback(Local, dt)
+        if self.Unloaded or not Data.Running or Data.Paused then 
+            return 
+        end
+        Callback(self, dt)
     end
 
-    Data.Func = Func
     BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, Func)
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = Data
-
-    return Data
-end
-
-function API:Stepped(Callback, Name)
-    Name = Name or self:RandomString(15)
-    local Local = self
-
-    local Data = {
-        Type = "RBXScriptConnection", 
-        Service = "Stepped",
-        Running = true,
-        Paused = false,
-        Pause = function(S) S.Paused = true end,
-        Unpause = function(S) S.Paused = false end,
-        Kill = function(S) Local:ForceStop(Name) end
-    }
-
-    local Func = function(time, dt) 
-        if Local.Unloaded or not Data.Running or Data.Paused then return end
-        Callback(Local, time, dt) 
-    end
-
-    Data.Connection = Stepped:Connect(Func)
     Data.Func = Func
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = Data
-
-    return Data
-end
-
-function API:Heartbeat(Callback, Name)
-    Name = Name or self:RandomString(15)
-    local Local = self
     
-    local Data = {
-        Type = "RBXScriptConnection", 
-        Service = "Heartbeat",
-        Running = true,
-        Paused = false,
-        Pause = function(S) S.Paused = true end,
-        Unpause = function(S) S.Paused = false end,
-        Kill = function(S) Local:ForceStop(Name) end
-    }
-
-    local func = function(dt) 
-        if Local.Unloaded or not Data.Running or Data.Paused then return end
-        Callback(Local, dt) 
-    end
-
-    Data.Connection = Heartbeat:Connect(func)
-    Data.Func = func
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveConnections[Name] = Data
-
+    
     return Data
 end
 
 function API:BindKeybind(Key, Callback, BindName)
-    local Local = self
+    self:CreateStacks()
+    
     local Name = BindName or self:RandomString(15)
 
     local Data = {
-        Type = "RBXScriptConnection",
-        Service = "InputBegan",
+        Type = "Keybind",
+        Name = Name,
+        Key = Key,
         Running = true,
         Paused = false,
-        Key = Key,
-        Pause = function(S) S.Paused = true end,
-        Unpause = function(S) S.Paused = false end,
-        Kill = function(S) Local:ForceStop(Name) end
+        Pause = function(s) s.Paused = true end,
+        Unpause = function(s) s.Paused = false end,
+        Kill = function(s) 
+            s.Running = false
+            if s.Connection then
+                s.Connection:Disconnect()
+            end
+            if self.ActiveConnections then
+                self.ActiveConnections[Name] = nil
+            end
+        end
     }
 
     local Func = function(Input, Processed)
-        if Processed or Local.Unloaded or not Data.Running or Data.Paused then return end
-        if Input.KeyCode == Data.Key or Input.UserInputType == Data.Key then
+        if Processed or self.Unloaded or not Data.Running or Data.Paused then 
+            return 
+        end
+        if Input.KeyCode == Key or Input.UserInputType == Key then
             Callback(Input)
         end
     end
 
-    Data.Connection = UserInputService.InputBegan:Connect(Func)
-    Data.Func = Callback
-    Data.InternalFunc = Func
+    Data.Connection = InputBegan:Connect(Func)
+    Data.Callback = Callback
     
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveConnections[Name] = Data
-
+    
     return Data
 end
 
 function API:ForceStop(Name)
     local Entry = self.ActiveConnections and self.ActiveConnections[Name]
-    if not Entry then return false end
-
-    Entry.Running = false
-
-    if Entry.Type == "thread" then
-        if Entry.Thread then task_cancel(Entry.Thread) end
-    elseif Entry.Type == "RBXScriptConnection" then
-        if Entry.Connection then Entry.Connection:Disconnect() end
-    elseif Entry.Type == "BindToRenderStep" then
-        pcall(function() UnbindFromRenderStep(Entry.Name or Name) end)
+    if Entry then
+        Entry.Running = false
+        
+        if Entry.Type == "BindToRenderStep" then
+            pcall(function() 
+                UnbindFromRenderStep(Entry.Name or Name)
+            end)
+        elseif Entry.Connection then
+            Entry.Connection:Disconnect()
+        end
+        
+        self.ActiveConnections[Name] = nil
+        return true
     end
-
-    self.ActiveConnections[Name] = nil
-    return true
+    
+    if self.Stacks then
+        for Wait, Stack in pairs(self.Stacks.While) do
+            if Stack.Functions and Stack.Functions[Name] then
+                Stack.Functions[Name] = nil
+                return true
+            end
+        end
+        
+        if self.Stacks.Heartbeat.Functions and self.Stacks.Heartbeat.Functions[Name] then
+            self.Stacks.Heartbeat.Functions[Name] = nil
+            return true
+        end
+        
+        if self.Stacks.RenderStep.Functions and self.Stacks.RenderStep.Functions[Name] then
+            self.Stacks.RenderStep.Functions[Name] = nil
+            return true
+        end
+        
+        if self.Stacks.Stepped.Functions and self.Stacks.Stepped.Functions[Name] then
+            self.Stacks.Stepped.Functions[Name] = nil
+            return true
+        end
+    end
+    
+    return false
 end
 
 function API:GetState(Name)
     local Entry = (self.ActiveConnections and self.ActiveConnections[Name]) or (self.ActiveTasks and self.ActiveTasks[Name])
+    if Entry then
+        if not Entry.Running then return false end
+        if Entry.Paused then return "Paused" end
+        return true
+    end
+
+    if self.Stacks then
+        for Wait, Stack in pairs(self.Stacks.While) do
+            local Data = Stack.Functions and Stack.Functions[Name]
+            if Data then
+                if not Data.Running then return false end
+                if Data.Paused then return "Paused" end
+                return true
+            end
+        end
+
+        local Data = self.Stacks.Heartbeat.Functions and self.Stacks.Heartbeat.Functions[Name]
+        if Data then
+            if not Data.Running then return false end
+            if Data.Paused then return "Paused" end
+            return true
+        end
+        
+        Data = self.Stacks.RenderStep.Functions and self.Stacks.RenderStep.Functions[Name]
+        if Data then
+            if not Data.Running then return false end
+            if Data.Paused then return "Paused" end
+            return true
+        end
+        
+        Data = self.Stacks.Stepped.Functions and self.Stacks.Stepped.Functions[Name]
+        if Data then
+            if not Data.Running then return false end
+            if Data.Paused then return "Paused" end
+            return true
+        end
+    end
     
-    if not Entry then 
-        return nil 
-    end
-
-    if Entry.Running == false then 
-        return false 
-    end
-
-    if Entry.Paused then 
-        return "Paused" 
-    end
-
-    if Entry.Type == "thread" then
-        return coroutine.status(Entry.Thread) ~= "dead"
-    elseif Entry.Type == "RBXScriptConnection" then
-        return Entry.Connection and Entry.Connection.Connected
-    end
-
-    return Entry.Running
+    return nil
 end
 
 function API:AddTask(Signal, Callback, Name)
@@ -2749,12 +2874,47 @@ function API:Unload()
     (getgenv().FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
     self.Unloaded = true
 
+    if self.Stacks then
+        for Wait, Stack in pairs(self.Stacks.While) do
+            if Stack and Stack.Thread then
+                task_cancel(Stack.Thread)
+            end
+            if Stack and Stack.Functions then
+                Stack.Functions = nil
+            end
+        end
+        self.Stacks.While = nil
+        
+        local function CleanStack(StackName)
+            local Stack = self.Stacks[StackName]
+            if Stack then
+                if Stack.Connection then
+                    Stack.Connection:Disconnect()
+                    Stack.Connection = nil
+                end
+                Stack.Functions = nil
+            end
+        end
+        
+        CleanStack("Heartbeat")
+        CleanStack("RenderStep")
+        CleanStack("Stepped")
+        
+        self.Stacks = nil
+    end
+
     self.ActiveConnections = self.ActiveConnections or {}
     self.ActiveTasks = self.ActiveTasks or {}
 
-    for Instance, _ in pairs(self.ActiveConnections) do
+    for Instance, Entry in pairs(self.ActiveConnections) do
+        if Entry and Entry.Type == "BindToRenderStep" then
+            pcall(function() 
+                UnbindFromRenderStep(Entry.Name or Instance)
+            end)
+        end
         self:ForceStop(Instance)
     end
+    
     for Instance, _ in pairs(self.ActiveTasks) do
         self:StopTask(Instance)
     end
