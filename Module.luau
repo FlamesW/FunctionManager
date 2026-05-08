@@ -121,7 +121,7 @@ function API:Flags()
     self.XRayActive = false
     self.FlingActive = false
     self.Clip = true
-    self.Unloaded = false
+    self.UnloadedLM = false
 
     -- @Objects / Data
     self.FlightData = nil
@@ -2474,7 +2474,7 @@ local function AddService(self, Name, ServiceSignal)
     if Stack.Connection then return end
 
     Stack.Connection = ServiceSignal:Connect(function(...)
-        if self.Unloaded then 
+        if self.UnloadedLM then 
             if Stack.Connection then
                 Stack.Connection:Disconnect()
                 Stack.Connection = nil
@@ -2508,7 +2508,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
         self.Stacks.While[Wait] = Stack_Data
 
         Stack_Data.Thread = task_spawn(function()
-            while Stack_Data.Running and not Local.Unloaded do
+            while Stack_Data.Running and not Local.UnloadedLM do
                 local dt = task_wait(Wait)
 
                 for _, Data in pairs(Stack_Data.Functions) do
@@ -2546,7 +2546,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     if WaitBefore then
         task_spawn(function()
             task_wait(Wait)
-            if Data.Running and not Local.Unloaded then
+            if Data.Running and not Local.UnloadedLM then
                 Stack_Data.Functions[Name] = Data
             end
         end)
@@ -2662,7 +2662,7 @@ function API:BindRender(Callback, Name, Priority)
     }
 
     local Func = function(dt)
-        if self.Unloaded or not Data.Running or Data.Paused then 
+        if self.UnloadedLM or not Data.Running or Data.Paused then 
             return 
         end
         Callback(self, dt)
@@ -2704,7 +2704,7 @@ function API:BindKeybind(Key, Callback, BindName)
     }
 
     local Func = function(Input, Processed)
-        if Processed or self.Unloaded or not Data.Running or Data.Paused then 
+        if Processed or self.UnloadedLM or not Data.Running or Data.Paused then 
             return 
         end
         
@@ -2736,7 +2736,7 @@ function API:SetKeybind(Name, NewKey)
     Entry.Key = NewKey
 
     local Func = function(Input, Processed)
-        if Processed or self.Unloaded or not Entry.Running or Entry.Paused then 
+        if Processed or self.UnloadedLM or not Entry.Running or Entry.Paused then 
             return 
         end
         if Input.KeyCode == NewKey or Input.UserInputType == NewKey then
@@ -2861,7 +2861,7 @@ function API:AddTask(Signal, Callback, Name)
 
     local function wrapper()
         Data.Connection = Signal:Connect(function(...)
-            if Data.Running and not Data.Paused and not Local.Unloaded then
+            if Data.Running and not Data.Paused and not Local.UnloadedLM then
                 Callback(Local, ...)
             end
         end)
@@ -2900,52 +2900,52 @@ function API:RestartTask(Name)
 end
 
 function API:UnloadLM()
-    self.Unloaded = true
+    self.UnloadedLM = true
 
     if self.ActiveConnections then
-        for Name, _ in pairs(self.ActiveConnections) do
-            self:ForceStop(Name)
+        for Instance, _ in pairs(self.ActiveConnections) do
+            self:ForceStop(Instance)
         end
     end
 
     if self.ActiveTasks then
-        for Name, _ in pairs(self.ActiveTasks) do
-            self:StopTask(Name)
+        for Instance, _ in pairs(self.ActiveTasks) do
+            self:StopTask(Instance)
         end
     end
 
     if self.Stacks then
         for _, Stack in pairs(self.Stacks.While) do
             if Stack.Functions then
-                for Name, _ in pairs(Stack.Functions) do
-                    self:ForceStop(Name)
+                for Instance, _ in pairs(Stack.Functions) do
+                    self:ForceStop(Instance)
                 end
             end
         end
         
         if self.Stacks.Heartbeat and self.Stacks.Heartbeat.Functions then
-            for Name, _ in pairs(self.Stacks.Heartbeat.Functions) do
-                self:ForceStop(Name)
+            for Instance, _ in pairs(self.Stacks.Heartbeat.Functions) do
+                self:ForceStop(Instance)
             end
         end
         
         if self.Stacks.RenderStep and self.Stacks.RenderStep.Functions then
-            for Name, _ in pairs(self.Stacks.RenderStep.Functions) do
-                self:ForceStop(Name)
+            for Instance, _ in pairs(self.Stacks.RenderStep.Functions) do
+                self:ForceStop(Instance)
             end
         end
         
         if self.Stacks.Stepped and self.Stacks.Stepped.Functions then
-            for Name, _ in pairs(self.Stacks.Stepped.Functions) do
-                self:ForceStop(Name)
+            for Instance, _ in pairs(self.Stacks.Stepped.Functions) do
+                self:ForceStop(Instance)
             end
         end
     end
 end
 
-function API:Toggle(State)
+function API:ToggleLM(State)
     if typeof(State) == "boolean" then
-        self.Unloaded = State
+        self.UnloadedLM = State
     end
 end
 
