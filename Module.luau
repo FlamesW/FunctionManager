@@ -2454,13 +2454,13 @@ end
 
 -- // >Loop Manager, Build: @1.39 | by Mommy Flames
 function API:CreateStacks()
-    if self.Stacks then return end
-
-    self.Stacks = { 
-		While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
-        RenderStep = {Connection = nil, Functions = {}, Active = true},
-        Stepped = {Connection = nil, Functions = {}, Active = true},
-    }
+    if not self.Stacks then
+        self.Stacks = { 
+            While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
+            RenderStep = {Connection = nil, Functions = {}, Active = true},
+            Stepped = {Connection = nil, Functions = {}, Active = true},
+        }
+    end
 end
 
 local function AddService(self, Name, ServiceSignal)
@@ -2540,7 +2540,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     if WaitBefore then
         task_spawn(function()
             task_wait(Wait)
-            if Data.Running and not Local.Unloaded and self.Stacks then
+            if Data.Running and not Local.Unloaded then
                 Stack_Data.Functions[Name] = Data
             end
         end)
