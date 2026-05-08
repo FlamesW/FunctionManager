@@ -2530,7 +2530,9 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
             if Stack_Data.Functions and not next(Stack_Data.Functions) then
                 Stack_Data.Running = false
                 pcall(task_cancel, Stack_Data.Thread)
-                self.Stacks.While[Wait] = nil
+                if self.Stacks and self.Stacks.While then
+                    self.Stacks.While[Wait] = nil
+                end
             end
         end
     }
@@ -2538,7 +2540,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     if WaitBefore then
         task_spawn(function()
             task_wait(Wait)
-            if Data.Running and not Local.Unloaded then
+            if Data.Running and not Local.Unloaded and self.Stacks then
                 Stack_Data.Functions[Name] = Data
             end
         end)
