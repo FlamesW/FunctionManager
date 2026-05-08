@@ -102,16 +102,20 @@ end
 
 function API:Flags()
     local Tables = {
-		"AssetCache", "HighlightCache", "RecencyStores", 
+        "AssetCache", "HighlightCache", "RecencyStores", 
         "HistoryParts", "Origins", "Timers", "Priorities", "ActiveConnections", 
-		"CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses",
+        "CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses"
     }
 
     for _, Name in ipairs(Tables) do
         self[Name] = {}
     end
 
-    self:CreateStacks()
+    self.Stacks = {
+        While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
+        RenderStep = {Connection = nil, Functions = {}, Active = true},
+        Stepped = {Connection = nil, Functions = {}, Active = true},
+    }
 
     -- @Booleans / States
     self.XRayActive = false
@@ -2456,14 +2460,12 @@ end
 
 -- // >Loop Manager, Build: @1.42 | by Mommy Flames
 function API:CreateStacks()
-    if type(self.Stacks) ~= "table" then
+    if type(self.Stacks) ~= "table" or type(self.Stacks.While) ~= "table" then
         self.Stacks = {
             While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
             RenderStep = {Connection = nil, Functions = {}, Active = true},
             Stepped = {Connection = nil, Functions = {}, Active = true},
         }
-    elseif type(self.Stacks.While) ~= "table" then
-        self.Stacks.While = {}
     end
 end
 
