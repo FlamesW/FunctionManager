@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.53", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.54", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -2900,6 +2900,8 @@ function API:RestartTask(Name)
 end
 
 function API:UnloadLM()
+    self.Unloaded = true
+
     if self.ActiveConnections then
         for Name, _ in pairs(self.ActiveConnections) do
             self:ForceStop(Name)
@@ -2961,8 +2963,6 @@ end
 function API:Unload()
     -- // @Unload.module~
     (getgenv().FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
-    self.Unloaded = true
-
     self:UnloadLM();
 
     self:XRay(false);
