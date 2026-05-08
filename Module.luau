@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.54", Author = "♡ FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.56", Author = "FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -2458,7 +2458,7 @@ function API:Audio_Logger()
     return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
 end
 
--- // >Loop Manager, Build: @1.42 | by Mommy Flames
+-- // @Loop Manager.module, Build: 1.43 | by Mommy Flames
 function API:CreateStacks()
     if type(self.Stacks) ~= "table" or type(self.Stacks.While) ~= "table" then
         self.Stacks = {
@@ -2497,7 +2497,8 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
         Stack_Data = {
             Functions = {},
             Running = true,
-            Thread = nil
+            Thread = nil,
+            Wait = Wait
         }
         self.Stacks.While[Wait] = Stack_Data
 
@@ -2506,7 +2507,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
                 if Local.UnloadedLM then
                     task_wait()
                 else
-                    local dt = task_wait(Wait)
+                    local dt = task_wait(Stack_Data.Wait)
                     for _, Data in pairs(Stack_Data.Functions) do
                         if Data.Running and not Data.Paused then
                             task_spawn(Data.Callback, Local, dt)
@@ -2521,10 +2522,17 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
         Running = true,
         Paused = false,
         Callback = Callback,
+        Name = Name,
 
         Pause = function(s) s.Paused = true end,
         Unpause = function(s) s.Paused = false end,
-        
+
+        SetWait = function(s, New)
+            if Stack_Data then
+                Stack_Data.Wait = New
+            end
+        end,
+
         Kill = function(s) 
             s.Running = false
             if Stack_Data.Functions then
@@ -2557,6 +2565,21 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore)
     return Data
 end
 
+function API:SetWait(Name, New)
+    if not self.Stacks or not self.Stacks.While then
+        return false
+    end
+    
+    for Wait, Stack in pairs(self.Stacks.While) do
+        if Stack.Functions and Stack.Functions[Name] then
+            Stack.Wait = New
+            return true
+        end
+    end
+    
+    return false
+end
+
 function API:RenderStep(Callback, Name)
     self:CreateStacks()
     
@@ -2581,6 +2604,18 @@ function API:RenderStep(Callback, Name)
     
     self.Stacks.RenderStep.Functions[Name] = Data
     return Data
+end
+
+function API:SetWait(Name, NewWait)
+    if self.Stacks and self.Stacks.While then
+        for Wait, Stack in pairs(self.Stacks.While) do
+            if Stack.Functions and Stack.Functions[Name] then
+                Stack.Functions[Name]:SetWait(NewWait)
+                return true
+            end
+        end
+    end
+    return false
 end
 
 function API:Heartbeat(Callback, Name)
