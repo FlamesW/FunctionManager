@@ -2899,6 +2899,48 @@ function API:RestartTask(Name)
     end
 end
 
+function API:UnloadLM()
+    if self.ActiveConnections then
+        for Name, _ in pairs(self.ActiveConnections) do
+            self:ForceStop(Name)
+        end
+    end
+
+    if self.ActiveTasks then
+        for Name, _ in pairs(self.ActiveTasks) do
+            self:StopTask(Name)
+        end
+    end
+
+    if self.Stacks then
+        for _, Stack in pairs(self.Stacks.While) do
+            if Stack.Functions then
+                for Name, _ in pairs(Stack.Functions) do
+                    self:ForceStop(Name)
+                end
+            end
+        end
+        
+        if self.Stacks.Heartbeat and self.Stacks.Heartbeat.Functions then
+            for Name, _ in pairs(self.Stacks.Heartbeat.Functions) do
+                self:ForceStop(Name)
+            end
+        end
+        
+        if self.Stacks.RenderStep and self.Stacks.RenderStep.Functions then
+            for Name, _ in pairs(self.Stacks.RenderStep.Functions) do
+                self:ForceStop(Name)
+            end
+        end
+        
+        if self.Stacks.Stepped and self.Stacks.Stepped.Functions then
+            for Name, _ in pairs(self.Stacks.Stepped.Functions) do
+                self:ForceStop(Name)
+            end
+        end
+    end
+end
+
 function API:Toggle(State)
     if typeof(State) == "boolean" then
         self.Unloaded = State
@@ -2921,50 +2963,7 @@ function API:Unload()
     (getgenv().FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
     self.Unloaded = true
 
-    if self.Stacks then
-        for Wait, Stack in pairs(self.Stacks.While) do
-            if Stack and Stack.Thread then
-                task_cancel(Stack.Thread)
-            end
-            if Stack and Stack.Functions then
-                Stack.Functions = nil
-            end
-        end
-        self.Stacks.While = nil
-        
-        local function CleanStack(StackName)
-            local Stack = self.Stacks[StackName]
-            if Stack then
-                if Stack.Connection then
-                    Stack.Connection:Disconnect()
-                    Stack.Connection = nil
-                end
-                Stack.Functions = nil
-            end
-        end
-        
-        CleanStack("Heartbeat")
-        CleanStack("RenderStep")
-        CleanStack("Stepped")
-        
-        self.Stacks = nil
-    end
-
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveTasks = self.ActiveTasks or {}
-
-    for Instance, Entry in pairs(self.ActiveConnections) do
-        if Entry and Entry.Type == "BindToRenderStep" then
-            pcall(function() 
-                UnbindFromRenderStep(Entry.Name or Instance)
-            end)
-        end
-        self:ForceStop(Instance)
-    end
-    
-    for Instance, _ in pairs(self.ActiveTasks) do
-        self:StopTask(Instance)
-    end
+    self:UnloadLM();
 
     self:XRay(false);
     self:Flight(false, nil);
