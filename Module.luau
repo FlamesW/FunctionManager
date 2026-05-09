@@ -100,53 +100,6 @@ local Internal = function(packet)
     end
 end
 
-function API:Flags()
-    local Tables = {
-        "AssetCache", "HighlightCache", "RecencyStores", 
-        "HistoryParts", "Origins", "Timers", "Priorities", "ActiveConnections", 
-        "CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses",
-        "ControlModule", "Websocket", "Sounds", "ActiveTasks", "Priorities",
-        "Flags", "Stacks", "XRayActive", "FlingActive", "Clip", "UnloadedLM",
-        "FlingLoop", "Noclipping", "EndPoint", "TaskOnce", "LogConnection"
-    }
-
-    for _, Name in ipairs(Tables) do
-        self[Name] = self[Name] or {}
-    end
-
-    self.Stacks = self.Stacks or {
-        While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
-        RenderStep = {Connection = nil, Functions = {}, Active = true},
-        Stepped = {Connection = nil, Functions = {}, Active = true},
-    }
-
-    -- @Booleans / States
-    self.XRayActive = self.XRayActive or false
-    self.FlingActive = self.FlingActive or false
-    self.Clip = self.Clip or true
-    self.UnloadedLM = self.UnloadedLM or false
-
-    -- @Objects / Data
-    self.FlightData = nil
-    self.JumpData = nil
-    self.WSData = nil
-    self.JPData = nil
-    self.FlingData = nil
-    self.FlingLoop = nil
-    self.Noclipping = nil
-    self.EndPoint = nil
-    self.TaskOnce = nil
-    self.LogConnection = nil
-    self.Websocket = nil
-    self.ControlModule = nil
-
-    self.ActiveTasks = self.ActiveTasks or {}
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.LoggedGamepasses = self.LoggedGamepasses or {}
-    self.Priorities = self.Priorities or {}
-    self.Timers = self.Timers or {}
-end
-
 -- // @Functions.module
 function API:CreateInstance(ClassName, Properties)
     local InstanceObj = Instance_new(ClassName)
@@ -1124,6 +1077,8 @@ function API:GetHeldTool()
 end
 
 function API:AddPriority(Name, Priority, Condition, Action)
+    self.Priorities = self.Priorities or {}
+
     table_insert(self.Priorities, {
         Name = Name,
         Priority = Priority,
@@ -3378,7 +3333,6 @@ function API.Launch(Class)
     Class.CurrentCamera = CurrentCamera
     Class.CoreGui = CoreGui
 
-    API.Flags(Class)
     return setmetatable(Class, API)
 end
 
