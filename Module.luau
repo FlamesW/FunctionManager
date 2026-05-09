@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.59", Author = "FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.60", Author = "FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -1269,13 +1269,13 @@ function API:BypassWS(State, Speed)
         local delta = RunService.Heartbeat:Wait()
         local moveDir = Humanoid.MoveDirection
         
-        local Root = self:GetRoot()
-        if not Root then return end
+        local Roots = self:GetRoot()
+        if not Roots then return end
         
         if moveDir.Magnitude > 0 then
-            Root.CFrame = Root.CFrame + (moveDir * self.WSData.Speed * delta * self.WSData.Speed)
+            Roots.CFrame = Roots.CFrame + (moveDir * self.WSData.Speed * delta * self.WSData.Speed)
         else
-            Root.CFrame = Root.CFrame + (moveDir * delta * self.WSData.Speed)
+            Roots.CFrame = Roots.CFrame + (moveDir * delta * self.WSData.Speed)
         end
     end)
     
