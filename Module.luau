@@ -3296,9 +3296,12 @@ function API:Unload()
 
     self:XRay(false);
     self:Flight(false, nil);
-    self:StopClip();
-    self:StopFling();
-	self:InfiniteJump(false)
+	self:BypassWS(false, nil);
+	self:TouchFling(false);
+	self:BypassJP(false, nil);
+	self:InfiniteJump(false);
+	self:StopClip();
+	self:StopFling();
 
     self:ClearHighlights();
     self:ClearBaseplates();
