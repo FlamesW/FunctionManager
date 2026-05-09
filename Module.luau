@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.56", Author = "FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.57", Author = "FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -1221,6 +1221,24 @@ function API:SetCameraOcclusion(Mode)
     end
 end
 
+function API:GetControlModule()
+    if self.ControlModule then
+        return self.ControlModule
+    end
+    
+    local Scripts = LocalPlayer:FindFirstChild("PlayerScripts")
+    if not Scripts then return nil end
+    
+    local Module = PlayerScripts:FindFirstChild("PlayerModule")
+    if not Module then return nil end
+    
+    local ControlModule = Module:FindFirstChild("ControlModule")
+    if not ControlModule then return nil end
+
+    self.ControlModule = require(ControlModule)
+    return self.ControlModule
+end
+
 function API:PurchasePrompts(State)
     local Prompt = CoreGui:FindFirstChild("PurchasePromptApp")
     if Prompt then
@@ -1242,8 +1260,173 @@ function API:SetJumpPower(Amount)
     end
 end
 
+function API:BypassWS(State, Speed)
+    State = State or false
+    Speed = Speed or 5
+    
+    self.WSData = self.WSData or {
+        Active = false,
+        Running = false,
+        Speed = Speed,
+        Connections = {}
+    }
+    
+    local function CleanUP()
+        self.WSData.Active = false
+        self.WSData.Running = false
+        
+        for _, Connection in ipairs(self.WSData.Connections) do
+            pcall(function() Connection:Disconnect() end)
+        end
+        table_clear(self.WSData.Connections)
+    end
+    
+    if not State then
+        CleanUP()
+        return false
+    end
+    
+    if self.WSData.Active then
+        return true
+    end
+    
+    self.WSData.Active = true
+    self.WSData.Running = true
+    self.WSData.Speed = Speed
+    
+    local Connection = Heartbeat:Connect(function()
+        if not self.WSData.Running then return end
+        
+        local Humanoid = self:GetHumanoid()
+        if not Humanoid then return end
+        
+        local delta = RunService.Heartbeat:Wait()
+        local moveDir = Humanoid.MoveDirection
+        
+        local Root = self:GetRoot()
+        if not Root then return end
+        
+        if moveDir.Magnitude > 0 then
+            Root.CFrame = Root.CFrame + (moveDir * self.WSData.Speed * delta * self.WSData.Speed)
+        else
+            Root.CFrame = Root.CFrame + (moveDir * delta * self.WSData.Speed)
+        end
+    end)
+    
+    table_insert(self.WSData.Connections, Connection)
+    
+    return true
+end
+
+function API:SetBypassedWS(Speed)
+    if not self.WSData or not self.WSData.Active then
+        return false
+    end
+    
+    self.WSData.Speed = Speed
+    return true
+end
+
+function API:BypassJP(State, Amount)
+    State = State or false
+    Amount = Amount or 20
+    
+    self.JPData = self.JPData or {
+        Active = false,
+        Running = false,
+        Amount = Amount,
+        Connections = {}
+    }
+    
+    local function CleanUP()
+        self.JPData.Active = false
+        self.JPData.Running = false
+        
+        for _, Connection in ipairs(self.JPData.Connections) do
+            pcall(function() Connection:Disconnect() end)
+        end
+        table_clear(self.JPData.Connections)
+    end
+    
+    if not State then
+        CleanUP()
+        return false
+    end
+    
+    if self.JPData.Active then
+        return true
+    end
+    
+    self.JPData.Active = true
+    self.JPData.Running = true
+    self.JPData.Amount = Amount
+    
+    local Connection = Heartbeat:Connect(function()
+        if not self.JPData.Running then return end
+        
+        local Humanoid = self:GetHumanoid()
+        if not Humanoid then return end
+        
+        local Roots = self:GetRoot()
+        if not Roots then return end
+        
+        if Humanoid:GetState() == Enum.HumanoidStateType.Jumping then
+            Roots.CFrame = Roots.CFrame * CFrame_new(0, self.JPData.Amount, 0)
+        end
+    end)
+    
+    table_insert(self.JPData.Connections, Connection)
+    
+    return true
+end
+
+function API:SetBypassedJP(Amount)
+    if not self.JPData or not self.JPData.Active then
+        return false
+    end
+    
+    self.JPData.Power = Amount
+    return true
+end
+
 function API:SetTime(Amount)
     LightingService.ClockTime = Amount
+end
+
+function API:GetControlModule()
+    if self.ControlModule then
+        return self.ControlModule
+    end
+    
+    local playerScripts = LocalPlayer:FindFirstChild("PlayerScripts")
+    if not playerScripts then return nil end
+    
+    local playerModule = playerScripts:FindFirstChild("PlayerModule")
+    if not playerModule then return nil end
+    
+    local controlModule = playerModule:FindFirstChild("ControlModule")
+    if not controlModule then return nil end
+    
+    self.ControlModule = require(controlModule)
+    return self.ControlModule
+end
+
+function API:FlightConfig(Config)
+    if not self.FlightData then
+        self.FlightData = {Active = false, Connections = {}}
+    end
+    
+    self.FlightData.SpeedMin = Config.SpeedMin or self.FlightData.SpeedMin or 10
+    self.FlightData.SpeedMax = Config.SpeedMax or self.FlightData.SpeedMax or 250
+    self.FlightData.SpeedStep = Config.SpeedStep or self.FlightData.SpeedStep or 1.5
+    
+    if self.FlightData.Active then
+        self.FlightData.Speed = math_clamp(self.FlightData.Speed, 
+            self.FlightData.SpeedMin, 
+            self.FlightData.SpeedMax)
+    end
+    
+    return true
 end
 
 function API:Flight(State, Speed)
@@ -1285,7 +1468,7 @@ function API:Flight(State, Speed)
     end
     
     self.FlightData.Active = true
-    self.FlightData.Speed = Speed
+    self.FlightData.Speed = math_clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
     
     local BV = self:CreateInstance("BodyVelocity", {
         Name = "00x00x00x00x00",
@@ -1306,6 +1489,7 @@ function API:Flight(State, Speed)
     self.FlightData.BodyGyro = BG
     
     local Camera = CurrentCamera
+    local ControlModule = self:IsMobile() and self:GetControlModule() or nil
     
     local Connection = RenderStepped:Connect(function()
         local Roots = self:GetRoot()
@@ -1321,25 +1505,37 @@ function API:Flight(State, Speed)
         end
         
         local moveDirection = Vector3_zero
-        
-        if IsKeyDown(UserInputService, Enum.KeyCode.W) then
-            moveDirection += Camera.CFrame.LookVector
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.S) then
-            moveDirection -= Camera.CFrame.LookVector
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.A) then
-            moveDirection -= Camera.CFrame.RightVector
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.D) then
-            moveDirection += Camera.CFrame.RightVector
-        end
-        
-        if IsKeyDown(UserInputService, Enum.KeyCode.Space) then
-            moveDirection += Camera.CFrame.UpVector
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
-            moveDirection -= Camera.CFrame.UpVector
+    
+        if self:IsMobile() and ControlModule then
+            local direction = ControlModule:GetMoveVector()
+            moveDirection = (Camera.CFrame.RightVector * direction.X) + (Camera.CFrame.LookVector * -direction.Z)
+    
+            if moveDirection.Magnitude > 0 then
+                moveDirection = moveDirection.Unit * self.FlightData.Speed
+            end
+        else
+            if IsKeyDown(UserInputService, Enum.KeyCode.W) then
+                moveDirection += Camera.CFrame.LookVector
+            end
+            if IsKeyDown(UserInputService, Enum.KeyCode.S) then
+                moveDirection -= Camera.CFrame.LookVector
+            end
+            if IsKeyDown(UserInputService, Enum.KeyCode.A) then
+                moveDirection -= Camera.CFrame.RightVector
+            end
+            if IsKeyDown(UserInputService, Enum.KeyCode.D) then
+                moveDirection += Camera.CFrame.RightVector
+            end
+            if IsKeyDown(UserInputService, Enum.KeyCode.Space) then
+                moveDirection += Camera.CFrame.UpVector
+            end
+            if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
+                moveDirection -= Camera.CFrame.UpVector
+            end
+            
+            if moveDirection.Magnitude > 0 then
+                moveDirection = moveDirection.Unit * self.FlightData.Speed
+            end
         end
 
         if IsKeyDown(UserInputService, Enum.KeyCode.Equals) then
@@ -1348,10 +1544,6 @@ function API:Flight(State, Speed)
         elseif IsKeyDown(UserInputService, Enum.KeyCode.Minus) then
             self.FlightData.Speed = math_clamp(self.FlightData.Speed - self.FlightData.SpeedStep, 
                 self.FlightData.SpeedMin, self.FlightData.SpeedMax)
-        end
-
-        if moveDirection.Magnitude > 0 then
-            moveDirection = moveDirection.Unit * self.FlightData.Speed
         end
         
         if self.FlightData.BodyVelocity then
@@ -1376,6 +1568,109 @@ function API:SetFlightSpeed(Speed)
     Speed = math_clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
     self.FlightData.Speed = Speed
 
+    return true
+end
+
+function API:InfiniteJump(State)
+    State = State or false
+
+    self.JumpData = self.JumpData or {
+        Active = false,
+        Debounce = false,
+        Connections = {}
+    }
+    
+    local function CleanUP()
+        self.JumpData.Active = false
+        self.JumpData.Debounce = false
+        
+        for _, Connection in ipairs(self.JumpData.Connections) do
+            pcall(function() Connection:Disconnect() end)
+        end
+        table_clear(self.JumpData.Connections)
+    end
+    
+    if not State then
+        CleanUP()
+        return false
+    end
+    
+    if self.JumpData.Active then
+        return true
+    end
+    
+    self.JumpData.Active = true
+    
+    local Connection = UserInputService.JumpRequest:Connect(function()
+        if not self.JumpData.Debounce then
+            self.JumpData.Debounce = true
+            
+            local Humanoid = self:GetHumanoid()
+            if Humanoid then
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+            
+            task_wait(0.1)
+            self.JumpData.Debounce = false
+        end
+    end)
+    
+    table_insert(self.JumpData.Connections, Connection)
+    
+    return true
+end
+
+function API:TouchFling(State)
+    State = State or false
+    
+    self.FlingData = self.FlingData or {
+        Active = false,
+        Running = false,
+        Connections = {}
+    }
+    
+    local function CleanUP()
+        self.FlingData.Active = false
+        self.FlingData.Running = false
+        
+        for _, Connection in ipairs(self.FlingData.Connections) do
+            pcall(function() Connection:Disconnect() end)
+        end
+        table_clear(self.FlingData.Connections)
+    end
+    
+    if not State then
+        CleanUP()
+        return false
+    end
+
+    if self.FlingData.Active then
+        return true
+    end
+    
+    self.FlingData.Active = true
+    self.FlingData.Running = true
+
+    local movel = 0.1
+
+    local Connection = Heartbeat:Connect(function()
+        if not self.FlingData.Running then return end
+        
+        local Roots = self:GetRoot()
+        if not Roots then return end
+    
+        local vel = Roots.Velocity
+        Roots.Velocity = vel * 10000 + Vector3_new(0, 10000, 0)
+        RenderStepped:Wait()
+        Roots.Velocity = vel
+        Stepped:Wait()
+        Roots.Velocity = vel + Vector3_new(0, movel, 0)
+        
+        movel = -movel
+    end)
+
+    table_insert(self.FlingData.Connections, Connection)
+    
     return true
 end
 
@@ -2606,18 +2901,6 @@ function API:RenderStep(Callback, Name)
     return Data
 end
 
-function API:SetWait(Name, NewWait)
-    if self.Stacks and self.Stacks.While then
-        for Wait, Stack in pairs(self.Stacks.While) do
-            if Stack.Functions and Stack.Functions[Name] then
-                Stack.Functions[Name]:SetWait(NewWait)
-                return true
-            end
-        end
-    end
-    return false
-end
-
 function API:Heartbeat(Callback, Name)
     self:CreateStacks()
     
@@ -3003,6 +3286,7 @@ function API:Unload()
     self:Flight(false, nil);
     self:StopClip();
     self:StopFling();
+	self:InfiniteJump(false)
 
     self:ClearHighlights();
     self:ClearBaseplates();
