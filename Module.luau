@@ -105,7 +105,6 @@ function API:Flags()
         "AssetCache", "HighlightCache", "RecencyStores", 
         "HistoryParts", "Origins", "Timers", "Priorities", "ActiveConnections", 
         "CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses",
-        "FlightData", "JumpData", "WSData", "JPData", "FlingData",
         "ControlModule", "Websocket", "Sounds", "ActiveTasks", "Priorities",
         "Flags", "Stacks", "XRayActive", "FlingActive", "Clip", "UnloadedLM",
         "FlingLoop", "Noclipping", "EndPoint", "TaskOnce", "LogConnection"
@@ -128,18 +127,18 @@ function API:Flags()
     self.UnloadedLM = self.UnloadedLM or false
 
     -- @Objects / Data
-    self.FlightData = self.FlightData or nil
-    self.JumpData = self.JumpData or nil
-    self.WSData = self.WSData or nil
-    self.JPData = self.JPData or nil
-    self.FlingData = self.FlingData or nil
-    self.FlingLoop = self.FlingLoop or nil
-    self.Noclipping = self.Noclipping or nil
-    self.EndPoint = self.EndPoint or nil
-    self.TaskOnce = self.TaskOnce or nil
-    self.LogConnection = self.LogConnection or nil
-    self.Websocket = self.Websocket or nil
-    self.ControlModule = self.ControlModule or nil
+    self.FlightData = nil
+    self.JumpData = nil
+    self.WSData = nil
+    self.JPData = nil
+    self.FlingData = nil
+    self.FlingLoop = nil
+    self.Noclipping = nil
+    self.EndPoint = nil
+    self.TaskOnce = nil
+    self.LogConnection = nil
+    self.Websocket = nil
+    self.ControlModule = nil
 
     self.ActiveTasks = self.ActiveTasks or {}
     self.ActiveConnections = self.ActiveConnections or {}
