@@ -3266,6 +3266,8 @@ function API:Unload()
     self:ClearRaknet();
 
     getgenv().FunctionManager_Engine = nil
+	task_wait();
+
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
     end
