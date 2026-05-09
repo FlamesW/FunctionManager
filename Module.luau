@@ -104,36 +104,48 @@ function API:Flags()
     local Tables = {
         "AssetCache", "HighlightCache", "RecencyStores", 
         "HistoryParts", "Origins", "Timers", "Priorities", "ActiveConnections", 
-        "CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses"
+        "CreatedBaseplates", "Sounds", "ActiveTasks", "LoggedGamepasses",
+        "FlightData", "JumpData", "WSData", "JPData", "FlingData",
+        "ControlModule", "Websocket", "Sounds", "ActiveTasks", "Priorities",
+        "Flags", "Stacks", "XRayActive", "FlingActive", "Clip", "UnloadedLM",
+        "FlingLoop", "Noclipping", "EndPoint", "TaskOnce", "LogConnection"
     }
 
     for _, Name in ipairs(Tables) do
-        self[Name] = {}
+        self[Name] = self[Name] or {}
     end
 
-    self.Stacks = {
+    self.Stacks = self.Stacks or {
         While = {}, Heartbeat = {Connection = nil, Functions = {}, Active = true},
         RenderStep = {Connection = nil, Functions = {}, Active = true},
         Stepped = {Connection = nil, Functions = {}, Active = true},
     }
 
     -- @Booleans / States
-    self.XRayActive = false
-    self.FlingActive = false
-    self.Clip = true
-    self.UnloadedLM = false
+    self.XRayActive = self.XRayActive or false
+    self.FlingActive = self.FlingActive or false
+    self.Clip = self.Clip or true
+    self.UnloadedLM = self.UnloadedLM or false
 
     -- @Objects / Data
-    self.FlightData = nil
-    self.FlingLoop = nil
-    self.Noclipping = nil
-    self.EndPoint = nil
-    self.TaskOnce = nil
-    self.Websocket = nil
-    self.LogConnection = nil
+    self.FlightData = self.FlightData or nil
+    self.JumpData = self.JumpData or nil
+    self.WSData = self.WSData or nil
+    self.JPData = self.JPData or nil
+    self.FlingData = self.FlingData or nil
+    self.FlingLoop = self.FlingLoop or nil
+    self.Noclipping = self.Noclipping or nil
+    self.EndPoint = self.EndPoint or nil
+    self.TaskOnce = self.TaskOnce or nil
+    self.LogConnection = self.LogConnection or nil
+    self.Websocket = self.Websocket or nil
+    self.ControlModule = self.ControlModule or nil
 
     self.ActiveTasks = self.ActiveTasks or {}
     self.ActiveConnections = self.ActiveConnections or {}
+    self.LoggedGamepasses = self.LoggedGamepasses or {}
+    self.Priorities = self.Priorities or {}
+    self.Timers = self.Timers or {}
 end
 
 -- // @Functions.module
