@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.61", Author = "FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.62", Author = "FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -741,12 +741,16 @@ function API:ResolvePosition(...)
     local args = {...}
     local arg = args[1]
     
-    if arg == nil then
+    if #args >= 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number" then
+        return Vector3_new(args[1], args[2], args[3])
+    end
+    
+    if type(arg) == "number" then
         return nil
     end
     
-    if typeof(arg) == "number" and args[2] and args[3] then
-        return Vector3_new(arg, args[2], args[3])
+    if arg == nil then
+        return nil
     end
     
     if typeof(arg) == "Vector3" then
@@ -761,51 +765,70 @@ function API:ResolvePosition(...)
         if arg:IsA("BasePart") then
             return arg.Position
         end
-        
         if arg:IsA("Model") then
             local root = arg.PrimaryPart or 
                         arg:FindFirstChild("HumanoidRootPart") or 
                         arg:FindFirstChildWhichIsA("BasePart")
-            if root then
-                return root.Position
-            end
+            if root then return root.Position end
         end
-        
         if arg:IsA("Player") and arg.Character then
-            local char = arg.Character
-            local root = char.PrimaryPart or 
-                        char:FindFirstChild("HumanoidRootPart") or 
-                        char:FindFirstChildWhichIsA("BasePart")
-            if root then
-                return root.Position
-            end
+            local root = arg.Character:FindFirstChild("HumanoidRootPart")
+            if root then return root.Position end
         end
-    
         if arg:IsA("Humanoid") and arg.Parent then
-            local char = arg.Parent
-            local root = char.PrimaryPart or 
-                        char:FindFirstChild("HumanoidRootPart") or 
-                        char:FindFirstChildWhichIsA("BasePart")
-            if root then
-                return root.Position
-            end
+            local root = arg.Parent:FindFirstChild("HumanoidRootPart")
+            if root then return root.Position end
+        end
+        if arg:IsA("Tool") and arg.Parent and arg.Parent:IsA("Model") then
+            local root = arg.Parent:FindFirstChild("HumanoidRootPart")
+            if root then return root.Position end
+        end
+        if arg.PrimaryPart then
+            return arg.PrimaryPart.Position
+        end
+        local anyPart = arg:FindFirstChildWhichIsA("BasePart")
+        if anyPart then
+            return anyPart.Position
         end
     end
     
-    if typeof(arg) == "table" then
+    if type(arg) == "table" then
         if arg.x and arg.y and arg.z then
             return Vector3_new(arg.x, arg.y, arg.z)
         end
-        if #arg == 3 then
+        if arg.X and arg.Y and arg.Z then
+            return Vector3_new(arg.X, arg.Y, arg.Z)
+        end
+        if #arg >= 3 then
             return Vector3_new(arg[1], arg[2], arg[3])
+        end
+        if arg.position and typeof(arg.position) == "Vector3" then
+            return arg.position
+        end
+        if arg.Pos and typeof(arg.Pos) == "Vector3" then
+            return arg.Pos
+        end
+        if arg.p and typeof(arg.p) == "Vector3" then
+            return arg.p
         end
     end
     
     if type(arg) == "string" then
-        local x, y, z = arg:match("(-?%d+[, ]+%-?%d+[, ]+%-?%d+)")
+        local x,y,z = arg:match("(%d+)[, ]+(%d+)[, ]+(%d+)")
         if x and y and z then
+            return Vector3_new(tonumber(x), tonumber(y), tonumber(z))
+        end
+        x,y,z = arg:match("(%d+)%s+(%d+)%s+(%d+)")
+        if x and y and z then
+            return Vector3_new(tonumber(x), tonumber(y), tonumber(z))
+        end
+        x,y,z = arg:match("(-?%d+)[, ]+(-?%d+)[, ]+(-?%d+)")
+        if x and y and z then
+            return Vector3_new(tonumber(x), tonumber(y), tonumber(z))
+        end
+        if arg:match("Vector3") then
             local nums = {}
-            for num in arg:gmatch("-?%d+") do
+            for num in arg:gmatch("(%d+%.?%d*)") do
                 table.insert(nums, tonumber(num))
             end
             if #nums >= 3 then
@@ -814,8 +837,28 @@ function API:ResolvePosition(...)
         end
     end
     
+    if typeof(arg) == "UDim2" then
+        return Vector3_new(arg.X.Offset, arg.Y.Offset, 0)
+    end
+    
+    if typeof(arg) == "UDim" then
+        return Vector3_new(arg.Offset, 0, 0)
+    end
+    
+    if typeof(arg) == "Region3" then
+        return (arg.CFrame.Position + arg.Size / 2)
+    end
+    
+    if typeof(arg) == "Ray" then
+        return arg.Origin
+    end
+    
     if type(arg) == "userdata" and arg.Position and typeof(arg.Position) == "Vector3" then
         return arg.Position
+    end
+    
+    if type(arg) == "userdata" and arg.CFrame and typeof(arg.CFrame) == "CFrame" then
+        return arg.CFrame.Position
     end
     
     return nil
