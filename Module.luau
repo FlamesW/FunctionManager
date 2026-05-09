@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.57", Author = "FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.59", Author = "FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
