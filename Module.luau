@@ -34,7 +34,7 @@ local LoadTime = os_clock()
 -- // @Variables
 local game = game
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.60", Author = "FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.61", Author = "FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(game:GetService("Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -740,32 +740,84 @@ end
 function API:ResolvePosition(...)
     local args = {...}
     local arg = args[1]
+    
+    if arg == nil then
+        return nil
+    end
+    
     if typeof(arg) == "number" and args[2] and args[3] then
         return Vector3_new(arg, args[2], args[3])
     end
+    
     if typeof(arg) == "Vector3" then
         return arg
     end
+    
     if typeof(arg) == "CFrame" then
         return arg.Position
     end
+    
     if typeof(arg) == "Instance" then
         if arg:IsA("BasePart") then
             return arg.Position
         end
+        
         if arg:IsA("Model") then
-            local root =
-                arg.PrimaryPart or
-                arg:FindFirstChild("HumanoidRootPart") or
-                arg:FindFirstChildWhichIsA("BasePart")
+            local root = arg.PrimaryPart or 
+                        arg:FindFirstChild("HumanoidRootPart") or 
+                        arg:FindFirstChildWhichIsA("BasePart")
+            if root then
+                return root.Position
+            end
+        end
+        
+        if arg:IsA("Player") and arg.Character then
+            local char = arg.Character
+            local root = char.PrimaryPart or 
+                        char:FindFirstChild("HumanoidRootPart") or 
+                        char:FindFirstChildWhichIsA("BasePart")
+            if root then
+                return root.Position
+            end
+        end
+    
+        if arg:IsA("Humanoid") and arg.Parent then
+            local char = arg.Parent
+            local root = char.PrimaryPart or 
+                        char:FindFirstChild("HumanoidRootPart") or 
+                        char:FindFirstChildWhichIsA("BasePart")
             if root then
                 return root.Position
             end
         end
     end
-    if typeof(arg) == "table" and arg.x and arg.y and arg.z then
-        return Vector3_new(arg.x, arg.y, arg.z)
+    
+    if typeof(arg) == "table" then
+        if arg.x and arg.y and arg.z then
+            return Vector3_new(arg.x, arg.y, arg.z)
+        end
+        if #arg == 3 then
+            return Vector3_new(arg[1], arg[2], arg[3])
+        end
     end
+    
+    if type(arg) == "string" then
+        local x, y, z = arg:match("(-?%d+[, ]+%-?%d+[, ]+%-?%d+)")
+        if x and y and z then
+            local nums = {}
+            for num in arg:gmatch("-?%d+") do
+                table.insert(nums, tonumber(num))
+            end
+            if #nums >= 3 then
+                return Vector3_new(nums[1], nums[2], nums[3])
+            end
+        end
+    end
+    
+    if type(arg) == "userdata" and arg.Position and typeof(arg.Position) == "Vector3" then
+        return arg.Position
+    end
+    
     return nil
 end
 
@@ -1351,7 +1403,7 @@ function API:SetBypassedJP(Amount)
         return false
     end
     
-    self.JPData.Power = Amount
+    self.JPData.Amount = Amount
     return true
 end
 
@@ -2201,7 +2253,7 @@ function API:GetNPC(Model)
         return Data
     end
 
-    function Status:NewTP()
+    function Status:Teleport()
         local Roots = API:GetRoot()
         if not Roots then return end
 
@@ -2223,7 +2275,7 @@ function API:GetNPC(Model)
     return Status
 end
 
-function API:FakeTP(Speed, ...)
+function API:Travel(Speed, ...)
     local args = {...}
     if #args < 1 then return end
 
@@ -2238,12 +2290,12 @@ function API:FakeTP(Speed, ...)
 
     local Current = Roots.Position
     local Delta = Position - Current;
-
     local Distance = Delta.Magnitude
     
     if Distance < 0.05 then return end
 
-    local Num = tonumber(Speed) or math_huge
+    local Num = tonumber(Speed)
+    if not Num or Num <= 0 then Num = math_huge end
     local dt = Heartbeat:Wait();
 
     local Step = math_min(Num * dt, Distance)
