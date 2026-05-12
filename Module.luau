@@ -49,32 +49,32 @@ local LoadTime = os_clock()
 
 -- // @Variables
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.62", Author = "FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.63", Author = "FlamesW", Language = "luau", File = "Module.luau"}
 local Players: Players = GetService("Players", true)
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
 local Roots = Character:WaitForChild("HumanoidRootPart");
 local Humanoid = Character:WaitForChild("Humanoid");
-local RunService: RunService = GetService("RunService", false)
-local TweenService: TweenService = GetService("TweenService", true)
-local MarketplaceService: MarketplaceService = GetService("MarketplaceService", false)
-local HttpService: HttpService = GetService("HttpService", true)
-local TeleportService: TeleportService = GetService("TeleportService", true)
-local RbxAnalyticsService: RbxAnalyticsService = GetService("RbxAnalyticsService", true)
+local RunService: RunService = GetService("RunService", false);
+local TweenService: TweenService = GetService("TweenService", true);
+local MarketplaceService: MarketplaceService = GetService("MarketplaceService", false);
+local HttpService: HttpService = GetService("HttpService", true);
+local TeleportService: TeleportService = GetService("TeleportService", true);
+local RbxAnalyticsService: RbxAnalyticsService = GetService("RbxAnalyticsService", true);
 local VirtualInputManager: VirtualInputManager = Instance_new("VirtualInputManager");
-local RequestService = (http and http.request) or request or http_request or (syn and syn.request)
+local RequestService = (http and http.request) or request or http_request or (syn and syn.request);
 local GetConnections: GetConnections = getconnections or get_signal_cons;
-local UserInputService: UserInputService = GetService("UserInputService", true)
-local SoundService: SoundService = GetService("SoundService", true)
-local StarterGuiService: StarterGuiService = GetService("StarterGui", true)
-local CoreGui: CoreGui = GetService("CoreGui", true)
-local LightingService: LightingService = GetService("Lighting", true)
+local UserInputService: UserInputService = GetService("UserInputService", true);
+local SoundService: SoundService = GetService("SoundService", true);
+local StarterGuiService: StarterGuiService = GetService("StarterGui", true);
+local CoreGui: CoreGui = GetService("CoreGui", true);
+local LightingService: LightingService = GetService("Lighting", false);
 local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
 
 -- // @Caches
-local HttpGet = HttpService.HttpGet;
-local HttpJSONDecode = HttpService.JSONDecode;
-local gameHttpGet = game.HttpGet;
+local Http_Get = HttpService.HttpGet;
+local Http_JSONDecode = HttpService.JSONDecode;
+local game_HttpGet = game.HttpGet;
 
 local RenderStepped = RunService.RenderStepped;
 local Heartbeat = RunService.Heartbeat;
@@ -102,7 +102,7 @@ local AssetTypes = {
     [38] = "Plugin", [41] = "MeshPart", [42] = "Video", [43] = "Tool"
 }
 
-getgenv().FunctionManager_Engine = LocalPlayer.CharacterAdded:Connect(function(Running)
+getgenv().FunctionManagr_Engine = LocalPlayer.CharacterAdded:Connect(function(Running)
     Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart"), Running:WaitForChild("Humanoid");
     CurrentCamera = workspace.CurrentCamera;
 end)
@@ -270,7 +270,7 @@ end
 function API:LoadCustomAsset(Asset, Url)
     if not isfile(Asset) then
         local Succ, Cont = pcall(function()
-            return gameHttpGet(Url, true)
+            return game_HttpGet(Url, true)
         end)
 
         if Succ then 
@@ -345,13 +345,13 @@ function API:Request(url)
     if RequestService then
         return RequestService({Url = url, Method = "GET"}).Body
     else
-        return HttpGet(url, true)
+        return Http_Get(url, true)
     end
 end
 
 function API:LoadFile(Url)
     local Success, Result = pcall(function()
-        return loadstring(gameHttpGet(Url .. "?nocache=" .. tostring(os_clock())))()
+        return loadstring(game_HttpGet(Url .. "?nocache=" .. tostring(os_clock())))()
     end)
 
     return Success and Result or nil
@@ -365,7 +365,6 @@ function API:ConnectSocket(Url)
     local WebSocketLib = self:GetWebSocket()
     
     if not WebSocketLib then
-        warn("WebSocket is not available on this executor")
         return false, "WebSocket not available"
     end
     
@@ -927,7 +926,6 @@ end
 
 function API:Raknet_Desync(State)
     if not raknet then 
-        warn("[Raknet] Not supported on this executor")
         return false 
     end
 
@@ -1376,7 +1374,7 @@ function API:BypassWS(State, Speed)
         local Humanoid = self:GetHumanoid()
         if not Humanoid then return end
         
-        local delta = RunService.Heartbeat:Wait()
+        local delta = HeartBeat:Wait()
         local moveDir = Humanoid.MoveDirection
         
         local Roots = self:GetRoot()
@@ -1943,7 +1941,7 @@ function API:GetFriends()
     
     for _, Friend in pairs(Data.data) do
         local Success, Response = pcall(function()
-            return HttpGet("https://users.roblox.com/v1/users/" .. Friend.id)
+            return Http_Get("https://users.roblox.com/v1/users/" .. Friend.id)
         end)
         
         if Success then
@@ -2560,14 +2558,14 @@ function API:Verify(Options)
 
     if Options.Url then
         local Success, Content = pcall(function()
-            return gameHttpGet(Options.Url)
+            return game_HttpGet(Options.Url)
         end)
     
         if Success then
             local allMatches = {}
             
             local success, decoded = pcall(function()
-                return HttpJSONDecode(Content)
+                return Http_JSONDecode(Content)
             end)
             
             if success and type(decoded) == "table" then
