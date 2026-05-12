@@ -5,6 +5,22 @@ local cloneref = (cloneref or clonereference or function(instance: any)
     return instance;
 end)
 
+local game, Cache = game, {}
+local game_GetService = game.GetService
+
+-- // @Services.func
+local function GetService(Name, Enabled)
+    local Key = Name .. (Enabled and "1" or "0")
+    local Cached = Cache[Key]
+    if Cached then return Cached end
+    
+    local Service = game_GetService(game, Name)
+    Service = Enabled and cloneref(Service) or Service
+    
+    Cache[Key] = Service
+    return Service
+end
+
 -- // @Performance.vars
 local type, typeof, pcall, tick, warn, print, loadstring, setmetatable =
     type, typeof, pcall, tick, warn, print, loadstring, setmetatable
@@ -32,28 +48,27 @@ API.__index = API
 local LoadTime = os_clock()
 
 -- // @Variables
-local game = game
 local workspace = workspace
 local Project = {Name = "Function Manager", Build = "@1.62", Author = "FlamesW", Language = "luau", File = "Module.luau"}
-local Players: Players = cloneref(game:GetService("Players"));
+local Players: Players = GetService("Players", true)
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
 local Roots = Character:WaitForChild("HumanoidRootPart");
 local Humanoid = Character:WaitForChild("Humanoid");
-local RunService: RunService = game:GetService("RunService");
-local TweenService: TweenService = cloneref(game:GetService("TweenService"));
-local MarketplaceService: MarketplaceService = game:GetService("MarketplaceService");
-local HttpService: HttpService = cloneref(game:GetService("HttpService"));
-local TeleportService: TeleportService = cloneref(game:GetService("TeleportService"));
-local RbxAnalyticsService: RbxAnalyticsService = cloneref(game:GetService("RbxAnalyticsService"));
+local RunService: RunService = GetService("RunService", false)
+local TweenService: TweenService = GetService("TweenService", true)
+local MarketplaceService: MarketplaceService = GetService("MarketplaceService", false)
+local HttpService: HttpService = GetService("HttpService", true)
+local TeleportService: TeleportService = GetService("TeleportService", true)
+local RbxAnalyticsService: RbxAnalyticsService = GetService("RbxAnalyticsService", true)
 local VirtualInputManager: VirtualInputManager = Instance_new("VirtualInputManager");
 local RequestService = (http and http.request) or request or http_request or (syn and syn.request)
 local GetConnections: GetConnections = getconnections or get_signal_cons;
-local UserInputService: UserInputService = cloneref(game:GetService("UserInputService"));
-local SoundService: SoundService = cloneref(game:GetService("SoundService"));
-local StarterGuiService: StarterGuiService = cloneref(game:GetService("StarterGui"));
-local CoreGui: CoreGui = cloneref(game:GetService("CoreGui"));
-local LightingService: LightingService = cloneref(game:GetService("Lighting"));
+local UserInputService: UserInputService = GetService("UserInputService", true)
+local SoundService: SoundService = GetService("SoundService", true)
+local StarterGuiService: StarterGuiService = GetService("StarterGui", true)
+local CoreGui: CoreGui = GetService("CoreGui", true)
+local LightingService: LightingService = GetService("Lighting", true)
 local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
 
 -- // @Caches
@@ -3345,12 +3360,12 @@ function API:Unload()
 
     self:XRay(false);
     self:Flight(false, nil);
-	self:BypassWS(false, nil);
-	self:TouchFling(false);
-	self:BypassJP(false, nil);
-	self:InfiniteJump(false);
-	self:StopClip();
-	self:StopFling();
+    self:BypassWS(false, nil);
+    self:TouchFling(false);
+    self:BypassJP(false, nil);
+    self:InfiniteJump(false);
+    self:StopClip();
+    self:StopFling();
 
     self:ClearHighlights();
     self:ClearBaseplates();
@@ -3361,7 +3376,7 @@ function API:Unload()
     self:ClearRaknet();
 
     getgenv().FunctionManager_Engine = nil
-	task_wait();
+    task_wait();
 
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
