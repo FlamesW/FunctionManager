@@ -107,7 +107,7 @@ local AssetTypes = {
     [38] = "Plugin", [41] = "MeshPart", [42] = "Video", [43] = "Tool"
 }
 
-getgenv().FunctionManagr_Engine = LocalPlayer.CharacterAdded:Connect(function(Running)
+global.FunctionManager_Engine = LocalPlayer.CharacterAdded:Connect(function(Running)
     Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart"), Running:WaitForChild("Humanoid");
     CurrentCamera = workspace.CurrentCamera;
 end)
