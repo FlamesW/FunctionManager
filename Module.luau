@@ -1,6 +1,5 @@
 -- // @FunctionManager.luau
 local global = shared or (getgenv and getgenv()) or _G;
-
 (global.FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
 
 local cloneref = (cloneref or clonereference or function(instance: any)
@@ -54,7 +53,7 @@ local LoadTime = os_clock()
 
 -- // @Variables
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.65", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.66", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players = GetService("Players", true)
 locaLocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -274,13 +273,13 @@ function API:ClearSounds()
 end
 
 function API:LoadCustomAsset(Asset, Url)
-    if not isfile(Asset) then
+    if not is_file(Asset) then
         local Success, Content = pcall(function()
             return game_HttpGet(Url)
         end)
 
         if Success then 
-            writefile(Asset, Content) 
+            write_file(Asset, Content) 
         else 
             return Url 
         end
