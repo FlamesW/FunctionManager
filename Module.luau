@@ -6,10 +6,6 @@ local cloneref = (cloneref or clonereference or function(instance: any)
     return instance;
 end)
 
-local clonefunction = (clonefunction or copyfunction or function(func) 
-    return func 
-end)
-
 -- // @Performance.vars
 local game = game -- // Boom 🤯💥
 
@@ -34,6 +30,10 @@ local Vector3_new, Vector2_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CF
 
 local write_file, read_file, is_file, make_folder, is_folder, del_folder, del_file, list_files =
     writefile, readfile, isfile, makefolder, isfolder, delfolder, delfile, listfiles
+
+local clonefunction = (clonefunction or copyfunction or function(func) 
+    return func 
+end)
 
 if typeof(clonefunction) == "function" then
     local isfolder_dummy, isfile_dummy, listfiles_dummy = clonefunction(isfolder), clonefunction(isfile), clonefunction(listfiles)
