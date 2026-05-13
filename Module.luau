@@ -43,19 +43,19 @@ if typeof(clonefunction) == "function" then
     end)
 
     if isfolder_success == false or typeof(isfolder_error) ~= "boolean" then
-        local global_env = getgenv()
+        local G = getgenv and getgenv() or _G
 
-        global_env.isfolder = function(Folder)
+        G.isfolder = function(Folder)
             local Success, Data = pcall(isfolder_dummy, Folder)
             return Success and Data or false
         end
 
-        global_env.isfile = function(File)
+        G.isfile = function(File)
             local Success, Data = pcall(isfile_dummy, File)
             return Success and Data or false
         end
 
-        global_env.listfiles = function(Folder)
+        G.listfiles = function(Folder)
             local Success, Data = pcall(listfiles_dummy, Folder)
             return Success and Data or {}
         end
