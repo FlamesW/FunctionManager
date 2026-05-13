@@ -1,11 +1,13 @@
 -- // @FunctionManager.luau
-(getgenv().FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
+local global = shared or (getgenv and getgenv()) or _G;
+
+(global.FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
 
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance;
 end)
 
-local game, getgenv, Cache = game, getgenv or shared, {}
+local game, Cache = game, {}
 local game_GetService = game.GetService
 
 -- // @Services.func
@@ -52,7 +54,7 @@ local LoadTime = os_clock()
 
 -- // @Variables
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.64", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.65", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players = GetService("Players", true)
 locaLocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -1254,7 +1256,7 @@ function API:Click()
 end
 
 function API:AntiAFK()
-    if getgenv().AFK_Service then return end
+    if global.AFK_Service then return end
 
     if GetConnections then
         for _, Con in pairs(GetConnections(LocalPlayer.Idled)) do
@@ -1271,7 +1273,7 @@ function API:AntiAFK()
         end)
     end
 
-    getgenv().AFK_Service = true
+    global.AFK_Service = true
 end
 
 function API:SetFOV(Num)
@@ -1938,7 +1940,7 @@ function API:GetFriends()
     
     if not Success then return {} end
     
-    local Data = HttpJSONDecode(Response)
+    local Data = Http_JSONDecode(Response)
     if not Data or not Data.data then return {} end
     
     local Friends = {}
@@ -3357,7 +3359,7 @@ end
 
 function API:Unload()
     -- // @Unload.module~
-    (getgenv().FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
+    (global.FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
     self:UnloadLM();
 
     self:XRay(false);
@@ -3373,11 +3375,10 @@ function API:Unload()
     self:ClearBaseplates();
     self:ClearWebSockets();
     self:ClearGamepasses();
-
     self:ClearSounds();
     self:ClearRaknet();
 
-    getgenv().FunctionManager_Engine = nil
+    global.FunctionManager_Engine = nil
     task_wait();
 
     for Instance in pairs(API) do
@@ -3385,24 +3386,6 @@ function API:Unload()
     end
     setmetatable(API, nil)
     warn("[Functions.luau]: Unloaded")
-end
-
-function API:Help()
-    warn("=====[ FUNCTIONS ]=====")
-    local List = {}
-
-    for k, v in pairs(API) do
-        if typeof(v) == "function" and k ~= "__index" and k ~= "wrap" and k ~= "Help" and k ~= "Req" and k ~= "OverrideFunction" and k ~= "Merge" and k ~= "Launch" and k ~= "SelectEverything" then
-            table_insert(List, k)
-        end
-    end
-
-    table_sort(List)
-    for _, k in ipairs(List) do
-        print("• " .. k)
-    end
-
-    warn("=======================")
 end
 
 function API:Merge(...) -- // Merges with one another module 😉
