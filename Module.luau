@@ -60,7 +60,7 @@ if typeof(clonefunction) == "function" then
             return Success and Data or {}
         end
 
-		is_folder, is_file, list_files = global_env.isfolder, global_env.isfile, global_env.listfiles
+		is_folder, is_file, list_files = G.isfolder, G.isfile, G.listfiles
     end
 end
 
