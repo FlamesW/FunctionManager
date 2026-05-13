@@ -6,6 +6,10 @@ local cloneref = (cloneref or clonereference or function(instance: any)
     return instance;
 end)
 
+local clonefunction = (clonefunction or copyfunction or function(func) 
+    return func 
+end)
+
 -- // @Performance.vars
 local game = game -- // Boom 🤯💥
 
@@ -31,6 +35,35 @@ local Vector3_new, Vector2_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CF
 local write_file, read_file, is_file, make_folder, is_folder, del_folder, del_file, list_files =
     writefile, readfile, isfile, makefolder, isfolder, delfolder, delfile, listfiles
 
+if typeof(clonefunction) == "function" then
+    local isfolder_dummy, isfile_dummy, listfiles_dummy = clonefunction(isfolder), clonefunction(isfile), clonefunction(listfiles)
+
+    local isfolder_success, isfolder_error = pcall(function()
+        return isfolder_dummy(tostring(math_random(1000000, 9999999)))
+    end)
+
+    if isfolder_success == false or typeof(isfolder_error) ~= "boolean" then
+        local global_env = getgenv()
+
+        global_env.isfolder = function(Folder)
+            local Success, Data = pcall(isfolder_dummy, Folder)
+            return Success and Data or false
+        end
+
+        global_env.isfile = function(File)
+            local Success, Data = pcall(isfile_dummy, File)
+            return Success and Data or false
+        end
+
+        global_env.listfiles = function(Folder)
+            local Success, Data = pcall(listfiles_dummy, Folder)
+            return Success and Data or {}
+        end
+
+		is_folder, is_file, list_files = global_env.isfolder, global_env.isfile, global_env.listfiles
+    end
+end
+
 -- // @API.module
 local API = {}
 API.__index = API
@@ -38,28 +71,28 @@ API.__index = API
 local LoadTime = os_clock()
 
 -- // @Variables
-local workspace, cache = workspace, game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.66", Author = "FlamesW",Language = "luau", File = "Module.luau"}
-local Players: Players = cloneref(cache(game, "Players"));
+local workspace, Cache = workspace, game.GetService;
+local Project = {Name = "Function Manager", Build = "@1.67", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Players: Players = cloneref(Cache(game, "Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
 if not Character then Character = LocalPlayer.CharacterAdded:Wait(); end
 local Roots = Character:FindFirstChild("HumanoidRootPart") or Character:WaitForChild("HumanoidRootPart", 0.1);
 local Humanoid = Character:FindFirstChild("Humanoid") or Character:WaitForChild("Humanoid", 0.1);
-local RunService: RunService = cache(game, "RunService");
-local TweenService: TweenService = cloneref(cache(game, "TweenService"));
-local MarketplaceService: MarketplaceService = cache(game, "MarketplaceService");
-local HttpService: HttpService = cloneref(cache(game, "HttpService"));
-local TeleportService: TeleportService = cache(game, "TeleportService");
-local RbxAnalyticsService: RbxAnalyticsService = cloneref(cache(game, "RbxAnalyticsService"));
+local RunService: RunService = Cache(game, "RunService");
+local TweenService: TweenService = cloneref(Cache(game, "TweenService"));
+local MarketplaceService: MarketplaceService = Cache(game, "MarketplaceService");
+local HttpService: HttpService = cloneref(Cache(game, "HttpService"));
+local TeleportService: TeleportService = Cache(game, "TeleportService");
+local RbxAnalyticsService: RbxAnalyticsService = cloneref(Cache(game, "RbxAnalyticsService"));
 local VirtualInputManager: VirtualInputManager = Instance_new("VirtualInputManager");
 local RequestService = (http and http.request) or request or http_request or (syn and syn.request);
 local GetConnections: GetConnections = getconnections or get_signal_cons;
-local UserInputService: UserInputService = cloneref(cache(game, "UserInputService"));
-local SoundService: SoundService = cloneref(cache(game, "SoundService"));
-local StarterGuiService: StarterGuiService = cloneref(cache(game, "StarterGui"));
-local CoreGui: CoreGui = cloneref(cache(game, "CoreGui"));
-local LightingService: LightingService = cache(game, "Lighting");
+local UserInputService: UserInputService = cloneref(Cache(game, "UserInputService"));
+local SoundService: SoundService = cloneref(Cache(game, "SoundService"));
+local StarterGuiService: StarterGuiService = cloneref(Cache(game, "StarterGui"));
+local CoreGui: CoreGui = cloneref(Cache(game, "CoreGui"));
+local LightingService: LightingService = Cache(game, "Lighting");
 local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
 
 -- // @Caches
@@ -275,7 +308,7 @@ function API:LoadCustomAsset(Asset, Url)
     if get_asset then
         return get_asset(Asset)
     else
-        return isfile(Asset) and "rbxasset://" .. Asset or Url
+        return is_file(Asset) and "rbxasset://" .. Asset or Url
     end
 end
 
@@ -694,12 +727,12 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
             local path = ""
             for folder in Dir:gmatch("[^/]+") do
                 path = path .. folder .. "/"
-                if not isfolder(path) then makefolder(path) end
+                if not is_folder(path) then make_folder(path) end
             end
         end
         
         local Success, Remote = pcall(function()
-            return API:Request(RemoteUrl .. "?v=" .. os_time())
+            return self:Request(RemoteUrl .. "?v=" .. os_time())
         end)
         if not Success then return warn("Failed: " .. RemoteUrl) end
         
@@ -710,11 +743,11 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
             Truncated = true
         end
         
-        local Exists = isfile(FilePath)
-        local Old = Exists and readfile(FilePath) or nil
+        local Exists = is_file(FilePath)
+        local Old = Exists and read_file(FilePath) or nil
         local Changed = Exists and Old ~= StoredContent
         
-        writefile(FilePath, StoredContent)
+        write_file(FilePath, StoredContent)
         
         if not Exists and OnDownloaded then
             OnDownloaded({FileName = FileName, Content = Remote, Size = #Remote, StoredSize = #StoredContent, Truncated = Truncated})
