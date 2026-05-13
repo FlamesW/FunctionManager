@@ -55,7 +55,7 @@ local LoadTime = os_clock()
 local workspace = workspace
 local Project = {Name = "Function Manager", Build = "@1.66", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players = GetService("Players", true)
-locaLocalPlayer: Player = Players.LocalPlayer;
+local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
 local Roots = Character:WaitForChild("HumanoidRootPart");
 local Humanoid = Character:WaitForChild("Humanoid");
@@ -1379,7 +1379,7 @@ function API:BypassWS(State, Speed)
         local Humanoid = self:GetHumanoid()
         if not Humanoid then return end
         
-        local delta = HeartBeat:Wait()
+        local delta = Heartbeat:Wait()
         local moveDir = Humanoid.MoveDirection
         
         local Roots = self:GetRoot()
@@ -3345,13 +3345,13 @@ function API:ToggleLM(State)
     end
 end
 
-function API:OverrideFunction(Name, Function)
+function API:OverrideFunction(Name, Func)
     if typeof(self[Name]) ~= "function" then
         return false
     end
 
     self[self:RandomString(15)] = self[Name]
-    self[Name] = Function
+    self[Name] = Func
 
     return true
 end
