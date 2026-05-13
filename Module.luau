@@ -6,23 +6,9 @@ local cloneref = (cloneref or clonereference or function(instance: any)
     return instance;
 end)
 
-local game, Cache = game, {}
-local game_GetService = game.GetService
-
--- // @Services.func
-local function GetService(Name, Enabled)
-    local Key = Name .. (Enabled and "1" or "0")
-    local Cached = rawget(Cache, Key)
-    if Cached then return Cached end
-    
-    local Service = game_GetService(game, Name)
-    Service = Enabled and cloneref(Service) or Service
-    
-    rawset(Cache, Key, Service)
-    return Service
-end
-
 -- // @Performance.vars
+local game = game -- // Boom 🤯💥
+
 local type, typeof, pcall, tick, warn, print, loadstring, setmetatable =
     type, typeof, pcall, tick, warn, print, loadstring, setmetatable
 
@@ -52,27 +38,28 @@ API.__index = API
 local LoadTime = os_clock()
 
 -- // @Variables
-local workspace = workspace
+local workspace, cache = workspace, game.GetService;
 local Project = {Name = "Function Manager", Build = "@1.66", Author = "FlamesW",Language = "luau", File = "Module.luau"}
-local Players: Players = GetService("Players", true)
+local Players: Players = cloneref(cache(game, "Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
-local Roots = Character:WaitForChild("HumanoidRootPart");
-local Humanoid = Character:WaitForChild("Humanoid");
-local RunService: RunService = GetService("RunService", false);
-local TweenService: TweenService = GetService("TweenService", true);
-local MarketplaceService: MarketplaceService = GetService("MarketplaceService", false);
-local HttpService: HttpService = GetService("HttpService", true);
-local TeleportService: TeleportService = GetService("TeleportService", false);
-local RbxAnalyticsService: RbxAnalyticsService = GetService("RbxAnalyticsService", true);
+if not Character then Character = LocalPlayer.CharacterAdded:Wait(); end
+local Roots = Character:FindFirstChild("HumanoidRootPart") or Character:WaitForChild("HumanoidRootPart", 0.1);
+local Humanoid = Character:FindFirstChild("Humanoid") or Character:WaitForChild("Humanoid", 0.1);
+local RunService: RunService = cache(game, "RunService");
+local TweenService: TweenService = cloneref(cache(game, "TweenService"));
+local MarketplaceService: MarketplaceService = cache(game, "MarketplaceService");
+local HttpService: HttpService = cloneref(cache(game, "HttpService"));
+local TeleportService: TeleportService = cache(game, "TeleportService");
+local RbxAnalyticsService: RbxAnalyticsService = cloneref(cache(game, "RbxAnalyticsService"));
 local VirtualInputManager: VirtualInputManager = Instance_new("VirtualInputManager");
 local RequestService = (http and http.request) or request or http_request or (syn and syn.request);
 local GetConnections: GetConnections = getconnections or get_signal_cons;
-local UserInputService: UserInputService = GetService("UserInputService", true);
-local SoundService: SoundService = GetService("SoundService", true);
-local StarterGuiService: StarterGuiService = GetService("StarterGui", true);
-local CoreGui: CoreGui = GetService("CoreGui", true);
-local LightingService: LightingService = GetService("Lighting", false);
+local UserInputService: UserInputService = cloneref(cache(game, "UserInputService"));
+local SoundService: SoundService = cloneref(cache(game, "SoundService"));
+local StarterGuiService: StarterGuiService = cloneref(cache(game, "StarterGui"));
+local CoreGui: CoreGui = cloneref(cache(game, "CoreGui"));
+local LightingService: LightingService = cache(game, "Lighting");
 local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
 
 -- // @Caches
