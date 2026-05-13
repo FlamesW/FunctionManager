@@ -5,19 +5,19 @@ local cloneref = (cloneref or clonereference or function(instance: any)
     return instance;
 end)
 
-local game, Cache = game, {}
+local game, getgenv, Cache = game, getgenv or shared, {}
 local game_GetService = game.GetService
 
 -- // @Services.func
 local function GetService(Name, Enabled)
     local Key = Name .. (Enabled and "1" or "0")
-    local Cached = Cache[Key]
+    local Cached = rawget(Cache, Key)
     if Cached then return Cached end
     
     local Service = game_GetService(game, Name)
     Service = Enabled and cloneref(Service) or Service
     
-    Cache[Key] = Service
+    rawset(Cache, Key, Service)
     return Service
 end
 
@@ -41,6 +41,9 @@ local pairs, ipairs = pairs, ipairs
 local Vector3_new, Vector2_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CFrame_lookAt, CFrame_new, Instance_new =
     Vector3.new, Vector2.new, Vector3.zero, Color3.fromRGB, Color3.fromHSV, CFrame.lookAt, CFrame.new, Instance.new
 
+local write_file, read_file, is_file, make_folder, is_folder, del_folder, del_file, list_files =
+    writefile, readfile, isfile, makefolder, isfolder, delfolder, delfile, listfiles
+
 -- // @API.module
 local API = {}
 API.__index = API
@@ -49,9 +52,9 @@ local LoadTime = os_clock()
 
 -- // @Variables
 local workspace = workspace
-local Project = {Name = "Function Manager", Build = "@1.63", Author = "FlamesW", Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.64", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players = GetService("Players", true)
-local LocalPlayer: Player = Players.LocalPlayer;
+locaLocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
 local Roots = Character:WaitForChild("HumanoidRootPart");
 local Humanoid = Character:WaitForChild("Humanoid");
@@ -59,7 +62,7 @@ local RunService: RunService = GetService("RunService", false);
 local TweenService: TweenService = GetService("TweenService", true);
 local MarketplaceService: MarketplaceService = GetService("MarketplaceService", false);
 local HttpService: HttpService = GetService("HttpService", true);
-local TeleportService: TeleportService = GetService("TeleportService", true);
+local TeleportService: TeleportService = GetService("TeleportService", false);
 local RbxAnalyticsService: RbxAnalyticsService = GetService("RbxAnalyticsService", true);
 local VirtualInputManager: VirtualInputManager = Instance_new("VirtualInputManager");
 local RequestService = (http and http.request) or request or http_request or (syn and syn.request);
@@ -75,6 +78,7 @@ local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
 local Http_Get = HttpService.HttpGet;
 local Http_JSONDecode = HttpService.JSONDecode;
 local game_HttpGet = game.HttpGet;
+local get_asset = getcustomasset or getsynasset;
 
 local RenderStepped = RunService.RenderStepped;
 local Heartbeat = RunService.Heartbeat;
@@ -269,19 +273,19 @@ end
 
 function API:LoadCustomAsset(Asset, Url)
     if not isfile(Asset) then
-        local Succ, Cont = pcall(function()
-            return game_HttpGet(Url, true)
+        local Success, Content = pcall(function()
+            return game_HttpGet(Url)
         end)
 
-        if Succ then 
-            writefile(Asset, Cont) 
+        if Success then 
+            writefile(Asset, Content) 
         else 
             return Url 
         end
     end
 
-    if getcustomasset then
-        return getcustomasset(Asset)
+    if get_asset then
+        return get_asset(Asset)
     else
         return isfile(Asset) and "rbxasset://" .. Asset or Url
     end
