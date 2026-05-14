@@ -1052,6 +1052,11 @@ function API:IsAlive()
     return Hum and Hum.Health > 0
 end
 
+function API:IsAFriend(Player)
+    if not Player then return false end
+    return Player:IsFriendsWith(self:GetPlayer().UserId)
+end
+
 function API:GetPlaceId()
     return PlaceId
 end
@@ -2328,21 +2333,25 @@ function API:GetDistance(Target, UseSquared)
 end
 
 function API:IsNPC(Model)
-    if not Model or not Model:IsA("Model") then
-        return false
-    end
-
-    if Players:GetPlayerFromCharacter(Model) then
-        return false
-    end
-
+    if not Model or not Model:IsA("Model") then return false end
+    
+    if Players:GetPlayerFromCharacter(Model) then return false end
+    
     local Humanoid = Model:FindFirstChildOfClass("Humanoid")
     local RootPart = Model:FindFirstChild("HumanoidRootPart")
-
+    
     return Humanoid ~= nil and RootPart ~= nil
 end
 
-function API:IsMobAlive(Model)
+function API:Alive(Character)
+    Character = Character or self:GetCharacter()
+    if not Character then return false end
+    
+    local Humanoid = Character:FindFirstChildWhichIsA("Humanoid")
+    return Humanoid and Humanoid.Health > 0
+end
+
+function API:IsNPCAlive(Model)
     if not Model or not Model:IsA("Model") then
         return false
     end
@@ -2355,6 +2364,30 @@ function API:IsMobAlive(Model)
     return Hum.Health > 0
 end
 
+function API:GetClosestNPC(Radius)
+    Radius = Radius or math_huge
+    local Closest = nil
+    local ClosestDistSquared = Radius * Radius
+
+    local Models, _ = self:GetDescendants(workspace, "Model")
+    
+    for i = 1, #Models do
+        local model = Models[i]
+        if self:IsNPC(model) then
+            local DistanceSquared = self:GetDistance(model, true)
+            if DistanceSquared < ClosestDistSquared then
+                ClosestDistSquared = DistanceSquared
+                Closest = model
+            end
+        end
+    end
+    
+    if Closest then
+        return self:GetNPC(Closest), math_sqrt(ClosestDistSquared)
+    end
+    return nil, ClosestDistSquared
+end
+
 function API:GetClosestPlayer(Radius)
     Radius = Radius or math_huge
     local Closest = nil
@@ -2362,7 +2395,7 @@ function API:GetClosestPlayer(Radius)
 
     for _, v in ipairs(self:GetPlayers(false)) do
         if v.Character then
-            local DistanceSquared = self:GetDistance(v.Character, true)  -- Use squared distance
+            local DistanceSquared = self:GetDistance(v.Character, true)
             if DistanceSquared < ClosestDistSquared then
                 ClosestDistSquared = DistanceSquared
                 Closest = v
@@ -2374,6 +2407,142 @@ function API:GetClosestPlayer(Radius)
         return Closest, math_sqrt(ClosestDistSquared)
     end
     return Closest, ClosestDistSquared
+end
+
+function API:GetFarthestPlayer(Radius)
+    Radius = Radius or math_huge
+    local Farthest, FarthestDistSquared = nil, 0
+
+    for _, v in ipairs(self:GetPlayers(false)) do
+        if v.Character then
+            local DistanceSquared = self:GetDistance(v.Character, true)
+            if DistanceSquared > FarthestDistSquared and DistanceSquared <= (Radius * Radius) then
+                FarthestDistSquared = DistanceSquared
+                Farthest = v
+            end
+        end
+    end
+    
+    if Farthest then
+        return Farthest, math_sqrt(FarthestDistSquared)
+    end
+    return nil, 0
+end
+
+function API:HasAccessory(Character, Accessories, MinMatches)
+    if not Character then return false end
+    MinMatches = MinMatches or 1
+
+    local Count = 0
+    for _, Accessory in ipairs(Character:GetChildren()) do
+        if Accessory:IsA("Accessory") then
+            local AccessoryNameLower = string_lower(Accessory.Name)
+            for _, Name in ipairs(Accessories) do
+                local NameLower = string_lower(Name)
+                if AccessoryNameLower:find(NameLower) then
+                    Count = Count + 1
+                    if Count >= MinMatches then 
+                        return true 
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+function API:Search(Input)
+    if type(Input) ~= "string" then return nil end
+
+    local InputLower = string_lower(Input)
+    local Players = self:GetPlayers(true)
+    local LocalPlayer = self:GetPlayer()
+    
+    if InputLower == "random" then
+        return Players[math_random(1, #Players)]
+    end
+
+    if InputLower == "nearest" then
+        local Closest, _ = self:GetClosestPlayer()
+        return Closest
+    end
+
+    if InputLower == "farthest" then
+        local Farthest, _ = self:GetFarthestPlayer()
+        return Farthest
+    end
+
+    if InputLower == "closestnpc" then
+        local Closest, _ = self:GetClosestNPC()
+        return Closest
+    end
+
+    if InputLower == "bacons" then
+        local Bacons = {}
+        for _, Player in ipairs(Players) do
+            if self:HasAccessory(Player.Character, {"Pal Hair", "Kate Hair"}, 1) then
+                table_insert(Bacons, Player)
+            end
+        end
+        if #Bacons > 0 then
+            return Bacons[math_random(1, #Bacons)]
+        end
+        return nil
+    end
+
+    if InputLower == "furries" then
+        local Furries = {}
+        for _, Player in ipairs(Players) do
+            if self:HasAccessory(Player.Character, {"Tail", "Ears", "Horns", "Antlers", "Collar", 
+                "Chain", "Leash", "Bunny", "Wolf", "Fox", "Cat", "Dog", "Dragon", "Demon", "Kitsune", "Neko", "Kemono", "Feline", 
+                "Canine", "Paws", "Claws", "Whiskers", "Muzzle", "Snout", "Beast", "Shark", "Creature", "Animal", "Pet", "Fluff",
+                "Mane", "Feathers", "Wings", "Scales", "Fins", "Gills", "Hooves", "Paw", "Furry", "Anthro"
+            }, 2) then
+                table_insert(Furries, Player)
+            end
+        end
+        if #Furries > 0 then
+            return Furries[math_random(1, #Furries)]
+        end
+        return nil
+    end
+
+    if InputLower == "friends" then
+        local Friends = {}
+        for _, Player in ipairs(Players) do
+            if Player ~= LocalPlayer and self:IsAFriend(Player) then
+                table_insert(Friends, Player)
+            end
+        end
+        if #Friends > 0 then
+            return Friends[math_random(1, #Friends)]
+        end
+        return nil
+    end
+
+    if InputLower == "nonfriends" then
+        local NonFriends = {}
+        for _, Player in ipairs(Players) do
+            if Player ~= LocalPlayer and not self:IsAFriend(Player) then
+                table_insert(NonFriends, Player)
+            end
+        end
+        if #NonFriends > 0 then
+            return NonFriends[math_random(1, #NonFriends)]
+        end
+        return nil
+    end
+
+    for _, Player in ipairs(Players) do
+        local nameLower = string_lower(Player.Name)
+        local displayLower = string_lower(Player.DisplayName)
+
+        if nameLower == InputLower or displayLower == InputLower or nameLower:find(InputLower) or displayLower:find(InputLower) then
+            return Player
+        end
+    end
+    
+    return nil
 end
 
 function API:GetNPC(Model)
@@ -2475,11 +2644,13 @@ function API:GetNPC(Model)
         return Data
     end
 
-    function Status:Teleport()
+    function Status:Teleport(Offset)
         local Roots = API:GetRoot()
         if not Roots then return end
 
-        if self.CustomTeleport then
+		Offset = Offset or Vector3_new(0, 0, 0)
+
+		if self.CustomTeleport then
             return self.CustomTeleport(self, Roots)
         end
 
@@ -2491,7 +2662,7 @@ function API:GetNPC(Model)
             end
         end
 
-        self.Model:PivotTo(CFrame_new(self.Root.Position))
+        Roots.CFrame = self.Root.CFrame + Offset
     end
 
     return Status
