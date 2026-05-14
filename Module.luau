@@ -72,7 +72,7 @@ local LoadTime = os_clock()
 
 -- // @Variables
 local workspace, Cache = workspace, game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.67", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.68", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players = cloneref(Cache(game, "Players"));
 local LocalPlayer: Player = Players.LocalPlayer;
 local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -92,6 +92,7 @@ local UserInputService: UserInputService = cloneref(Cache(game, "UserInputServic
 local SoundService: SoundService = cloneref(Cache(game, "SoundService"));
 local StarterGuiService: StarterGuiService = cloneref(Cache(game, "StarterGui"));
 local CoreGui: CoreGui = cloneref(Cache(game, "CoreGui"));
+local Performance: Performance = Cache(game, "Stats");
 local LightingService: LightingService = Cache(game, "Lighting");
 local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
 
@@ -115,8 +116,7 @@ local GetPlatform = UserInputService.GetPlatform;
 local WorkspaceRaycast = workspace.Raycast;
 local RaycastParamsNew = RaycastParams.new;
 
-local GamePlaceId = game.PlaceId;
-local GameJobId = game.JobId;
+local PlaceId, JobId, GameId  = game.PlaceId, game.JobId, game.GameId;
 
 local AssetTypes = {
     [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
@@ -201,6 +201,53 @@ function API:PlaySound(Id, Options)
     end
 
     return Data.Instance
+end
+
+function API:IsSoundPlaying(Id)
+    local SoundId = Id
+    if self.Sounds.Assets and self.Sounds.Assets[Id] then
+        SoundId = self.Sounds.Assets[Id]
+    end
+    if type(SoundId) == "number" then
+        SoundId = "rbxassetid://" .. SoundId
+    end
+    
+    local Data = self.Sounds[SoundId]
+    return Data and Data.Instance and Data.Instance.Playing or false
+end
+
+function API:PauseSound(Id)
+    local SoundId = Id
+    if self.Sounds.Assets and self.Sounds.Assets[Id] then
+        SoundId = self.Sounds.Assets[Id]
+    end
+    if type(SoundId) == "number" then
+        SoundId = "rbxassetid://" .. SoundId
+    end
+    
+    local Data = self.Sounds[SoundId]
+    if Data and Data.Instance then
+        Data.Instance:Pause()
+        return true
+    end
+    return false
+end
+
+function API:ResumeSound(Id)
+    local SoundId = Id
+    if self.Sounds.Assets and self.Sounds.Assets[Id] then
+        SoundId = self.Sounds.Assets[Id]
+    end
+    if type(SoundId) == "number" then
+        SoundId = "rbxassetid://" .. SoundId
+    end
+    
+    local Data = self.Sounds[SoundId]
+    if Data and Data.Instance then
+        Data.Instance:Resume()
+        return true
+    end
+    return false
 end
 
 function API:StopSound(...)
@@ -350,6 +397,36 @@ function API:GetAssetInfo(Id)
     return Result
 end
 
+function API:GetDescendants(Instance, ClassName)
+    local Descendants = Instance:GetDescendants()
+    local Results = table_create(#Descendants)
+    local Count = 0
+
+    for i = 1, #Descendants do
+        if Descendants[i].ClassName == ClassName then
+            Count = Count + 1
+            Results[Count] = Descendants[i]
+        end
+    end
+
+    return Results, Count
+end
+
+function API:GetChildren(Instance, ClassName)
+    local Children = Instance:GetChildren()
+    local Results = table_create(#Children)
+    local Count = 0
+    
+    for i = 1, #Children do
+        if Children[i].ClassName == ClassName then
+            Count = Count + 1
+            Results[Count] = Children[i]
+        end
+    end
+    
+    return Results, Count
+end
+
 function API:GetDevice()
     return GetPlatform(UserInputService)
 end
@@ -364,6 +441,32 @@ end
 
 function API:Date()
     return os_date("%Y/%m/%d")
+end
+
+function API:GetPing()
+    local Ping = Performance.Network.ServerStatsItem["Data Ping"]:GetValue()
+    return tonumber(string.format("%.2f", Ping))
+end
+
+function API:GetFps()
+    if not self.FpsCounter then
+        local Frames = tick()
+        self.CurrentFPS = 0
+
+        self.FpsCounter = RenderStepped:Connect(function()
+            local tick = tick()
+            self.CurrentFPS = 1 / (tick - Frames)
+            Frames = tick
+        end)
+    end
+
+    return self.CurrentFPS or 0
+end
+
+function API:StopFps()
+    if self.FpsCounter then self.FpsCounter:Disconnect()
+        self.FpsCounter = nil self.CurrentFPS = 0
+    end
 end
 
 function API:Request(url)
@@ -949,6 +1052,18 @@ function API:IsAlive()
     return Hum and Hum.Health > 0
 end
 
+function API:GetPlaceId()
+    return PlaceId
+end
+
+function API:GetJobId()
+    return JobId
+end
+
+function API:GetGameId()
+    return GameId
+end
+
 function API:Raknet_Desync(State)
     if not raknet then 
         return false 
@@ -1320,6 +1435,21 @@ function API:SetCameraOcclusion(Mode)
     end
 end
 
+function API:Zoom(Amount)
+    local Plr = self:GetPlayer()
+    if Plr then
+        Plr.CameraMinZoomDistance = Amount
+        Plr.CameraMaxZoomDistance = Amount
+    end
+end
+
+function API:ThirdPerson(Enabled)
+    local Plr = self:GetPlayer()
+    if Plr then
+        Plr.CameraMode = Enabled and Enum.CameraMode.Classic or Enum.CameraMode.LockFirstPerson
+    end
+end
+
 function API:GetControlModule()
     if self.ControlModule then
         return self.ControlModule
@@ -1356,6 +1486,13 @@ function API:SetJumpPower(Amount)
     local Hum = self:GetHumanoid()
     if Hum then
         Hum.JumpPower = Amount
+    end
+end
+
+function API:SetHipHeight(Amount)
+    local Hum = self:GetHumanoid()
+    if Hum then
+        Hum.HipHeight = Amount
     end
 end
 
@@ -1931,6 +2068,10 @@ function API:GetMousePosition()
     return GetMouseLocation(UserInputService)
 end
 
+function API:GetMouse()
+    return self:GetPlayer():GetMouse()
+end
+
 function API:SetMouseIcon(Icon)
     local Plr = self:GetPlayer()
     Plr.MouseIcon = Icon
@@ -2504,9 +2645,9 @@ function API:Rejoin()
     if #Players:GetPlayers() <= 1 then
         Plr:Kick("Rejoining...")
         task_wait(1);
-        TeleportService:Teleport(GamePlaceId, Plr)
+        TeleportService:Teleport(PlaceId, Plr)
     else
-        TeleportService:TeleportToPlaceInstance(GamePlaceId, GameJobId, Plr)
+        TeleportService:TeleportToPlaceInstance(PlaceId, JobId, Plr)
     end
 end
 
@@ -2514,7 +2655,7 @@ function API:ServerHop(MinPlayers, MaxPing)
     local Plr = self:GetPlayer()
 
     local Success, Result = pcall(function()
-        return HttpJSONDecode(gameHttpGet("https://games.roblox.com/v1/games/" ..GamePlaceId .."/servers/Public?sortOrder=Asc&limit=100"))
+        return HttpJSONDecode(gameHttpGet("https://games.roblox.com/v1/games/" ..PlaceId .."/servers/Public?sortOrder=Asc&limit=100"))
     end)
 
     if not Success or not Result then
@@ -2524,7 +2665,7 @@ function API:ServerHop(MinPlayers, MaxPing)
 
     for _, Server in next, Result.data do
         if Server.id and Server.playing < Server.maxPlayers and Server.playing > (MinPlayers or 0) and (not MaxPing or Server.ping <= MaxPing) then
-            TeleportService:TeleportToPlaceInstance(GamePlaceId, Server.id, Plr)
+            TeleportService:TeleportToPlaceInstance(PlaceId, Server.id, Plr)
             return
         end
     end
@@ -3387,8 +3528,10 @@ function API:Unload()
     self:TouchFling(false);
     self:BypassJP(false, nil);
     self:InfiniteJump(false);
+
     self:StopClip();
     self:StopFling();
+    self:StopFps();
 
     self:ClearHighlights();
     self:ClearBaseplates();
