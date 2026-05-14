@@ -2,15 +2,15 @@
 local global = shared or (getgenv and getgenv()) or _G;
 (global.FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
 
-local cloneref = (cloneref or clonereference or function(instance: any)
-    return instance;
+local cloneref: (Instance) -> Instance = (cloneref or clonereference or function(instance: Instance): Instance
+    return instance
 end)
 
 -- // @Performance.vars
 local game = game -- // Boom 🤯💥
 
-local type, typeof, pcall, tick, warn, print, loadstring, setmetatable =
-    type, typeof, pcall, tick, warn, print, loadstring, setmetatable
+local type, typeof, pcall, tick, warn, print, next,  loadstring, setmetatable =
+    type, typeof, pcall, tick, warn, print, next, loadstring, setmetatable
 
 local math_floor, math_random, math_clamp, math_min, math_sqrt, math_huge =
     math.floor, math.random, math.clamp, math.min, math.sqrt, math.huge
@@ -31,8 +31,8 @@ local Vector3_new, Vector2_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CF
 local write_file, read_file, is_file, make_folder, is_folder, del_folder, del_file, list_files =
     writefile, readfile, isfile, makefolder, isfolder, delfolder, delfile, listfiles
 
-local clonefunction = (clonefunction or copyfunction or function(func) 
-    return func 
+local clonefunction: (Function) -> Function = (clonefunction or copyfunction or function(func: Function): Function
+    return func
 end)
 
 if typeof(clonefunction) == "function" then
@@ -72,29 +72,29 @@ local LoadTime = os_clock()
 
 -- // @Variables
 local workspace, Cache = workspace, game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.68", Author = "FlamesW",Language = "luau", File = "Module.luau"}
-local Players: Players = cloneref(Cache(game, "Players"));
-local LocalPlayer: Player = Players.LocalPlayer;
-local Character: Model = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
+local Project = {Name = "Function Manager", Build = "@1.70", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Players: Players? = cloneref(Cache(game, "Players"));
+local LocalPlayer: Player? = Players.LocalPlayer;
+local Character: Model? = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
 if not Character then Character = LocalPlayer.CharacterAdded:Wait(); end
-local Roots = Character:FindFirstChild("HumanoidRootPart") or Character:WaitForChild("HumanoidRootPart", 0.1);
-local Humanoid = Character:FindFirstChild("Humanoid") or Character:WaitForChild("Humanoid", 0.1);
-local RunService: RunService = Cache(game, "RunService");
-local TweenService: TweenService = cloneref(Cache(game, "TweenService"));
-local MarketplaceService: MarketplaceService = Cache(game, "MarketplaceService");
-local HttpService: HttpService = cloneref(Cache(game, "HttpService"));
-local TeleportService: TeleportService = Cache(game, "TeleportService");
-local RbxAnalyticsService: RbxAnalyticsService = cloneref(Cache(game, "RbxAnalyticsService"));
-local VirtualInputManager: VirtualInputManager = Instance_new("VirtualInputManager");
+local Roots: BasePart? = Character:FindFirstChild("HumanoidRootPart") or Character:WaitForChild("HumanoidRootPart", 0.1);
+local Humanoid: Humanoid? = Character:FindFirstChild("Humanoid") or Character:WaitForChild("Humanoid", 0.1);
+local RunService: RunService? = Cache(game, "RunService");
+local TweenService: TweenService? = cloneref(Cache(game, "TweenService"));
+local MarketplaceService: MarketplaceService? = Cache(game, "MarketplaceService");
+local HttpService: HttpService? = cloneref(Cache(game, "HttpService"));
+local TeleportService: TeleportService? = Cache(game, "TeleportService");
+local RbxAnalyticsService: RbxAnalyticsService? = cloneref(Cache(game, "RbxAnalyticsService"));
+local VirtualInputManager: VirtualInputManager? = Instance_new("VirtualInputManager");
 local RequestService = (http and http.request) or request or http_request or (syn and syn.request);
-local GetConnections: GetConnections = getconnections or get_signal_cons;
-local UserInputService: UserInputService = cloneref(Cache(game, "UserInputService"));
-local SoundService: SoundService = cloneref(Cache(game, "SoundService"));
-local StarterGuiService: StarterGuiService = cloneref(Cache(game, "StarterGui"));
-local CoreGui: CoreGui = cloneref(Cache(game, "CoreGui"));
-local Performance: Performance = Cache(game, "Stats");
-local LightingService: LightingService = Cache(game, "Lighting");
-local CurrentCamera: CurrentCamera = workspace.CurrentCamera;
+local GetConnections: GetConnections? = getconnections or get_signal_cons;
+local UserInputService: UserInputService? = cloneref(Cache(game, "UserInputService"));
+local SoundService: SoundService? = cloneref(Cache(game, "SoundService"));
+local StarterGuiService: StarterGuiService? = cloneref(Cache(game, "StarterGui"));
+local CoreGui: CoreGui? = cloneref(Cache(game, "CoreGui"));
+local Performance: Performance? = Cache(game, "Stats");
+local LightingService: LightingService? = Cache(game, "Lighting");
+local CurrentCamera: Camera? = workspace.CurrentCamera;
 
 -- // @Caches
 local Http_Get = HttpService.HttpGet;
@@ -141,15 +141,16 @@ local Internal = function(packet)
 end
 
 -- // @Functions.module
-function API:CreateInstance(ClassName, Properties)
+function API:CreateInstance(ClassName: string, Properties: { [string]: any }?)
     local InstanceObj = Instance_new(ClassName)
 
     if Properties then
-        for Property, Value in pairs(Properties) do
-            InstanceObj[Property] = Value
+        local k, v = next(Properties)
+        while k do
+            InstanceObj[k] = v
+            k, v = next(Properties, k)
         end
     end
-
     return InstanceObj
 end
 
@@ -2061,6 +2062,8 @@ function API:StopClip()
     self.Origins = {}
 end
 
+
+
 function API:IsStudio()
     return RunService:IsStudio()
 end
@@ -2648,7 +2651,7 @@ function API:GetNPC(Model)
         local Roots = API:GetRoot()
         if not Roots then return end
 
-		Offset = Offset or Vector3_new(0, 0, 0)
+		Offset = Offset or Vector3_zero
 
 		if self.CustomTeleport then
             return self.CustomTeleport(self, Roots)
