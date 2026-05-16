@@ -3689,7 +3689,7 @@ function API:Unload()
     self:ClearRaknet();
 
     global.FunctionManager_Engine = nil
-    task_wait(0.67); -- // 6️⃣7️⃣🫴🤯🤯💥💥
+    task_wait(0.2); -- // 6️⃣7️⃣🫴🤯🤯💥💥
 
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
