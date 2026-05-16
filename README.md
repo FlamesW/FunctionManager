@@ -9,7 +9,7 @@ if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
     return
 end
 
-local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
 local CallThisWhatever = Class.Launch({});
 
 CallThisWhatever:Rejoin(); -- // Rejoins
@@ -19,7 +19,7 @@ CallThisWhatever:Rejoin(); -- // Rejoins
 * Merge Functions:
 
 ```lua
-local FunctionModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/home/Module.luau"))()
+local FunctionModule = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))()
 local TestModule = loadstring(game:HttpGet("https://pastefy.app/gYqC5OUA/raw"))()
 
 --[[
@@ -48,7 +48,7 @@ Utility:Rejoin() -- // Rejoins and ignores overwroted functions, FunctionModule 
 * Log Github Commits (No api or ratelimit)
 
 ```lua
-local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
 local FunctionModule = Class.Launch({});
 
 local Commit = FunctionModule:LogCommit("https://github.com/FlamesW/FunctionManager",
@@ -69,7 +69,7 @@ end
 * Auth Verification:
 
 ```lua
-local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
 local FunctionModule = Class.Launch({});
 
 local Success, Auth, Result = FunctionModule:Verify({
@@ -101,7 +101,7 @@ end
 * Sound Manager
 
 ```lua
-local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
+local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
 local FunctionModule = Class.Launch({});
 
 FunctionModule:SoundsAssets({
