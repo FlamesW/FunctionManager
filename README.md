@@ -20,10 +20,10 @@ CallThisWhatever:Rejoin(); -- // Rejoins
 #### You can also lookup language codes on https://developers.google.com/workspace/admin/directory/v1/languages
 ```lua
 local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
-local CallThisWhatever = Class.Launch({});
+local FunctionModule = Class.Launch({});
 
 -- // @Spanish -> The fast brown fox jumps over the lazy dog
-local Translated, DetectedCode, Original, OriginalCode = API:Translate("El rápido zorro marrón salta sobre el perro perezoso", "auto")
+local Translated, DetectedCode, Original, OriginalCode = FunctionModule:Translate("El rápido zorro marrón salta sobre el perro perezoso", "auto")
 
 print("Original Language: " .. Original)
 print("Original Code: " .. OriginalCode)
