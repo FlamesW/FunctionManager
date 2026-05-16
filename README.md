@@ -4,7 +4,10 @@
 
 ```lua
 -- >> @Prevents Runtime Duplicates
-if FunctionManager_Engine then warn("Function Manager.luau is already running") return end
+if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
+     warn("Function Manager.luau is already running")
+    return
+end
 
 local Class = loadstring(game:HttpGet("https://raw.githubusercontent.com/FlamesW/FunctionManager/refs/heads/home/Module.luau"))();
 local CallThisWhatever = Class.Launch({});
@@ -113,8 +116,8 @@ FunctionModule:PlaySound("Sans", {OnEnded = function() print("Sound Ended.") end
 * Flag:
 
 ```lua
-if FunctionManager_Engine then --> Checks if function manager is loaded or exists
-   print("Function Manager");
+if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
+     warn("Function Manager.luau is already running")
 end
 ```
 
