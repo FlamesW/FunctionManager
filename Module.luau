@@ -1,19 +1,19 @@
 -- // @FunctionManager.luau
 local global = shared or (getgenv and getgenv()) or _G;
-(global.FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
+(global.FunctionManager_Engine or {Unload = function() end}):Unload();
 
-local cloneref: (Instance) -> Instance = (cloneref or clonereference or function(instance: Instance): Instance
+local cloneref: (Instance) -> Instance = (cloneref or clonereference or function(instance: Instance)
     return instance
 end)
 
 -- // @Performance.vars
-local game = game -- // Boom 🤯💥
+local Game = game -- // Boom 🤯💥
 
 local type, typeof, pcall, tick, warn, print, next,  loadstring, setmetatable =
     type, typeof, pcall, tick, warn, print, next, loadstring, setmetatable
 
-local math_floor, math_random, math_clamp, math_min, math_sqrt, math_huge =
-    math.floor, math.random, math.clamp, math.min, math.sqrt, math.huge
+local math_floor, math_random, math_clamp, math_max, math_min, math_sqrt, math_huge =
+    math.floor, math.random, math.clamp, math.max, math.min, math.sqrt, math.huge
 
 local string_format, string_sub, string_match, string_gsub, string_gmatch, string_lower =
     string.format, string.sub, string.match, string.gsub, string.gmatch, string.lower
@@ -31,7 +31,7 @@ local Vector3_new, Vector2_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CF
 local write_file, read_file, is_file, make_folder, is_folder, del_folder, del_file, list_files =
     writefile, readfile, isfile, makefolder, isfolder, delfolder, delfile, listfiles
 
-local clonefunction: (Function) -> Function = (clonefunction or copyfunction or function(func: Function): Function
+local clonefunction: (Function) -> Function = (clonefunction or copyfunction or function(func: Function)
     return func
 end)
 
@@ -43,24 +43,24 @@ if typeof(clonefunction) == "function" then
     end)
 
     if isfolder_success == false or typeof(isfolder_error) ~= "boolean" then
-        local G = getgenv and getgenv() or _G
+        local globalEnv = getgenv and getgenv() or _G
 
-        G.isfolder = function(Folder)
+        globalEnv.isfolder = function(Folder)
             local Success, Data = pcall(isfolder_dummy, Folder)
             return Success and Data or false
         end
 
-        G.isfile = function(File)
+        globalEnv.isfile = function(File)
             local Success, Data = pcall(isfile_dummy, File)
             return Success and Data or false
         end
 
-        G.listfiles = function(Folder)
+        globalEnv.listfiles = function(Folder)
             local Success, Data = pcall(listfiles_dummy, Folder)
             return Success and Data or {}
         end
 
-		is_folder, is_file, list_files = G.isfolder, G.isfile, G.listfiles
+		is_folder, is_file, list_files = globalEnv.isfolder, globalEnv.isfile, globalEnv.listfiles
     end
 end
 
@@ -71,36 +71,37 @@ API.__index = API
 local LoadTime = os_clock()
 
 -- // @Variables
-local workspace, Cache = workspace, game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.70", Author = "FlamesW",Language = "luau", File = "Module.luau"}
-local Players: Players? = cloneref(Cache(game, "Players"));
+local Workspace, Cache = workspace, Game.GetService;
+local Project = {Name = "Function Manager", Build = "@1.71", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Players: Players? = cloneref(Cache(Game, "Players"));
 local LocalPlayer: Player? = Players.LocalPlayer;
 local Character: Model? = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
 if not Character then Character = LocalPlayer.CharacterAdded:Wait(); end
 local Roots: BasePart? = Character:FindFirstChild("HumanoidRootPart") or Character:WaitForChild("HumanoidRootPart", 0.1);
 local Humanoid: Humanoid? = Character:FindFirstChild("Humanoid") or Character:WaitForChild("Humanoid", 0.1);
-local RunService: RunService? = Cache(game, "RunService");
-local TweenService: TweenService? = cloneref(Cache(game, "TweenService"));
-local MarketplaceService: MarketplaceService? = Cache(game, "MarketplaceService");
-local HttpService: HttpService? = cloneref(Cache(game, "HttpService"));
-local TeleportService: TeleportService? = Cache(game, "TeleportService");
-local RbxAnalyticsService: RbxAnalyticsService? = cloneref(Cache(game, "RbxAnalyticsService"));
+local RunService: RunService? = Cache(Game, "RunService");
+local TweenService: TweenService? = cloneref(Cache(Game, "TweenService"));
+local MarketplaceService: MarketplaceService? = Cache(Game, "MarketplaceService");
+local HttpService: HttpService? = cloneref(Cache(Game, "HttpService"));
+local TeleportService: TeleportService? = Cache(Game, "TeleportService");
+local RbxAnalyticsService: RbxAnalyticsService? = cloneref(Cache(Game, "RbxAnalyticsService"));
 local VirtualInputManager: VirtualInputManager? = Instance_new("VirtualInputManager");
 local RequestService = (http and http.request) or request or http_request or (syn and syn.request);
 local GetConnections: GetConnections? = getconnections or get_signal_cons;
-local UserInputService: UserInputService? = cloneref(Cache(game, "UserInputService"));
-local SoundService: SoundService? = cloneref(Cache(game, "SoundService"));
-local StarterGuiService: StarterGuiService? = cloneref(Cache(game, "StarterGui"));
-local CoreGui: CoreGui? = cloneref(Cache(game, "CoreGui"));
-local Performance: Performance? = Cache(game, "Stats");
-local LightingService: LightingService? = Cache(game, "Lighting");
-local CurrentCamera: Camera? = workspace.CurrentCamera;
+local UserInputService: UserInputService? = cloneref(Cache(Game, "UserInputService"));
+local SoundService: SoundService? = cloneref(Cache(Game, "SoundService"));
+local StarterGuiService: StarterGuiService? = cloneref(Cache(Game, "StarterGui"));
+local CoreGui: CoreGui? = cloneref(Cache(Game, "CoreGui"));
+local Performance: Performance? = Cache(Game, "Stats");
+local LightingService: LightingService? = Cache(Game, "Lighting");
+local CurrentCamera: Camera? = Workspace.CurrentCamera;
+global.FunctionManager_Engine = API
 
--- // @Caches
+-- // @Caches.vars
 local Http_Get = HttpService.HttpGet;
 local Http_JSONDecode = HttpService.JSONDecode;
-local game_HttpGet = game.HttpGet;
-local get_asset = getcustomasset or getsynasset;
+local Game_HttpGet = Game.HttpGet;
+local Get_Asset = getcustomasset or getsynasset;
 
 local RenderStepped = RunService.RenderStepped;
 local Heartbeat = RunService.Heartbeat;
@@ -113,10 +114,10 @@ local IsKeyDown = UserInputService.IsKeyDown;
 local GetMouseLocation = UserInputService.GetMouseLocation;
 local GetPlatform = UserInputService.GetPlatform;
 
-local WorkspaceRaycast = workspace.Raycast;
+local WorkspaceRaycast = Workspace.Raycast;
 local RaycastParamsNew = RaycastParams.new;
 
-local PlaceId, JobId, GameId  = game.PlaceId, game.JobId, game.GameId;
+local PlaceId, JobId, GameId  = Game.PlaceId, Game.JobId, Game.GameId;
 
 local AssetTypes = {
     [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
@@ -127,10 +128,20 @@ local AssetTypes = {
     [38] = "Plugin", [41] = "MeshPart", [42] = "Video", [43] = "Tool"
 }
 
-global.FunctionManager_Engine = LocalPlayer.CharacterAdded:Connect(function(Running)
-    Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart"), Running:WaitForChild("Humanoid");
-    CurrentCamera = workspace.CurrentCamera;
-end)
+-- // @Signal.luau
+function API:_Connect(Name: string, Connection: Signal)
+    self._Signal = self._Signal or {} self._Signal[Name] = self._Signal[Name] or {} self._Signal[Name][#self._Signal[Name] + 1] = Connection return Connection;
+end
+
+function API:_Disconnect(Name: string): ()
+    local Connections = self._Signal and self._Signal[Name] if Connections then for i = 1, #Connections do pcall(Connections[i].Disconnect, Connections[i]) end self._Signal[Name] = nil end;
+end
+
+-- // @Engine.luau
+API:_Connect("@Engine.luau", LocalPlayer.CharacterAdded:Connect(function(Running)
+    Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart"), Running:WaitForChild("Humanoid")
+    CurrentCamera = Workspace.CurrentCamera
+end))
 
 local Internal = function(packet)
     if packet.PacketId == 0x1B then
@@ -180,7 +191,7 @@ function API:PlaySound(Id, Options)
     
     if not Options.Stack then
         if Data.Connection then
-            Data.Connection:Disconnect()
+            self:_Disconnect(Data.Connection)
             Data.Connection = nil
         end
         
@@ -195,10 +206,18 @@ function API:PlaySound(Id, Options)
     Data.Instance:Play()
 
     if Options.OnEnded then
-        Data.Connection = Data.Instance.Ended:Connect(function()
+        local Manager = "@Sound_" .. self:RandomString(15)
+        local Connection = Data.Instance.Ended:Connect(function()
             Options.OnEnded(Data.Instance)
-            Data.Connection = nil
+            self:_Disconnect(Manager)
+
+            if Data then
+                Data.Connection = nil
+            end
         end)
+
+        self:_Connect(Manager, Connection)
+        Data.Connection = Manager
     end
 
     return Data.Instance
@@ -263,9 +282,13 @@ function API:StopSound(...)
         if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
             SoundId = "rbxassetid://" .. tostring(SoundId)
         end
-        
+
         local Data = self.Sounds[SoundId]
         if Data and Data.Instance then
+            if Data.Connection then
+                self:_Disconnect(Data.Connection)
+                Data.Connection = nil
+            end
             Data.Instance:Stop()
         end
     end
@@ -327,9 +350,13 @@ end
 
 function API:ClearSounds()
     if not self.Sounds then return end
-    
-    for _, Data in pairs(self.Sounds) do
+
+    for SoundId, Data in pairs(self.Sounds) do
         if type(Data) == "table" and Data.Instance then
+            if Data.Connection then
+                self:_Disconnect(Data.Connection)
+            end
+
             pcall(function()
                 Data.Instance:Stop()
                 Data.Instance:Destroy()
@@ -343,7 +370,7 @@ end
 function API:LoadCustomAsset(Asset, Url)
     if not is_file(Asset) then
         local Success, Content = pcall(function()
-            return game_HttpGet(Url)
+            return Game_HttpGet(Url)
         end)
 
         if Success then 
@@ -353,8 +380,8 @@ function API:LoadCustomAsset(Asset, Url)
         end
     end
 
-    if get_asset then
-        return get_asset(Asset)
+    if Get_Asset then
+        return Get_Asset(Asset)
     else
         return is_file(Asset) and "rbxasset://" .. Asset or Url
     end
@@ -459,15 +486,17 @@ function API:GetFps()
             self.CurrentFPS = 1 / (tick - Frames)
             Frames = tick
         end)
+
+        self:_Connect("@Fps", self.FpsCounter)
     end
 
     return self.CurrentFPS or 0
 end
 
 function API:StopFps()
-    if self.FpsCounter then self.FpsCounter:Disconnect()
-        self.FpsCounter = nil self.CurrentFPS = 0
-    end
+    self:_Disconnect("@Fps")
+    self.FpsCounter = nil
+    self.CurrentFPS = 0
 end
 
 function API:Request(url)
@@ -480,7 +509,7 @@ end
 
 function API:LoadFile(Url)
     local Success, Result = pcall(function()
-        return loadstring(game_HttpGet(Url .. "?nocache=" .. tostring(os_clock())))()
+        return loadstring(Game_HttpGet(Url .. "?nocache=" .. tostring(os_clock())))()
     end)
 
     return Success and Result or nil
@@ -514,30 +543,30 @@ function API:ConnectSocket(Url)
             OnDisconnect = nil,
             OnError = nil
         }
-        
-        Connection.OnMessage:Connect(function(message)
+
+        self:_Connect("@WebSocket_Message", Connection.OnMessage:Connect(function(message)
             if self.Websocket and self.Websocket.Handlers then
                 for _, handler in ipairs(self.Websocket.Handlers) do
                     pcall(handler, message)
                 end
             end
-        end)
-        
-        Connection.OnClose:Connect(function()
+        end))
+
+        self:_Connect("@WebSocket_Close", Connection.OnClose:Connect(function()
             if self.Websocket then
                 self.Websocket.Connected = false
                 if self.Websocket.OnDisconnect then
                     pcall(self.Websocket.OnDisconnect)
                 end
             end
-        end)
+        end))
         
         if Connection.OnError then
-            Connection.OnError:Connect(function(Err)
+            self:_Connect("@WebSocket_Error", Connection.OnError:Connect(function(Err)
                 if self.Websocket and self.Websocket.OnError then
                     pcall(self.Websocket.OnError, Err)
                 end
-            end)
+            end))
         end
         
         return true, "Connected"
@@ -610,6 +639,10 @@ end
 
 function API:ClearWebSockets()
     if not self.Websocket then return end
+
+    self:_Disconnect("@WebSocket_Message")
+    self:_Disconnect("@WebSocket_Close")
+    self:_Disconnect("@WebSocket_Error")
 
     if self.Websocket.Connection then
         pcall(function()
@@ -1382,17 +1415,17 @@ function API:RunTasks()
 end
 
 function API:Press(Key)
-    VirtualInputManager:SendKeyEvent(true, Key, false, game)
+    VirtualInputManager:SendKeyEvent(true, Key, false, Game)
 end
 
 function API:Unpress(Key)
-    VirtualInputManager:SendKeyEvent(false, Key, false, game)
+    VirtualInputManager:SendKeyEvent(false, Key, false, Game)
 end
 
 function API:Click()
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, Game, 0)
     task_wait(0.1)
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, Game, 0)
 end
 
 function API:AntiAFK()
@@ -1407,9 +1440,9 @@ function API:AntiAFK()
         end
     else
         LocalPlayer.Idled:Connect(function()
-            self:Press(Enum.KeyCode.Thumbstick1)
+            self:Press(Enum.KeyCode.F5)
             task_wait(0.05)
-            self:Unpress(Enum.KeyCode.Thumbstick1)
+            self:Unpress(Enum.KeyCode.F5)
         end)
     end
 
@@ -1425,7 +1458,7 @@ function API:SetCameraType(Type)
 end
 
 function API:SetGravity(Amount)
-    workspace.Gravity = Amount
+    Workspace.Gravity = Amount
 end
 
 function API:SetCameraOcclusion(Mode)
@@ -1510,19 +1543,15 @@ function API:BypassWS(State, Speed)
         Active = false,
         Running = false,
         Speed = Speed,
-        Connections = {}
     }
     
     local function CleanUP()
         self.WSData.Active = false
         self.WSData.Running = false
-        
-        for _, Connection in ipairs(self.WSData.Connections) do
-            pcall(function() Connection:Disconnect() end)
-        end
-        table_clear(self.WSData.Connections)
+
+		self:_Disconnect("@TPWalk")
     end
-    
+
     if not State then
         CleanUP()
         return false
@@ -1554,9 +1583,8 @@ function API:BypassWS(State, Speed)
             Roots.CFrame = Roots.CFrame + (moveDir * delta * self.WSData.Speed)
         end
     end)
-    
-    table_insert(self.WSData.Connections, Connection)
-    
+
+    self:_Connect("@TPWalk", Connection)
     return true
 end
 
@@ -1577,17 +1605,13 @@ function API:BypassJP(State, Amount)
         Active = false,
         Running = false,
         Amount = Amount,
-        Connections = {}
     }
     
     local function CleanUP()
         self.JPData.Active = false
         self.JPData.Running = false
         
-        for _, Connection in ipairs(self.JPData.Connections) do
-            pcall(function() Connection:Disconnect() end)
-        end
-        table_clear(self.JPData.Connections)
+		self:_Disconnect("@TPJump")
     end
     
     if not State then
@@ -1616,9 +1640,8 @@ function API:BypassJP(State, Amount)
             Roots.CFrame = Roots.CFrame * CFrame_new(0, self.JPData.Amount, 0)
         end
     end)
-    
-    table_insert(self.JPData.Connections, Connection)
-    
+
+    self:_Connect("@TPJump", Connection)
     return true
 end
 
@@ -1635,27 +1658,9 @@ function API:SetTime(Amount)
     LightingService.ClockTime = Amount
 end
 
-function API:GetControlModule()
-    if self.ControlModule then
-        return self.ControlModule
-    end
-    
-    local playerScripts = LocalPlayer:FindFirstChild("PlayerScripts")
-    if not playerScripts then return nil end
-    
-    local playerModule = playerScripts:FindFirstChild("PlayerModule")
-    if not playerModule then return nil end
-    
-    local controlModule = playerModule:FindFirstChild("ControlModule")
-    if not controlModule then return nil end
-    
-    self.ControlModule = require(controlModule)
-    return self.ControlModule
-end
-
 function API:FlightConfig(Config)
     if not self.FlightData then
-        self.FlightData = {Active = false, Connections = {}}
+        self.FlightData = {Active = false}
     end
     
     self.FlightData.SpeedMin = Config.SpeedMin or self.FlightData.SpeedMin or 10
@@ -1676,7 +1681,7 @@ function API:Flight(State, Speed)
     Speed = Speed or 50
 
     self.FlightData = self.FlightData or 
-    {Active = false, Speed = Speed, Connections = {}, BodyVelocity = nil, BodyGyro = nil, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
+    {Active = false, Speed = Speed, BodyVelocity = nil, BodyGyro = nil, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
 
     local function CleanUP()
         self.FlightData.Active = false
@@ -1687,11 +1692,8 @@ function API:Flight(State, Speed)
         if self.FlightData.BodyGyro then
             self.FlightData.BodyGyro:Destroy()
         end
-        
-        for _, Connection in ipairs(self.FlightData.Connections) do
-            pcall(function() Connection:Disconnect() end)
-        end
-        table_clear(self.FlightData.Connections)
+
+		self:_Disconnect("@Flight")
     end
     
     if not State then
@@ -1732,7 +1734,7 @@ function API:Flight(State, Speed)
     
     local Camera = CurrentCamera
     local ControlModule = self:IsMobile() and self:GetControlModule() or nil
-    
+
     local Connection = RenderStepped:Connect(function()
         local Roots = self:GetRoot()
         if not self.FlightData.Active or not Roots or not Camera then 
@@ -1746,37 +1748,37 @@ function API:Flight(State, Speed)
             self.FlightData.BodyGyro.Parent = Roots
         end
         
-        local moveDirection = Vector3_zero
+        local MoveDirection = Vector3_zero
     
-        if self:IsMobile() and ControlModule then
-            local direction = ControlModule:GetMoveVector()
-            moveDirection = (Camera.CFrame.RightVector * direction.X) + (Camera.CFrame.LookVector * -direction.Z)
+        if ControlModule then
+            local Direction = ControlModule:GetMoveVector()
+            MoveDirection = (Camera.CFrame.RightVector * Direction.X) + (Camera.CFrame.LookVector * -Direction.Z)
     
-            if moveDirection.Magnitude > 0 then
-                moveDirection = moveDirection.Unit * self.FlightData.Speed
+            if MoveDirection.Magnitude > 0 then
+                MoveDirection = MoveDirection.Unit * self.FlightData.Speed
             end
         else
             if IsKeyDown(UserInputService, Enum.KeyCode.W) then
-                moveDirection += Camera.CFrame.LookVector
+                MoveDirection += Camera.CFrame.LookVector
             end
             if IsKeyDown(UserInputService, Enum.KeyCode.S) then
-                moveDirection -= Camera.CFrame.LookVector
+                MoveDirection -= Camera.CFrame.LookVector
             end
             if IsKeyDown(UserInputService, Enum.KeyCode.A) then
-                moveDirection -= Camera.CFrame.RightVector
+                MoveDirection -= Camera.CFrame.RightVector
             end
             if IsKeyDown(UserInputService, Enum.KeyCode.D) then
-                moveDirection += Camera.CFrame.RightVector
+                MoveDirection += Camera.CFrame.RightVector
             end
             if IsKeyDown(UserInputService, Enum.KeyCode.Space) then
-                moveDirection += Camera.CFrame.UpVector
+                MoveDirection += Camera.CFrame.UpVector
             end
             if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
-                moveDirection -= Camera.CFrame.UpVector
+                MoveDirection -= Camera.CFrame.UpVector
             end
             
-            if moveDirection.Magnitude > 0 then
-                moveDirection = moveDirection.Unit * self.FlightData.Speed
+            if MoveDirection.Magnitude > 0 then
+                MoveDirection = MoveDirection.Unit * self.FlightData.Speed
             end
         end
 
@@ -1789,7 +1791,7 @@ function API:Flight(State, Speed)
         end
         
         if self.FlightData.BodyVelocity then
-            self.FlightData.BodyVelocity.Velocity = moveDirection
+            self.FlightData.BodyVelocity.Velocity = MoveDirection
         end
         
         if self.FlightData.BodyGyro then
@@ -1797,19 +1799,7 @@ function API:Flight(State, Speed)
         end
     end)
 
-    table_insert(self.FlightData.Connections, Connection)
-    
-    return true
-end
-
-function API:SetFlightSpeed(Speed)
-    if not self.FlightData or not self.FlightData.Active then
-        return false
-    end
-
-    Speed = math_clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
-    self.FlightData.Speed = Speed
-
+    self:_Connect("@Flight", Connection)
     return true
 end
 
@@ -1819,17 +1809,13 @@ function API:InfiniteJump(State)
     self.JumpData = self.JumpData or {
         Active = false,
         Debounce = false,
-        Connections = {}
     }
     
     local function CleanUP()
         self.JumpData.Active = false
         self.JumpData.Debounce = false
-        
-        for _, Connection in ipairs(self.JumpData.Connections) do
-            pcall(function() Connection:Disconnect() end)
-        end
-        table_clear(self.JumpData.Connections)
+
+		self:_Disconnect("@InfiniteJump")
     end
     
     if not State then
@@ -1856,9 +1842,8 @@ function API:InfiniteJump(State)
             self.JumpData.Debounce = false
         end
     end)
-    
-    table_insert(self.JumpData.Connections, Connection)
-    
+
+    self:_Connect("@InfiniteJump", Connection)
     return true
 end
 
@@ -1868,17 +1853,13 @@ function API:TouchFling(State)
     self.FlingData = self.FlingData or {
         Active = false,
         Running = false,
-        Connections = {}
     }
     
     local function CleanUP()
         self.FlingData.Active = false
         self.FlingData.Running = false
         
-        for _, Connection in ipairs(self.FlingData.Connections) do
-            pcall(function() Connection:Disconnect() end)
-        end
-        table_clear(self.FlingData.Connections)
+		self:_Disconnect("@TouchFling")
     end
     
     if not State then
@@ -1911,8 +1892,7 @@ function API:TouchFling(State)
         movel = -movel
     end)
 
-    table_insert(self.FlingData.Connections, Connection)
-    
+    self:_Connect("@TouchFling", Connection)
     return true
 end
 
@@ -1922,7 +1902,7 @@ function API:XRay(State)
     if State then
         if self.XRayActive then return end
 
-        for _, p in ipairs(workspace:GetDescendants()) do
+        for _, p in ipairs(Workspace:GetDescendants()) do
             if p:IsA("BasePart") and not p.Parent:FindFirstChildWhichIsA("Humanoid") and not p.Parent.Parent:FindFirstChildWhichIsA("Humanoid") then
                 local Flag = false
     
@@ -1956,8 +1936,9 @@ end
 function API:AntiFling()
     if self.FlingActive then return end
 
-    self.FlingActive = true
-    self.FlingLoop = Heartbeat:Connect(function()
+	self.FlingActive = true
+
+    local Connection = Heartbeat:Connect(function()
         local Char = self:GetCharacter()
         if not Char then return end
 
@@ -1981,17 +1962,15 @@ function API:AntiFling()
             AntiFling.Velocity = Vector3_zero
         end
     end)
+
+	self:_Connect("@AntiFling", Connection)
 end
 
 function API:StopFling()
     if not self.FlingActive then return end
 
     self.FlingActive = false
-    
-    if self.FlingLoop then
-        self.FlingLoop:Disconnect()
-        self.FlingLoop = nil
-    end
+    self:_Disconnect("@AntiFling")
 
     local Char = self:GetCharacter()
     if Char then
@@ -2005,13 +1984,11 @@ function API:StopFling()
     end
 end
 
-function API:Noclip(Duration) -- // Noclip that must be used in loops at least faster than 0.45 seconds
+function API:Noclip(Duration)
     Duration = Duration or 0.45
 
-    if self.Noclipping then
-        self.Noclipping:Disconnect()
-        self.Noclipping = nil
-    end
+    self:_Disconnect("@Noclip")
+    self:StopClip()
 
     self.Clip = false
     self.EndPoint = tick() + Duration
@@ -2038,15 +2015,12 @@ function API:Noclip(Duration) -- // Noclip that must be used in loops at least f
         end
     end
 
-    self.Noclipping = Stepped:Connect(NoclipLoop)
+    self:_Connect("@Noclip", Stepped:Connect(NoclipLoop))
 end
 
 function API:StopClip()
-    if self.Noclipping then
-        self.Noclipping:Disconnect()
-        self.Noclipping = nil
-    end
-
+    self:_Disconnect("@Noclip")
+    
     self.Clip = true
     self.EndPoint = nil
     
@@ -2061,8 +2035,6 @@ function API:StopClip()
     
     self.Origins = {}
 end
-
-
 
 function API:IsStudio()
     return RunService:IsStudio()
@@ -2149,7 +2121,7 @@ function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, Ignore
     Params.FilterDescendantsInstances = IgnoreList or {}
     Params.IgnoreWater = IgnoreWater or false
     
-    local Result = WorkspaceRaycast(workspace, Origins, Dir.Unit * (Distance or 1000), Params)
+    local Result = WorkspaceRaycast(Workspace, Origins, Dir.Unit * (Distance or 1000), Params)
 
     if Callback and Result then
         Callback(Result)
@@ -2245,13 +2217,15 @@ function API:CreateHighlight(Target, Options)
     })
 
     self.HighlightCache[Target] = Highlight
+    local Preload = "@Highlight_" .. tostring(Target)
 
-    Target.AncestryChanged:Connect(function()
-        if not Target:IsDescendantOf(game) then
+    local Connection = Target.AncestryChanged:Connect(function()
+        if not Target:IsDescendantOf(Game) then
             self:RemoveHighlight(Target)
         end
     end)
 
+    self:_Connect(Preload, Connection)
     return Highlight
 end
 
@@ -2260,6 +2234,8 @@ function API:RemoveHighlight(Target)
 
     local Highlight = self.HighlightCache[Target]
     if not Highlight then return false end
+
+    self:_Disconnect("@Highlight_" .. tostring(Target))
 
     if Highlight and Highlight.Destroy then
         Highlight:Destroy()
@@ -2273,6 +2249,8 @@ function API:ClearHighlights()
     self.HighlightCache = self.HighlightCache or {}
 
     for Target, Highlight in pairs(self.HighlightCache) do
+        self:_Disconnect("@Highlight_" .. tostring(Target))
+
         if Highlight and Highlight.Destroy then
             pcall(function()
                 Highlight:Destroy()
@@ -2372,7 +2350,7 @@ function API:GetClosestNPC(Radius)
     local Closest = nil
     local ClosestDistSquared = Radius * Radius
 
-    local Models, _ = self:GetDescendants(workspace, "Model")
+    local Models, _ = self:GetDescendants(Workspace, "Model")
     
     for i = 1, #Models do
         local model = Models[i]
@@ -2733,7 +2711,7 @@ function API:LogGamepasses(State)
 
         if not self.LoggedGamepasses then self.LoggedGamepasses = {} end
         
-        local function capture(Type, Asset)
+        local function Capture(Type, Asset)
             local Data = {
                 Signal = Type,
                 ID = Asset,
@@ -2743,21 +2721,16 @@ function API:LogGamepasses(State)
             print("Successfully Logged [" .. Type .. "]: " .. tostring(Asset))
             return Data
         end
+
+        self:_Connect("@Gamepasses_Product", MarketplaceService.PromptProductPurchaseFinished:Connect(function(_, id) Capture("Product", id) end))
+        self:_Connect("@Gamepasses_Gamepass", MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(_, id) Capture("Gamepass", id) end))
+        self:_Connect("@Gamepasses_Purchase", MarketplaceService.PromptPurchaseFinished:Connect(function(_, id) Capture("Purchase", id) end))
+        self:_Connect("@Gamepasses_Bulk", MarketplaceService.PromptBulkPurchaseFinished:Connect(function(_, id) Capture("Bulk", id) end))
         
-        self.LogConnection = {
-            MarketplaceService.PromptProductPurchaseFinished:Connect(function(_, id) capture("Product", id) end),
-            MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(_, id) capture("Gamepass", id) end),
-            MarketplaceService.PromptPurchaseFinished:Connect(function(_, id) capture("Purchase", id) end),
-            MarketplaceService.PromptBulkPurchaseFinished:Connect(function(_, id) capture("Bulk", id) end)
-        }
+        self.LogConnection = true
         
     elseif State == false then
-        if self.LogConnection then
-            for _, Connection in ipairs(self.LogConnection) do
-                Connection:Disconnect()
-            end
-            self.LogConnection = nil
-        end
+        self:ClearGamepasses()
     end
 end
 
@@ -2776,11 +2749,10 @@ function API:GetGamepass(Type, Asset)
 end
 
 function API:ClearGamepasses()
-    if not self.LogConnection then return end
-    
-    for _, Connection in ipairs(self.LogConnection) do
-        pcall(function() Connection:Disconnect() end)
-    end
+    self:_Disconnect("@Gamepasses_Product")
+    self:_Disconnect("@Gamepasses_Gamepass")
+    self:_Disconnect("@Gamepasses_Purchase")
+    self:_Disconnect("@Gamepasses_Bulk")
     
     self.LogConnection = nil
     self.LoggedGamepasses = nil
@@ -2898,7 +2870,7 @@ function API:Verify(Options)
 
     if Options.Url then
         local Success, Content = pcall(function()
-            return game_HttpGet(Options.Url)
+            return Game_HttpGet(Options.Url)
         end)
     
         if Success then
@@ -3037,7 +3009,7 @@ function API:CreateBaseplate(Options)
     local Transparency = Options.Transparency or 0
     local Material = Options.Material or Enum.Material.Plastic
     local Offset = Options.Offset or Vector3_new(0, -3.7245, 0)
-    local Parent = Options.Parent or workspace
+    local Parent = Options.Parent or Workspace
     local CanCollide = Options.CanCollide ~= false
     local Anchored = Options.Anchored ~= false
 
@@ -3066,40 +3038,41 @@ function API:CreateBaseplate(Options)
     
     local Connection = nil
     
-    local API = {
+    local Usage = {
         Baseplate = Baseplate,
         
         SetSize = function(_, NewSize)
             Baseplate.Size = NewSize
-            return API
+            return Usage
         end,
         
         SetColor = function(_, NewColor)
             Baseplate.Color = NewColor
-            return API
+            return Usage
         end,
         
         SetTransparency = function(_, NewTrans)
             Baseplate.Transparency = NewTrans
-            return API
+            return Usage
         end,
         
         SetFollow = function(_, Followed)
             if Connection then
-                Connection:Disconnect()
+                self:_Disconnect(Connection)
                 Connection = nil
             end
             
             if Followed then
-                Connection = self:RenderStep(UpdatePosition, self:RandomString(15))
+                Connection = "@Baseplate_" .. self:RandomString(15)
+                self:_Connect(Connection, RenderStepped:Connect(UpdatePosition))
             end
-            return API
+            return Usage
         end,
         
         SetOffset = function(_, NewOffset)
             Offset = NewOffset
             UpdatePosition()
-            return API
+            return Usage
         end,
 
         GetOffset = function(_)
@@ -3108,10 +3081,11 @@ function API:CreateBaseplate(Options)
         
         Destroy = function(_)
             if Connection then
-                Connection:Disconnect()
+                self:_Disconnect(Connection)
+                Connection = nil
             end
             Baseplate:Destroy()
-            return API
+            return Usage
         end
     }
 
@@ -3119,10 +3093,10 @@ function API:CreateBaseplate(Options)
     table_insert(self.CreatedBaseplates, {
         Baseplate = Baseplate,
         Connection = Connection,
-        API = API
+        Usage = Usage
     })
     
-    return API
+    return Usage
 end
 
 function API:ClearBaseplates()
@@ -3134,7 +3108,7 @@ function API:ClearBaseplates()
                 Data.Baseplate:Destroy()
             end
             if Data.Connection then
-                Data.Connection:Disconnect()
+                self:_Disconnect(Data.Connection)
             end
         end)
     end
@@ -3167,7 +3141,7 @@ function API:Audio_Logger()
     return self:LoadFile("https://raw.githubusercontent.com/infyiff/backup/main/audiologger.lua")
 end
 
--- // @Loop Manager.module, Build: 1.43 | by Mommy Flames
+-- // @Loop Manager.module, Build: 1.43
 function API:CreateStacks()
     if type(self.Stacks) ~= "table" or type(self.Stacks.While) ~= "table" then
         self.Stacks = {
@@ -3178,11 +3152,11 @@ function API:CreateStacks()
     end
 end
 
-local function AddService(self, Name, ServiceSignal)
+local function AddService(self, Name, Signal)
     local Stack = self.Stacks[Name]
     if Stack.Connection then return end
 
-    Stack.Connection = ServiceSignal:Connect(function(...)
+    Stack.Connection = Signal:Connect(function(...)
         if self.UnloadedLM then return end
 
         local Funcs = Stack.Functions
@@ -3693,7 +3667,7 @@ end
 
 function API:Unload()
     -- // @Unload.module~
-    (global.FunctionManager_Engine or {Disconnect = function() end}):Disconnect();
+    self:_Disconnect("@Engine.luau")
     self:UnloadLM();
 
     self:XRay(false);
@@ -3745,8 +3719,8 @@ end
 
 function API.Launch(Class)
     Class.Core = {}
-    
-    -- // Services
+
+    -- // @Services
     Class.Players = Players
     Class.LocalPlayer = LocalPlayer
     Class.Character = Character
