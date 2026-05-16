@@ -3694,6 +3694,7 @@ function API:Unload()
     self:ClearSounds();
     self:ClearRaknet();
 
+    globalEnv._IsLoadedFM = nil
     global.FunctionManager_Engine = nil
     task_wait(0.25);
 
