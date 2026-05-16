@@ -1,8 +1,6 @@
 -- // @FunctionManager.luau
-local task_wait, task_spawn, task_cancel = task.wait, task.spawn, task.cancel
-
 local global = shared or (getgenv and getgenv()) or _G;
-(function(e)if not e then return end e:Unload();task_wait(1.67) end)(global.FunctionManager_Engine);
+(global.FunctionManager_Engine or {Unload = function() end}):Unload();
 
 local cloneref: (Instance) -> Instance = (cloneref or clonereference or function(instance: Instance)
     return instance
@@ -23,6 +21,7 @@ local string_format, string_sub, string_match, string_gsub, string_gmatch, strin
 local table_insert, table_clear, table_sort, table_create, table_concat =
     table.insert, table.clear, table.sort, table.create, table.concat
 
+local task_wait, task_spawn, task_cancel = task.wait, task.spawn, task.cancel
 local os_clock, os_time, os_date = os.clock, os.time, os.date
 local pairs, ipairs = pairs, ipairs
 
@@ -69,11 +68,11 @@ end
 local API = {} 
 API.__index = API
 
-local LoadTime = os_clock()
+local LoadTime = os.clock()
 
 -- // @Variables
 local Workspace, Cache = workspace, Game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.72", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.73", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players? = cloneref(Cache(Game, "Players"));
 local LocalPlayer: Player? = Players.LocalPlayer;
 local Character: Model? = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -3690,7 +3689,7 @@ function API:Unload()
     self:ClearRaknet();
 
     global.FunctionManager_Engine = nil
-    task_wait(0.2);
+    task_wait(0.67); -- // 6️⃣7️⃣🫴🤯🤯💥💥
 
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
@@ -3741,7 +3740,7 @@ function API.Launch(Class)
     Class.CurrentCamera = CurrentCamera
     Class.CoreGui = CoreGui
 
-    return setmetatable(Class, API)
+    return setmetatable(Class, {__index = API})
 end
 
 local Functions = 0
