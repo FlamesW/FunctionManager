@@ -72,7 +72,7 @@ local LoadTime = os.clock()
 
 -- // @Variables
 local Workspace, Cache = workspace, Game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.73", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.74", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players? = cloneref(Cache(Game, "Players"));
 local LocalPlayer: Player? = Players.LocalPlayer;
 local Character: Model? = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -3740,6 +3740,7 @@ function API.Launch(Class)
     Class.CurrentCamera = CurrentCamera
     Class.CoreGui = CoreGui
 
+	global.FunctionManager_Engine = Class
     return setmetatable(Class, {__index = API})
 end
 
