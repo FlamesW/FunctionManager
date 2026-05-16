@@ -72,7 +72,7 @@ local LoadTime = os.clock()
 
 -- // @Variables
 local Workspace, Cache = workspace, Game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.74", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.75", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players? = cloneref(Cache(Game, "Players"));
 local LocalPlayer: Player? = Players.LocalPlayer;
 local Character: Model? = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -3689,7 +3689,7 @@ function API:Unload()
     self:ClearRaknet();
 
     global.FunctionManager_Engine = nil
-    task_wait(0.2); -- // 6️⃣7️⃣🫴🤯🤯💥💥
+    task_wait(0.1); -- // 6️⃣7️⃣🫴🤯🤯💥💥
 
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
