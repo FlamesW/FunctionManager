@@ -1,6 +1,8 @@
 -- // @FunctionManager.luau
+local task_wait, task_spawn, task_cancel = task.wait, task.spawn, task.cancel
+
 local global = shared or (getgenv and getgenv()) or _G;
-(global.FunctionManager_Engine or {Unload = function() end}):Unload();
+(global.FunctionManager_Engine or {Unload = function() end}):Unload(); task_wait(0.5);
 
 local cloneref: (Instance) -> Instance = (cloneref or clonereference or function(instance: Instance)
     return instance
@@ -21,7 +23,6 @@ local string_format, string_sub, string_match, string_gsub, string_gmatch, strin
 local table_insert, table_clear, table_sort, table_create, table_concat =
     table.insert, table.clear, table.sort, table.create, table.concat
 
-local task_wait, task_spawn, task_cancel = task.wait, task.spawn, task.cancel
 local os_clock, os_time, os_date = os.clock, os.time, os.date
 local pairs, ipairs = pairs, ipairs
 
@@ -65,7 +66,7 @@ if typeof(clonefunction) == "function" then
 end
 
 -- // @API.module
-local API = {}
+local API = {} 
 API.__index = API
 
 local LoadTime = os_clock()
@@ -3689,7 +3690,7 @@ function API:Unload()
     self:ClearRaknet();
 
     global.FunctionManager_Engine = nil
-    task_wait();
+    task_wait(0.2);
 
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
