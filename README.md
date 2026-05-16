@@ -16,6 +16,22 @@ CallThisWhatever:Rejoin(); -- // Rejoins
 ```
 -------------------------------------------------------------------------------------------------------------------------------------
 
+```lua
+local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
+local CallThisWhatever = Class.Launch({});
+
+-- // @Spanish -> The fast brown fox jumps over the lazy dog
+local Translated, DetectedCode, Original, OriginalCode = API:Translate("El rápido zorro marrón salta sobre el perro perezoso", "auto")
+
+print("Original Language: " .. Original)
+print("Original Code: " .. OriginalCode)
+
+print("Detected code: " .. DetectedCode)
+print("Translated: " .. Translated)
+```
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
 * Merge Functions:
 
 ```lua
