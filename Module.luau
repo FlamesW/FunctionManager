@@ -35,6 +35,8 @@ local clonefunction: (Function) -> Function = (clonefunction or copyfunction or 
     return func
 end)
 
+local globalEnv = getgenv and getgenv() or _G;
+
 if typeof(clonefunction) == "function" then
     local isfolder_dummy, isfile_dummy, listfiles_dummy = clonefunction(isfolder), clonefunction(isfile), clonefunction(listfiles)
 
@@ -43,7 +45,6 @@ if typeof(clonefunction) == "function" then
     end)
 
     if isfolder_success == false or typeof(isfolder_error) ~= "boolean" then
-        local globalEnv = getgenv and getgenv() or _G
 
         globalEnv.isfolder = function(Folder)
             local Success, Data = pcall(isfolder_dummy, Folder)
@@ -72,7 +73,7 @@ local LoadTime = os.clock()
 
 -- // @Variables
 local Workspace, Cache = workspace, Game.GetService;
-local Project = {Name = "Function Manager", Build = "@1.75", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.76", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players? = cloneref(Cache(Game, "Players"));
 local LocalPlayer: Player? = Players.LocalPlayer;
 local Character: Model? = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait();
@@ -137,13 +138,17 @@ function API:_Disconnect(Name: string): ()
     local Connections = self._Signal and self._Signal[Name] if Connections then for i = 1, #Connections do pcall(Connections[i].Disconnect, Connections[i]) end self._Signal[Name] = nil end;
 end
 
+function globalEnv._IsLoadedFM() --> typeof(_IsLoadedFM) == "function" and _IsLoadedFM();
+    return global.FunctionManager_Engine ~= nil
+end
+
 -- // @Engine.luau
 API:_Connect("@Engine.luau", LocalPlayer.CharacterAdded:Connect(function(Running)
     Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart"), Running:WaitForChild("Humanoid")
     CurrentCamera = Workspace.CurrentCamera
 end))
 
-local Internal = function(packet)
+local function Internal(packet)
     if packet.PacketId == 0x1B then
         local data = packet.AsBuffer
         buffer.writeu32(data, 1, 0xFFFFFFFF)
@@ -3690,6 +3695,7 @@ function API:Unload()
     self:ClearRaknet();
 
     global.FunctionManager_Engine = nil
+	globalEnv._LoadedFM = nil
     task_wait(0.25);
 
     for Instance in pairs(API) do
