@@ -5,7 +5,7 @@
 ```lua
 -- >> @Prevents Runtime Duplicates
 if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
-     warn("@Function Manager.luau is already running")
+    warn("@Function Manager.luau is already running")
     return
 end
 
@@ -117,7 +117,8 @@ FunctionModule:PlaySound("Sans", {OnEnded = function() print("Sound Ended.") end
 
 ```lua
 if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
-     warn("@Function Manager.luau is already running")
+    warn("@Function Manager.luau is already running")
+    return
 end
 ```
 
