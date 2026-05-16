@@ -3666,7 +3666,8 @@ function API:OverrideFunction(Name, Func)
 end
 
 function API:Unload()
-    -- // @Unload.module~
+    warn("[@Functions.luau]: Unloaded")
+
     self:_Disconnect("@Engine.luau")
     self:UnloadLM();
 
@@ -3689,13 +3690,12 @@ function API:Unload()
     self:ClearRaknet();
 
     global.FunctionManager_Engine = nil
-    task_wait(0.1); -- // 6️⃣7️⃣🫴🤯🤯💥💥
+    task_wait(0.25);
 
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
     end
     setmetatable(API, nil)
-    warn("[Functions.luau]: Unloaded")
 end
 
 function API:Merge(...) -- // Merges with one another module 😉
@@ -3750,6 +3750,6 @@ for _, v in pairs(API) do
 end
 
 local EndTime = os_clock()
-warn(string_format("[Functions.luau] Loaded in %.3f ms, Build: %s, Functions: %d | By: %s", (EndTime - LoadTime) * 1000, Project.Build, Functions, Project.Author))
+warn(string_format("[@Functions.luau] Loaded in %.3f ms, Build: %s, Functions: %d | By: %s", (EndTime - LoadTime) * 1000, Project.Build, Functions, Project.Author))
 
 return API
