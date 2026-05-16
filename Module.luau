@@ -2,7 +2,7 @@
 local task_wait, task_spawn, task_cancel = task.wait, task.spawn, task.cancel
 
 local global = shared or (getgenv and getgenv()) or _G;
-(global.FunctionManager_Engine or {Unload = function() end}):Unload(); task_wait(1);
+(function(e)if not e then return end e:Unload();task_wait(1.67) end)(global.FunctionManager_Engine);
 
 local cloneref: (Instance) -> Instance = (cloneref or clonereference or function(instance: Instance)
     return instance
