@@ -3695,7 +3695,6 @@ function API:Unload()
     self:ClearRaknet();
 
     global.FunctionManager_Engine = nil
-	globalEnv._LoadedFM = nil
     task_wait(0.25);
 
     for Instance in pairs(API) do
