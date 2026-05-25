@@ -16,6 +16,18 @@ CallThisWhatever:Rejoin(); -- // Rejoins
 ```
 -------------------------------------------------------------------------------------------------------------------------------------
 
+* Spectate:
+
+```lua
+local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
+local CallThisWhatever = Class.Launch({});
+
+CallThisWhatever:Spectate("closestnpc") -- // args (random, closestnpc, nearest, farthest, bacons, furries, friends , nonfriends, names / displays (shortened))
+-- // can also accept instances :Spectate(workspace.Carl)
+```
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
 * Auto Translation:
 #### You can also lookup language codes on https://developers.google.com/workspace/admin/directory/v1/languages
 ```lua
