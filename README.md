@@ -23,7 +23,7 @@ local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManage
 local CallThisWhatever = Class.Launch({});
 
 CallThisWhatever:Spectate("closestnpc") -- // args (random, closestnpc, nearest, farthest, bacons, furries, friends , nonfriends, names / displays (shortened))
--- // can also accept instances :Spectate(workspace.Carl)
+-- // can also accept instances :Fling(workspace.Carl)
 ```
 
 -------------------------------------------------------------------------------------------------------------------------------------
