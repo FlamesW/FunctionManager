@@ -12,7 +12,7 @@ end
 local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
 local CallThisWhatever = Class.Launch({});
 
-CallThisWhatever:Rejoin(); -- // Rejoins
+CallThisWhatever:Rejoin() -- // Rejoins
 ```
 -------------------------------------------------------------------------------------------------------------------------------------
 
