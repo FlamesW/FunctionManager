@@ -43,6 +43,8 @@ CallThisWhatever:Fling("random") -- // args (random, closestnpc, nearest, farthe
 * Spoofing:
 
 ```lua
+local Game, os_clock, loadstring = game,os.clock, loadstring
+
 local function Load_Module()
     local Source = "https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"
     
@@ -59,7 +61,7 @@ local function Load_Module()
             
             local Repo = "https://raw.githubusercontent.com/FlamesW/FunctionManager"
             local GotVersion, Response = pcall(function()
-                return game:HttpGet(Repo .. "/home/%40Version.cfg" .. "?nocache=" .. tostring(os.clock()))
+                return Game:HttpGet(Repo .. "/home/%40Version.cfg" .. "?nocache=" .. tostring(os_clock()))
             end)
 
             local Latest_Version = nil
@@ -68,7 +70,7 @@ local function Load_Module()
             end
 
             if Latest_Version and Current_Version and Latest_Version ~= Current_Version then
-                local FreshContent = game:HttpGet(Source .. "?nocache=" .. tostring(os.clock()))
+                local FreshContent = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
                 pcall(writefile, File, FreshContent)
                 return loadstring(FreshContent)()
             else
@@ -77,7 +79,7 @@ local function Load_Module()
         end
     end
 
-    local Content = game:HttpGet(Source .. "?nocache=" .. tostring(os.clock()))
+    local Content = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
     pcall(writefile, File, Content)
 
     return loadstring(Content)()
@@ -86,13 +88,13 @@ end
 local Function_Manager = Load_Module()
 local Script = Function_Manager.Launch({})
 
-local Player = Script.LocalPlayer
-FunctionModule:Spoof(Player, "Name", "FakeUsername")
+local LPlayer = Script.LocalPlayer
+Script:Spoof(Player, "Name", "FakeUsername")
 
-print(Player.Name) -- // Will print "FakeUsername"
+print(LPlayer.Name) -- // Will print "FakeUsername"
 task.wait(1)
 
-FunctionModule:Unspoof(Player, "Name")
+Script:Unspoof(LPlayer, "Name")
 print(Player.Name) -- // Prints the real name again
 ```
 
