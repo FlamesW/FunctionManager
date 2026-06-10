@@ -45,19 +45,21 @@ CallThisWhatever:Fling("random") -- // args (random, closestnpc, nearest, farthe
 
 
 ```lua
-local Game, os_clock, loadstring = game,os.clock, loadstring
+
+local Game, os_clock, loadstring, tostring = game, os.clock, loadstring, tostring
+local write_file, read_file, is_file, make_folder, is_folder = writefile, readfile, isfile, makefolder, isfolder
 
 local function Load_Module()
     local Source = "https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"
     
-    if not isfolder("@File_Caches") then 
-        makefolder("@File_Caches") 
+    if not is_folder("@File_Caches") then 
+        make_folder("@File_Caches") 
     end
     
     local File = "@File_Caches/Module.luau"
 
-    if isfile(File) then
-        local Content = readfile(File)
+    if is_file(File) then
+        local Content = read_file(File)
         if Content then
             local Current_Version = Content:match('Build%s*=%s*"@([%d%.]+)"')
             
@@ -73,7 +75,7 @@ local function Load_Module()
 
             if Latest_Version and Current_Version and Latest_Version ~= Current_Version then
                 local FreshContent = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
-                pcall(writefile, File, FreshContent)
+                pcall(write_file, File, FreshContent)
                 return loadstring(FreshContent)()
             else
                 return loadstring(Content)()
@@ -82,9 +84,9 @@ local function Load_Module()
     end
 
     local Content = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
-    pcall(writefile, File, Content)
+    pcall(write_file, File, Content)
 
-    return loadstring(Content)()
+    return loadstring(Content)
 end
 
 local Function_Manager = Load_Module()
