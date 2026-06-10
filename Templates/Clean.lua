@@ -83,14 +83,14 @@ local function LoadFile(luau, State)
         return loadstring(Content)()
     end
 
-    if not isfolder("@File_Caches") then 
-        makefolder("@File_Caches") 
+    if not is_folder("@File_Caches") then 
+        make_folder("@File_Caches") 
     end
     
     local File = "@File_Caches/" .. luau
 
-    if isfile(File) then
-        local Success, Content = pcall(readfile, File)
+    if is_file(File) then
+        local Success, Content = pcall(read_file, File)
         if Success and Content then
             if luau == "Module.luau" then
                 local Current_Version = Content:match('Build%s*=%s*"@([%d%.]+)"')
@@ -107,7 +107,7 @@ local function LoadFile(luau, State)
 
                 if Latest_Version and Current_Version and Latest_Version ~= Current_Version then
                     local FreshContent = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
-                    pcall(writefile, File, FreshContent)
+                    pcall(write_file, File, FreshContent)
 
                     Notify("Module updated -> @" .. Latest_Version)
                     return loadstring(FreshContent)()
@@ -118,7 +118,7 @@ local function LoadFile(luau, State)
                 task_spawn(function()
                     local Client_Check = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
                     if Client_Check ~= Content then
-                        pcall(writefile, File, Client_Check)
+                        pcall(write_file, File, Client_Check)
                         Notify(luau .. " got updated!")
                     end
                 end)
@@ -128,7 +128,7 @@ local function LoadFile(luau, State)
     end
 
     local Content = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
-    pcall(writefile, File, Content)
+    pcall(write_file, File, Content)
 
     return loadstring(Content)()
 end
