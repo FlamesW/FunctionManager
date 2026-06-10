@@ -40,7 +40,9 @@ CallThisWhatever:Fling("random") -- // args (random, closestnpc, nearest, farthe
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
-* Spoofing:
+* Spoofing + Cache loading:
+##### Cache uses workspace reading techniques to load the module in less than a millisecond, though on first load/any update loading takes slightly slower than force downloading due to update forces refresh then downloads to ensure you're always updated.
+
 
 ```lua
 local Game, os_clock, loadstring = game,os.clock, loadstring
