@@ -46,7 +46,7 @@ CallThisWhatever:Fling("random") -- // args (random, closestnpc, nearest, farthe
 
 ```lua
 
-local Game, os_clock, loadstring, tostring = game, os.clock, loadstring, tostring
+local Game, os_clock, loadstring, tostring, match = game, os.clock, loadstring, tostring, match
 local write_file, read_file, is_file, make_folder, is_folder = writefile, readfile, isfile, makefolder, isfolder
 
 local function Load_Module()
