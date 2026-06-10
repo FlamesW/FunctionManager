@@ -7,7 +7,7 @@ local Assets = {
   -- // Add in more modules~
 }
 
-local function LoadFile(luau, State)
+local function Load_File(luau, State)
     local Source = Assets[luau]
     if (Source == nil) then
         return Game:Shutdown()
@@ -69,7 +69,7 @@ local function LoadFile(luau, State)
 end
 
 -- // @Module.Luau
-local Function_Manager = LoadFile("Module.luau", false)
+local Function_Manager = Load_File("Module.luau", false)
 local Script = Function_Manager.Launch({})
 
 -- // Functions here~
