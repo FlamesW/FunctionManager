@@ -19,8 +19,8 @@ local cloneref = (cloneref or clonereference or function(instance)
     return instance
 end)
 
-local type, typeof, pcall, tick, tonumber, warn, print, unpack, next, loadstring, setmetatable =
-    type, typeof, pcall, tick, tonumber, warn, print, unpack, next, loadstring, setmetatable
+local type, typeof, pcall, tick, tonumber, match, warn, print, unpack, next, loadstring, setmetatable =
+    type, typeof, pcall, tick, tonumber, match, warn, print, unpack, next, loadstring, setmetatable
 
 local math_floor, math_random, math_clamp, math_max, math_min, math_sqrt, math_rad, math_huge =
     math.floor, math.random, math.clamp, math.max, math.min, math.sqrt, math.rad, math.huge
