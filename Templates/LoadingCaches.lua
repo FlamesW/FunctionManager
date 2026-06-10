@@ -1,5 +1,5 @@
 -- // @Loading caches
-local Game, os_clock, loadstring, tostring, task_spawn, warn = game, os.clock, loadstring, tostring, task.spawn, warn
+local Game, os_clock, loadstring, tostring, task_spawn, warn, match = game, os.clock, loadstring, tostring, task.spawn, warn, match
 local write_file, read_file, is_file, make_folder, is_folder = writefile, readfile, isfile, makefolder, isfolder
 
 local Assets = {
