@@ -40,6 +40,64 @@ CallThisWhatever:Fling("random") -- // args (random, closestnpc, nearest, farthe
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
+* Spoofing:
+
+```lua
+local function Load_Module()
+    local Source = "https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"
+    
+    if not isfolder("@File_Caches") then 
+        makefolder("@File_Caches") 
+    end
+    
+    local File = "@File_Caches/Module.luau"
+
+    if isfile(File) then
+        local Content = readfile(File)
+        if Content then
+            local Current_Version = Content:match('Build%s*=%s*"@([%d%.]+)"')
+            
+            local Repo = "https://raw.githubusercontent.com/FlamesW/FunctionManager"
+            local GotVersion, Response = pcall(function()
+                return game:HttpGet(Repo .. "/home/%40Version.cfg" .. "?nocache=" .. tostring(os.clock()))
+            end)
+
+            local Latest_Version = nil
+            if GotVersion and Response then
+                Latest_Version = Response:match("@([%d%.]+)")
+            end
+
+            if Latest_Version and Current_Version and Latest_Version ~= Current_Version then
+                local FreshContent = game:HttpGet(Source .. "?nocache=" .. tostring(os.clock()))
+                pcall(writefile, File, FreshContent)
+                return loadstring(FreshContent)()
+            else
+                return loadstring(Content)()
+            end
+        end
+    end
+
+    local Content = game:HttpGet(Source .. "?nocache=" .. tostring(os.clock()))
+    pcall(writefile, File, Content)
+
+    return loadstring(Content)()
+end
+
+local Function_Manager = Load_Module()
+local Script = Function_Manager.Launch({})
+
+local Player = Script.LocalPlayer
+FunctionModule:Spoof(Player, "Name", "FakeUsername")
+
+print(Player.Name) -- // Will print "FakeUsername"
+task.wait(1)
+
+FunctionModule:Unspoof(Player, "Name")
+print(Player.Name) -- // Prints the real name again
+```
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
 * Auto Translation:
 #### You can also lookup language codes on https://developers.google.com/workspace/admin/directory/v1/languages
 ```lua
