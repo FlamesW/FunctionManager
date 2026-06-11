@@ -81,13 +81,13 @@ local function LoadFile(luau, State)
     local function Execute(Content)
         local Chunk, Err = loadstring(Content)
         if not Chunk then
-            warn("[LoadFile] Compile error in " .. luau .. ":", Err)
+            warn("[File] Compile error in " .. luau .. ":", Err)
             return nil
         end
 
         local Success, Result = pcall(Chunk)
         if not Success then
-            warn("[LoadFile] Runtime error in " .. luau .. ":", Result)
+            warn("[File] Runtime error in " .. luau .. ":", Result)
             return nil
         end
 
