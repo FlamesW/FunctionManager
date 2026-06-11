@@ -74,33 +74,51 @@ end
 
 local function LoadFile(luau, State)
     local Source = Assets[luau]
-    if (Source == nil) then
+    if Source == nil then
         return Game:Shutdown()
+    end
+
+    local function Execute(Content)
+        local Chunk, Err = loadstring(Content)
+        if not Chunk then
+            warn("[LoadFile] Compile error in " .. luau .. ":", Err)
+            return nil
+        end
+
+        local Success, Result = pcall(Chunk)
+        if not Success then
+            warn("[LoadFile] Runtime error in " .. luau .. ":", Result)
+            return nil
+        end
+
+        return Result
     end
 
     if State == true then
         local Content = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
-        return loadstring(Content)()
+        return Execute(Content)
     end
 
-    if not is_folder("@File_Caches") then 
-        make_folder("@File_Caches") 
+    if not is_folder("@File_Caches") then
+        make_folder("@File_Caches")
     end
-    
+
     local File = "@File_Caches/" .. luau
 
     if is_file(File) then
         local Success, Content = pcall(read_file, File)
+
         if Success and Content then
             if luau == "Module.luau" then
                 local Current_Version = Content:match('Build%s*=%s*"@([%d%.]+)"')
-    
                 local Repo = "https://raw.githubusercontent.com/FlamesW/FunctionManager"
+
                 local GotVersion, Response = pcall(function()
-                    return Game:HttpGet(Repo .. "/home/%40Version.cfg" .. "?nocache=" .. tostring(os_clock()))
+                    return Game:HttpGet(Repo .. "/home/%40Version.cfg?nocache=" .. tostring(os_clock()))
                 end)
 
-                local Latest_Version = nil
+                local Latest_Version
+
                 if GotVersion and Response then
                     Latest_Version = Response:match("@([%d%.]+)")
                 end
@@ -110,27 +128,29 @@ local function LoadFile(luau, State)
                     pcall(write_file, File, FreshContent)
 
                     Notify("Module updated -> @" .. Latest_Version)
-                    return loadstring(FreshContent)()
+                    return Execute(FreshContent)
                 else
-                    return loadstring(Content)()
+                    return Execute(Content)
                 end
-            else
-                task_spawn(function()
-                    local Client_Check = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
-                    if Client_Check ~= Content then
-                        pcall(write_file, File, Client_Check)
-                        Notify(luau .. " got updated!")
-                    end
-                end)
-                return loadstring(Content)()
             end
+
+            task_spawn(function()
+                local Client_Check = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
+
+                if Client_Check ~= Content then
+                    pcall(write_file, File, Client_Check)
+                    Notify(luau .. " got updated!")
+                end
+            end)
+
+            return Execute(Content)
         end
     end
 
     local Content = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
     pcall(write_file, File, Content)
 
-    return loadstring(Content)()
+    return Execute(Content)
 end
 
 -- // @Module.Luau
