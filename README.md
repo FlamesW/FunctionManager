@@ -45,61 +45,78 @@ CallThisWhatever:Fling("random") -- // args (random, closestnpc, nearest, farthe
 
 
 ```lua
-
-local Game, os_clock, loadstring, tostring, match = game, os.clock, loadstring, tostring, match
+local Game, os_clock, loadstring, tostring, match, task_wait = game, os.clock, loadstring, tostring, match, task.wait
 local write_file, read_file, is_file, make_folder, is_folder = writefile, readfile, isfile, makefolder, isfolder
 
 local function Load_Module()
     local Source = "https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"
-    
-    if not is_folder("@File_Caches") then 
-        make_folder("@File_Caches") 
+    local Repo = "https://raw.githubusercontent.com/FlamesW/FunctionManager"
+
+    if not is_folder("@File_Caches") then
+        make_folder("@File_Caches")
     end
-    
+
     local File = "@File_Caches/Module.luau"
+
+    local function Execute(Content)
+        local Chunk, Error = loadstring(Content)
+
+        if not Chunk then
+            error("[FunctionManager]: Failed to compile module:\n" .. tostring(Error))
+        end
+
+        local Success, Result = pcall(Chunk)
+
+        if not Success then
+            error("[FunctionManager]: Failed to execute module:\n" .. tostring(Result))
+        end
+
+        return Result
+    end
 
     if is_file(File) then
         local Content = read_file(File)
+
         if Content then
             local Current_Version = Content:match('Build%s*=%s*"@([%d%.]+)"')
-            
-            local Repo = "https://raw.githubusercontent.com/FlamesW/FunctionManager"
-            local GotVersion, Response = pcall(function()
-                return Game:HttpGet(Repo .. "/home/%40Version.cfg" .. "?nocache=" .. tostring(os_clock()))
+            local Latest_Version
+
+            local Success, Response = pcall(function()
+                return Game:HttpGet(Repo .. "/home/%40Version.cfg?nocache=" .. tostring(os_clock()))
             end)
 
-            local Latest_Version = nil
-            if GotVersion and Response then
+            if Success and Response then
                 Latest_Version = Response:match("@([%d%.]+)")
             end
 
             if Latest_Version and Current_Version and Latest_Version ~= Current_Version then
                 local FreshContent = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
                 pcall(write_file, File, FreshContent)
-                return loadstring(FreshContent)()
-            else
-                return loadstring(Content)()
+
+                return Execute(FreshContent)
             end
+
+            return Execute(Content)
         end
     end
 
     local Content = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
-    pcall(write_file, File, Content)
 
-    return loadstring(Content)
+    pcall(write_file, File, Content)
+    return Execute(Content)
 end
 
 local Function_Manager = Load_Module()
 local Script = Function_Manager.Launch({})
 
 local LPlayer = Script.LocalPlayer
-Script:Spoof(Player, "Name", "FakeUsername")
 
-print(LPlayer.Name) -- // Will print "FakeUsername"
-task.wait(1)
+Script:Spoof(LPlayer, "Name", "FakeUsername")
+print(LPlayer.Name) -- // Prints "FakeUsername".
+task_wait(1)
 
 Script:Unspoof(LPlayer, "Name")
-print(Player.Name) -- // Prints the real name again
+print(LPlayer.Name) -- // Prints the real name.
 ```
 
 -------------------------------------------------------------------------------------------------------------------------------------
