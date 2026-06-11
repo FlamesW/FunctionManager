@@ -40,9 +40,9 @@ CallThisWhatever:Fling("random") -- // args (random, closestnpc, nearest, farthe
 
 -------------------------------------------------------------------------------------------------------------------------------------
 
-* Spoofing + Cache loading:
-##### Cache uses workspace reading techniques to load the module in less than a millisecond, though on first load/any update loading takes slightly slower than force downloading due to update forces refresh then downloads to ensure you're always updated.
+* Spoofing
 
+#### Requires hooking
 
 ```lua
 local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))();
