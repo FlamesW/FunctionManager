@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@1.94", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.95", Author = "FlamesW",Language = "luau", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -584,19 +584,30 @@ function API:PlaySound(Id, Options)
     if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
         SoundId = "rbxassetid://" .. tostring(SoundId)
     end
-    
-    local Data = self.Sounds[SoundId]
-    if not Data then
-        local SoundInstance = self:CreateInstance("Sound", {
-            Name = self:RandomString(15),
-            SoundId = SoundId,
-            Parent = SoundService
-        })
-        Data = {Instance = SoundInstance}
-        self.Sounds[SoundId] = Data
-    end
-    
-    if not Options.Stack then
+
+    local Data
+    if Options.Stack then
+        Data = {
+            Instance = self:CreateInstance("Sound", {
+                Name = self:RandomString(15),
+                SoundId = SoundId,
+                Parent = SoundService
+            })
+        }
+        self.Sounds[SoundId .. "_" .. self:RandomString(15)] = Data
+    else
+        Data = self.Sounds[SoundId]
+        if not Data then
+            Data = {
+                Instance = self:CreateInstance("Sound", {
+                    Name = self:RandomString(15),
+                    SoundId = SoundId,
+                    Parent = SoundService
+                })
+            }
+            self.Sounds[SoundId] = Data
+        end
+        
         if Data.Connection then
             self:_Disconnect(Data.Connection)
             Data.Connection = nil
@@ -612,20 +623,27 @@ function API:PlaySound(Id, Options)
     Data.Instance.Looped = Options.Looped or false
     Data.Instance:Play()
 
-    if Options.OnEnded then
-        local Manager = "@Sound_" .. self:RandomString(15)
-        local Connection = Data.Instance.Ended:Connect(function()
-            Options.OnEnded(Data.Instance)
-            self:_Disconnect(Manager)
-
-            if Data then
-                Data.Connection = nil
+    local Manager = "@Sound_" .. self:RandomString(15)
+    local Connection = Data.Instance.Ended:Connect(function()
+        Data.Instance:Stop()
+        Data.Instance:Destroy()
+        
+        for Key, Value in pairs(self.Sounds) do
+            if Value == Data then
+                self.Sounds[Key] = nil
+                break
             end
-        end)
+        end
+        
+        self:_Disconnect(Manager)
+        
+        if Options.OnEnded then
+            Options.OnEnded(Data.Instance)
+        end
+    end)
 
-        self:_Connect(Manager, Connection)
-        Data.Connection = Manager
-    end
+    self:_Connect(Manager, Connection)
+    Data.Connection = Manager
 
     return Data.Instance
 end
