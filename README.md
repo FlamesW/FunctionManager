@@ -171,10 +171,30 @@ return Test
 ]]
 
 local Utility = FunctionModule.Launch({})
-:Merge(TestModule) --> @Merge
+:Merge(TestModule):Merge({ 
+    Superman = function(self)
+        self:Flight(true, 70)
+    end,
+	WhyAreYouHere = function()
+	    print("no")
+	end,
+	Rejoin = function()
+	    print("cant overwrite")
+	end,
+    KYS = function(self)
+        self:Unload()
+    end,
+})
 
-Utility:WhyAreYouHere() --> Func
+Utility:WhyAreYouHere() --> Func will call testmodule's function because whatever set first gets prioritized.
 task.wait(2)
+
+Utility:Superman() --> Custom func to fly
+
+task.wait(2)
+Utility:KYS() --> Custom func to unload
+
+task.wait(1)
 Utility:Rejoin() -- // Rejoins and ignores overwroted functions, FunctionModule always wins.
 ```
 -------------------------------------------------------------------------------------------------------------------------------------
