@@ -73,12 +73,12 @@ end
 --]]
 
 -- // @API.module
-local API = {} 
+local API = {}
 API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@1.95", Author = "FlamesW",Language = "luau", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.96", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -102,7 +102,7 @@ local Performance: Performance? = GetService(Game, "Stats");
 local LightingService: LightingService? = GetService(Game, "Lighting");
 local CurrentCamera: Camera? = Workspace.CurrentCamera;
 repeat task_wait() LocalPlayer = Players.LocalPlayer until LocalPlayer ~= nil
-global.FunctionManager_Engine = API -- // @Enviroment
+global.FunctionManager_Engine = API -- // @Enviroment exposure
 
 -- // @Caches.vars
 local Runtime = os_clock()
@@ -7498,24 +7498,34 @@ function API:Unload()
     self:_Exit();
 
     globalEnv._IsLoadedFM = nil
-    task_wait(0.35);
+    task_wait(0.25);
 
-	local Variables = global.FunctionManager_Engine
+    local Variables = global.FunctionManager_Engine
 
-	for Instance in pairs(Variables) do
-		Variables[Instance] = nil -- // ☝️🤓
-	end
-	setmetatable(Variables, nil)
+    for Instance in pairs(Variables) do
+        Variables[Instance] = nil -- // ☝️🤓
+    end
 
-	global.FunctionManager_Engine, Variables = nil, nil
+    setmetatable(Variables, nil)
+    global.FunctionManager_Engine, Variables = nil, nil
 
     for Instance in pairs(API) do
         API[Instance] = nil -- // 💀
     end
     setmetatable(API, nil)
+
+    for Instance in pairs(self) do
+        self[Instance] = nil -- // 💔🥀
+    end
+    setmetatable(self, nil)
+
+    -- // Forces garbage collection if you have it.
+    if type(gc) == "function" then
+        task_wait(0.1) gc()
+    end
 end
 
-function API:Merge(...) -- // Merges with one another module 😉
+function API:Merge(...) -- // Merges with one another module 😉👍
     for _, Modules in ipairs({...}) do
         for Method, Func in pairs(Modules) do
             if typeof(Func) == "function" then
