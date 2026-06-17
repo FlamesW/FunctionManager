@@ -3,7 +3,7 @@
 * Simple Rejoin:
 
 ```lua
--- >> @Prevents Runtime Duplicates
+-- >> @Prevents auto reloading
 if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
     warn("@Function Manager.luau is already running")
     return
