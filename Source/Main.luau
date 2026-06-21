@@ -3344,6 +3344,12 @@ function API:FlightConfig(Config)
     self.FlightData.SpeedMin = Config.SpeedMin or self.FlightData.SpeedMin or 10
     self.FlightData.SpeedMax = Config.SpeedMax or self.FlightData.SpeedMax or 250
     self.FlightData.SpeedStep = Config.SpeedStep or self.FlightData.SpeedStep or 1.5
+
+    self.FlightData.SpeedControls = {
+        Enabled = Config.SpeedControls and Config.SpeedControls.Enabled ~= nil and Config.SpeedControls.Enabled or true,
+        IncreaseKey = Config.SpeedControls and Config.SpeedControls.IncreaseKey or Enum.KeyCode.Equals,
+        DecreaseKey = Config.SpeedControls and Config.SpeedControls.DecreaseKey or Enum.KeyCode.Minus,
+    }
     
     if self.FlightData.Active then
         self.FlightData.Speed = math_clamp(self.FlightData.Speed, 
@@ -3354,11 +3360,25 @@ function API:FlightConfig(Config)
     return true
 end
 
+function API:SetFlightSpeed(Num)
+    if not self.FlightData then
+        return
+    end
+    
+    self.FlightData.Speed = math_clamp(Num, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+end
+
+function API:SetSpeedControls(State)
+    if not self.FlightData or not self.FlightData.SpeedControls then
+        return
+    end
+    
+    self.FlightData.SpeedControls.Enabled = State
+end
+
 function API:Flight(State, Speed)
     if State then
-        if not self:RegisterConflict("Flight", true) then
-            return false
-        end
+        self:RegisterConflict("Flight", true)
     else
         self:RegisterConflict("Flight", false)
     end
@@ -3368,6 +3388,14 @@ function API:Flight(State, Speed)
 
     self.FlightData = self.FlightData or 
     {Active = false, Speed = Speed, BodyVelocity = nil, BodyGyro = nil, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
+
+    if not self.FlightData.SpeedControls then
+        self.FlightData.SpeedControls = {
+            Enabled = true,
+            IncreaseKey = Enum.KeyCode.Equals,
+            DecreaseKey = Enum.KeyCode.Minus,
+        }
+    end
 
     local function CleanUP()
         self.FlightData.Active = false
@@ -3467,12 +3495,12 @@ function API:Flight(State, Speed)
             end
         end
 
-        if IsKeyDown(UserInputService, Enum.KeyCode.Equals) or IsKeyDown(UserInputService, Enum.KeyCode.KeypadPlus) then
-            self.FlightData.Speed = math_clamp(self.FlightData.Speed + self.FlightData.SpeedStep, 
-                self.FlightData.SpeedMin, self.FlightData.SpeedMax)
-        elseif IsKeyDown(UserInputService, Enum.KeyCode.Minus) or IsKeyDown(UserInputService, Enum.KeyCode.KeypadMinus) then
-            self.FlightData.Speed = math_clamp(self.FlightData.Speed - self.FlightData.SpeedStep, 
-                self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+        if self.FlightData.SpeedControls and self.FlightData.SpeedControls.Enabled then
+            if IsKeyDown(UserInputService, self.FlightData.SpeedControls.IncreaseKey) or IsKeyDown(UserInputService, Enum.KeyCode.KeypadPlus) then
+                self.FlightData.Speed = math_clamp(self.FlightData.Speed + self.FlightData.SpeedStep, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+            elseif IsKeyDown(UserInputService, self.FlightData.SpeedControls.DecreaseKey) or IsKeyDown(UserInputService, Enum.KeyCode.KeypadMinus) then
+                self.FlightData.Speed = math_clamp(self.FlightData.Speed - self.FlightData.SpeedStep, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+            end
         end
         
         if self.FlightData.BodyVelocity then
