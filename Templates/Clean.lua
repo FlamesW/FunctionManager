@@ -196,6 +196,8 @@ Components1:New("Title")({
     Title = "Farming Features",
 })
 
+Script:FlightConfig({ SpeedMin = 10, SpeedMax = 500, SpeedStep = 1.5 })
+
 Components1:New("Toggle")({
     Title = "Flight",
     Description = "Enables flight",
