@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@1.96", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.97", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -955,6 +955,27 @@ function API:DeleteData(FileName)
         pcall(function() del_file(FileName) end)
         return true
     end
+    return false
+end
+
+function API:ExecuteFile(FileName)
+    local Data = self:LoadData(FileName)
+    if not Data then return false end
+
+    if type(Data) == "string" then
+        local Success, Result = pcall(function()
+            return loadstring(Data)()
+        end)
+        return Success, Result
+    end
+
+    if type(Data) == "table" and Data.Code then
+        local Success, Result = pcall(function()
+            return loadstring(Data.Code)()
+        end)
+        return Success, Result
+    end
+
     return false
 end
 
@@ -3340,9 +3361,9 @@ function API:FlightConfig(Config)
     if not self.FlightData then
         self.FlightData = {Active = false}
     end
-    
+
     self.FlightData.SpeedMin = Config.SpeedMin or self.FlightData.SpeedMin or 10
-    self.FlightData.SpeedMax = Config.SpeedMax or self.FlightData.SpeedMax or 250
+    self.FlightData.SpeedMax = Config.SpeedMax or self.FlightData.SpeedMax or 500
     self.FlightData.SpeedStep = Config.SpeedStep or self.FlightData.SpeedStep or 1.5
 
     self.FlightData.SpeedControls = {
@@ -3360,22 +3381,6 @@ function API:FlightConfig(Config)
     return true
 end
 
-function API:SetFlightSpeed(Num)
-    if not self.FlightData then
-        return
-    end
-    
-    self.FlightData.Speed = math_clamp(Num, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
-end
-
-function API:SetSpeedControls(State)
-    if not self.FlightData or not self.FlightData.SpeedControls then
-        return
-    end
-    
-    self.FlightData.SpeedControls.Enabled = State
-end
-
 function API:Flight(State, Speed)
     if State then
         self:RegisterConflict("Flight", true)
@@ -3384,10 +3389,8 @@ function API:Flight(State, Speed)
     end
     
     State = State or false
-    Speed = Speed or 50
-
-    self.FlightData = self.FlightData or 
-    {Active = false, Speed = Speed, BodyVelocity = nil, BodyGyro = nil, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
+    
+    self.FlightData = self.FlightData or {Active = false, Speed = 50, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
 
     if not self.FlightData.SpeedControls then
         self.FlightData.SpeedControls = {
@@ -3399,8 +3402,7 @@ function API:Flight(State, Speed)
 
     local function CleanUP()
         self.FlightData.Active = false
-
-		self:_Disconnect("@Flight")
+        self:_Disconnect("@Flight")
         self:RegisterConflict("Flight", false)
     end
     
@@ -3421,9 +3423,14 @@ function API:Flight(State, Speed)
     end
     
     self.FlightData.Active = true
-    self.FlightData.Speed = math_clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
     
-	local Strength = 1e9
+    if Speed then
+        self.FlightData.Speed = math_clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+    else
+        self.FlightData.Speed = math_clamp(self.FlightData.Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+    end
+    
+    local Strength = 1e9
 
     local BV = self:CreateInstance("BodyVelocity", {
         Name = "00x00x00x00x00",
@@ -3431,7 +3438,6 @@ function API:Flight(State, Speed)
         Velocity = Vector3_zero,
         Parent = Roots
     })
-    self.FlightData.BodyVelocity = BV
     self:_Connect("@Flight", BV)
 
     local BG = self:CreateInstance("BodyGyro", {
@@ -3442,7 +3448,6 @@ function API:Flight(State, Speed)
         CFrame = Roots.CFrame,
         Parent = Roots
     })
-    self.FlightData.BodyGyro = BG
     self:_Connect("@Flight", BG)
 
     local Camera = CurrentCamera
@@ -3454,11 +3459,11 @@ function API:Flight(State, Speed)
             return 
         end
         
-        if self.FlightData.BodyVelocity and self.FlightData.BodyVelocity.Parent ~= Roots then
-            self.FlightData.BodyVelocity.Parent = Roots
+        if BV and BV.Parent ~= Roots then
+            BV.Parent = Roots
         end
-        if self.FlightData.BodyGyro and self.FlightData.BodyGyro.Parent ~= Roots then
-            self.FlightData.BodyGyro.Parent = Roots
+        if BG and BG.Parent ~= Roots then
+            BG.Parent = Roots
         end
         
         local MoveDirection = Vector3_zero
@@ -3503,17 +3508,107 @@ function API:Flight(State, Speed)
             end
         end
         
-        if self.FlightData.BodyVelocity then
-            self.FlightData.BodyVelocity.Velocity = MoveDirection
-        end
-        
-        if self.FlightData.BodyGyro then
-            self.FlightData.BodyGyro.CFrame = Camera.CFrame
-        end
+        BV.Velocity = MoveDirection
+        BG.CFrame = Camera.CFrame
     end)
 
     self:_Connect("@Flight", Connection)
     return true
+end
+
+function API:SetFlightSpeed(Num)
+    if not self.FlightData then
+        return
+    end
+
+    self.FlightData.Speed = math_clamp(Num, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
+end
+
+function API:SetFlightMinSpeed(Num)
+    if not self.FlightData then
+        return false
+    end
+    if type(Num) ~= "number" or Num < 0 then
+        return false
+    end
+
+    self.FlightData.SpeedMin = Num
+
+    if self.FlightData.Speed < Num then
+        self.FlightData.Speed = Num
+    end
+    return true
+end
+
+function API:SetFlightMaxSpeed(Num)
+    if not self.FlightData then
+        return false
+    end
+    if type(Num) ~= "number" or Num < 0 then
+        return false
+    end
+
+    self.FlightData.SpeedMax = Num
+
+    if self.FlightData.Speed > Num then
+        self.FlightData.Speed = Num
+    end
+    return true
+end
+
+function API:SetFlightSpeedStep(Num)
+    if not self.FlightData then
+        return false
+    end
+    if type(Num) ~= "number" or Num <= 0 then
+        return false
+    end
+    self.FlightData.SpeedStep = Num
+    return true
+end
+
+function API:SetFlightSpeedControls(State)
+    if not self.FlightData or not self.FlightData.SpeedControls then
+        return
+    end
+    
+    self.FlightData.SpeedControls.Enabled = State
+end
+
+function API:SetFlightIncreaseKey(KeyCode)
+    if not self.FlightData or not self.FlightData.SpeedControls then
+        return false
+    end
+    self.FlightData.SpeedControls.IncreaseKey = KeyCode
+    return true
+end
+
+function API:SetFlightDecreaseKey(KeyCode)
+    if not self.FlightData or not self.FlightData.SpeedControls then
+        return false
+    end
+    self.FlightData.SpeedControls.DecreaseKey = KeyCode
+    return true
+end
+
+function API:IsFlightActive()
+    return self.FlightData and self.FlightData.Active or false
+end
+
+function API:GetFlightSpeed()
+    return self.FlightData and self.FlightData.Speed or 0
+end
+
+function API:GetFlightMinSpeed()
+    return self.FlightData and self.FlightData.SpeedMin or 0
+end
+
+function API:GetFlightMaxSpeed()
+    return self.FlightData and self.FlightData.SpeedMax or 0
+end
+
+function API:GetFlightSpeedStep()
+    return self.FlightData and self.FlightData.SpeedStep or 0
 end
 
 function API:InfiniteJump(State)
@@ -5373,6 +5468,52 @@ function API:SetVehicleFlySpeed(Speed)
 end
 --]]
 
+function API:Notify(Title, Description, Duration, Image)
+    local Framework = self:LoadData("@Notification.UI")
+    
+    if not Framework then
+        local Success, Result = pcall(function()
+            return Game:HttpGet("https://raw.githubusercontent.com/FlamesW/Notification/refs/heads/home/Framework.luau")
+        end)
+        
+        if not Success then
+            warn("[Notify]: Failed to download library")
+            return false
+        end
+    
+        Framework = Result
+        self:SaveData("@Notification.UI", Result)
+    end
+    
+    local Success, Library = pcall(function()
+        return loadstring(Framework)()
+    end)
+    
+    if not Success then
+        return false
+    end
+    
+    if not self.NotificationHandler then
+        self.NotificationHandler = Library:New({
+            BackgroundColor = Color3.fromRGB(68, 71, 0),
+            TitleColor = Color3.fromRGB(255, 255, 255),
+            DescriptionColor = Color3.fromRGB(200, 200, 200),
+            Mode = "Dark",
+            VerticalPosition = "Top",
+            HorizontalPosition = "Right",
+        })
+    end
+    
+    self.NotificationHandler:Create({
+        Title = Title or "Notification",
+        Description = Description or "",
+        Duration = Duration or 3,
+        Image = Image,
+    })
+    
+    return true
+end
+
 function API:IsColor(Target, Colors)
     if Colors == "Nigger" then
         Colors = {["Really black"] = true,["Black"] = true,["Dark brown"] = true,["Reddish brown"] = true,
@@ -5820,9 +5961,68 @@ function API:GetHWID(Method)
     return nil
 end
 
+function API:GetExecutor()
+    local Success, Result = pcall(function()
+        if type(identifyexecutor) == "function" then
+            return identifyexecutor()
+        end
+    end)
+    if Success and Result then
+        return Result
+    end
+
+    Success, Result = pcall(function()
+        if type(getexecutorname) == "function" then
+            return getexecutorname()
+        end
+    end)
+    if Success and Result then
+        return Result
+    end
+
+    return "Unknown"
+end
+
 function API:Kick(Reason)
     Reason = Reason or "Disconnected by API";
     self:GetPlayer():Kick(Reason);
+end
+
+function API:FireRemote(Remote, ...)
+    local Event = ReplicatedStorage:FindFirstChild(Remote)
+    if not Event then
+        return false, "Remote not found"
+    end
+    
+    if Event:IsA("RemoteEvent") then
+        Event:FireServer(...)
+        return true
+    end
+    
+    if Event:IsA("RemoteFunction") then
+        return Event:InvokeServer(...)
+    end
+    
+    return false, "Unknown remote type"
+end
+
+function API:ListenRemote(Remote, Callback)
+    local Event = ReplicatedStorage:FindFirstChild(Remote)
+    if not Event then
+        return false, "Remote not found"
+    end
+    
+    if Event:IsA("RemoteEvent") then
+        Event.OnClientEvent:Connect(Callback)
+        return true
+    end
+    
+    if Event:IsA("RemoteFunction") then
+        Event.OnClientInvoke = Callback
+        return true
+    end
+    
+    return false, "Unknown remote type"
 end
 
 function API:Verify(Options)
