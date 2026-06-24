@@ -200,9 +200,11 @@ Components1:New("Toggle")({
     Title = "Flight",
     Description = "Enables flight",
     Callback = function(Value)
-        Script:Flight(Value, 70)
+        Script:Flight(Value)
     end,
 })
+
+Script:SetFlightSpeed(70)
 
 -- // @Settings Tab
 local Settings = Window:AddTab("Settings")
