@@ -1,5 +1,3 @@
-# 🤔 What is Function Manager?
-
 **Function Manager** is a powerful developer tool packed with a wide range of ready-to-use functions, including :Flight, :XRay, :Noclip, and more. Every function is fully optimized for peak runtime performance, delivering ultimate clarity and efficiency to your code.
 
 # Example Usage:
