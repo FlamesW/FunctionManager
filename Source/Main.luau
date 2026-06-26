@@ -797,17 +797,20 @@ end
 
 function API:GetAssetInfo(Id)
     self.AssetCache = self.AssetCache or {}
-
     local Cached = self.AssetCache[Id]
-    if Cached then
-        return Cached
-    end
+    if Cached then return Cached end
     
     local Success, Info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, Id)
-
-    if not Success or not Info then
-        return nil
-    end
+    if not Success or not Info then return nil end
+    
+    local AssetTypes = {
+        [1]="Image",[2]="TShirt",[3]="Audio",[4]="Mesh",[5]="Lua",
+        [8]="Hat",[9]="Place",[10]="Model",[11]="Shirt",[12]="Pants",
+        [13]="Decal",[17]="Head",[18]="Face",[19]="Gear",[21]="Badge",
+        [24]="Animation",[27]="Torso",[28]="RightArm",[29]="LeftArm",
+        [30]="LeftLeg",[31]="RightLeg",[32]="Package",[34]="GamePass",
+        [38]="Plugin",[41]="MeshPart",[42]="Video",[43]="Tool"
+    }
     
     local Result = {
         Id = Id,
@@ -815,14 +818,7 @@ function API:GetAssetInfo(Id)
         Creator = Info.Creator and Info.Creator.Name,
         CreatorId = Info.Creator and Info.Creator.Id,
         TypeId = Info.AssetTypeId,
-        TypeName = {
-            [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
-            [8] = "Hat", [9] = "Place", [10] = "Model", [11] = "Shirt", [12] = "Pants",
-            [13] = "Decal", [17] = "Head", [18] = "Face", [19] = "Gear", [21] = "Badge",
-            [24] = "Animation", [27] = "Torso", [28] = "RightArm", [29] = "LeftArm",
-            [30] = "LeftLeg", [31] = "RightLeg", [32] = "Package", [34] = "GamePass",
-            [38] = "Plugin", [41] = "MeshPart", [42] = "Video", [43] = "Tool"
-        }[Info.AssetTypeId] or "Unknown",
+        TypeName = AssetTypes[Info.AssetTypeId] or "Unknown",
         Description = Info.Description,
         Created = Info.Created,
         Updated = Info.Updated,
