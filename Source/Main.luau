@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@1.97", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.98", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -123,15 +123,6 @@ local RaycastParamsNew = RaycastParams.new;
 
 local PlaceId, JobId, GameId  = Game.PlaceId, Game.JobId, Game.GameId;
 local Get_Asset = getcustomasset or getsynasset;
-
-local AssetTypes = {
-    [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
-    [8] = "Hat", [9] = "Place", [10] = "Model", [11] = "Shirt", [12] = "Pants",
-    [13] = "Decal", [17] = "Head", [18] = "Face", [19] = "Gear", [21] = "Badge",
-    [24] = "Animation", [27] = "Torso", [28] = "RightArm", [29] = "LeftArm",
-    [30] = "LeftLeg", [31] = "RightLeg", [32] = "Package", [34] = "GamePass",
-    [38] = "Plugin", [41] = "MeshPart", [42] = "Video", [43] = "Tool"
-}
 
 -- // @Signal.luau
 function API:_Connect(Name: string, Object: any)
@@ -179,14 +170,6 @@ API:_Connect("@WindowListener", {
         Window_Focused = false
     end)
 })
-
-local function Internal(packet)
-    if packet.PacketId == 0x1B then
-        local data = packet.AsBuffer
-        buffer.writeu32(data, 1, 0xFFFFFFFF)
-        packet:SetData(data)
-    end
-end
 
 -- // @Functions.module
 function API:CreateInstance(ClassName: string, Properties: { [string]: any }?)
@@ -832,7 +815,14 @@ function API:GetAssetInfo(Id)
         Creator = Info.Creator and Info.Creator.Name,
         CreatorId = Info.Creator and Info.Creator.Id,
         TypeId = Info.AssetTypeId,
-        TypeName = AssetTypes[Info.AssetTypeId] or "Unknown",
+        TypeName = {
+            [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
+            [8] = "Hat", [9] = "Place", [10] = "Model", [11] = "Shirt", [12] = "Pants",
+            [13] = "Decal", [17] = "Head", [18] = "Face", [19] = "Gear", [21] = "Badge",
+            [24] = "Animation", [27] = "Torso", [28] = "RightArm", [29] = "LeftArm",
+            [30] = "LeftLeg", [31] = "RightLeg", [32] = "Package", [34] = "GamePass",
+            [38] = "Plugin", [41] = "MeshPart", [42] = "Video", [43] = "Tool"
+        }[Info.AssetTypeId] or "Unknown",
         Description = Info.Description,
         Created = Info.Created,
         Updated = Info.Updated,
@@ -2351,16 +2341,36 @@ function API:Raknet_Desync(State)
     end
 
     if State then
-        raknet.add_send_hook(Internal)
+        raknet.add_send_hook(function(packet)
+            if packet.PacketId == 0x1B then
+                local data = packet.AsBuffer
+                buffer.writeu32(data, 1, 0xFFFFFFFF)
+                packet:SetData(data)
+            end
+        end)
     else
-        raknet.remove_send_hook(Internal)
+        raknet.remove_send_hook(function(packet)
+            if packet.PacketId == 0x1B then
+                local data = packet.AsBuffer
+                buffer.writeu32(data, 1, 0xFFFFFFFF)
+                packet:SetData(data)
+            end
+        end)
     end
     return true
 end
 
 function API:ClearRaknet()
     if typeof(raknet) == "function" then
-        pcall(function() raknet.remove_send_hook(Internal) end)
+        pcall(function() 
+            raknet.remove_send_hook(function(packet)
+                if packet.PacketId == 0x1B then
+                    local data = packet.AsBuffer
+                    buffer.writeu32(data, 1, 0xFFFFFFFF)
+                    packet:SetData(data)
+                end
+            end)
+        end)
     end
 end
 
@@ -2772,6 +2782,104 @@ function API:RunTasks()
         return Task.name
     end
     return nil
+end
+
+function API:InteractUI(Button, Method, Manual)
+    Manual = Manual or false
+
+    if not Button then
+        GuiService.SelectedObject = nil
+        return false
+    end
+
+    if Method == "Connection" then
+        if not (GetConnections) then
+            GuiService.SelectedObject = nil
+            return self:InteractUI(Button, "KeyEvent", Manual)
+        end
+
+        local Success = pcall(function()
+            if not Button.MouseButton1Click then
+                GuiService.SelectedObject = nil
+                return
+            end
+
+            local MouseButton1Click_Connection = GetConnections(Button.MouseButton1Click)
+
+            if #MouseButton1Click_Connection == 0 then GuiService.SelectedObject = nil return end
+            for _, v in MouseButton1Click_Connection do
+                if Manual then
+                    v.Function()
+                else
+                    v:Fire()
+                end
+            end
+            GuiService.SelectedObject = nil
+        end)
+
+        if not Success then
+            GuiService.SelectedObject = nil
+        end
+        return Success
+    end
+
+    if Method == "KeyEvent" then
+        local Success = pcall(function()
+            GuiService.SelectedObject = Button
+            task_wait()
+
+            if GuiService.SelectedObject ~= Button then
+                GuiService.SelectedObject = nil
+                return
+            end
+
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, Game)
+            task_wait()
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, Game)
+
+            GuiService.SelectedObject = nil
+        end)
+
+        if not Success then
+            GuiService.SelectedObject = nil
+        end
+        return Success
+    end
+
+    if Method == "Mouse" then
+        local Success = pcall(function()
+            if not Button.AbsolutePosition or not Button.AbsoluteSize then
+                GuiService.SelectedObject = nil
+                return
+            end
+            
+            local Absolute_Position, Absolute_Size = Button.AbsolutePosition, Button.AbsoluteSize
+            local Center_X = Absolute_Position.X + Absolute_Size.X / 2
+            local Center_Y = Absolute_Position.Y + Absolute_Size.Y / 2
+
+            VirtualInputManager:SendMouseButtonEvent(Center_X, Center_Y, 0, true, Game, 1)
+            task_wait()
+            VirtualInputManager:SendMouseButtonEvent(Center_X, Center_Y, 0, false, Game, 1)
+            GuiService.SelectedObject = nil
+        end)
+        if not Success then
+            GuiService.SelectedObject = nil
+        end
+        return Success
+    end
+
+    if Method == "Fallback" or Method == nil then
+        for _, MethodType in ipairs({"Connection", "KeyEvent", "Mouse"}) do
+            if self:InteractUI(Button, MethodType, Manual) then
+                return true
+            end
+        end
+        GuiService.SelectedObject = nil
+        return false
+    end
+    
+    GuiService.SelectedObject = nil
+    return false
 end
 
 function API:Press(Key)
@@ -5912,7 +6020,7 @@ function API:ServerHop(Options)
     end)
 
     local Thread_Timeout = task_spawn(function()
-        task.wait(Timeout)
+        task_wait(Timeout)
         if self.ServerHopping then
             warn(string_format("[Serverhop]: Timeouted after %.1f seconds (attempts: %d/%d)", Timeout, Attempts, MaxRetries))
             self.ServerHopping = nil
