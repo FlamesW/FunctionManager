@@ -157,6 +157,16 @@ end
 local Function_Manager = LoadFile("Module.luau", false)
 local Script = Function_Manager.Launch({})
 
+local Toggle_Label
+
+Script:WhileLoop(0.15, function(self)
+    if Toggle_Label and Toggle_Label.SetDescription then
+        local Speed = self:CalculateSpeed("MPH", 1)
+
+        Toggle_Label:SetDescription("MPH: " .. Speed)
+    end
+end, "Speed_Calculator")
+
 -- // @Modal.UI
 local Modal = LoadFile("Modal.UI", false)
 
@@ -196,17 +206,17 @@ Components1:New("Title")({
     Title = "Farming Features",
 })
 
-Script:FlightConfig({ SpeedMin = 10, SpeedMax = 500, SpeedStep = 1.5 })
+Script:FlightConfig({ SpeedMin = 10, SpeedMax = 2000, SpeedStep = 1.5 }) -- // Max Speed: ~1252 mph (Mach 1.63)
 
-Components1:New("Toggle")({
+Toggle_Label = Components1:New("Toggle")({
     Title = "Flight",
-    Description = "Enables flight",
+    Description = "MPH: None",
     Callback = function(Value)
         Script:Flight(Value)
     end,
 })
 
-Script:SetFlightSpeed(70)
+Script:SetFlightSpeed(70) -- // Current Speed: ~43.8 mph (5.7% of speed of sound)
 
 -- // @Settings Tab
 local Settings = Window:AddTab("Settings")
