@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@1.98", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@1.99", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -97,6 +97,7 @@ local TextChatService: TextChatService? = cloneref(GetService(Game, "TextChatSer
 local UserInputService: UserInputService? = cloneref(GetService(Game, "UserInputService"));
 local SoundService: SoundService? = cloneref(GetService(Game, "SoundService"));
 local StarterGuiService: StarterGuiService? = cloneref(GetService(Game, "StarterGui"));
+local GuiService: GuiService? = cloneref(GetService(Game, "GuiService"));
 local CoreGui: CoreGui? = cloneref(GetService(Game, "CoreGui"));
 local Performance: Performance? = GetService(Game, "Stats");
 local LightingService: LightingService? = GetService(Game, "Lighting");
@@ -7902,6 +7903,7 @@ function API.Launch(Class)
     Class.Performance = Performance
     Class.LightingService = LightingService
     Class.CurrentCamera = CurrentCamera
+    Class.GuiService = GuiService
     Class.CoreGui = CoreGui
 
     global.FunctionManager_Engine = Class
