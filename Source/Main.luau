@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@1.99", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.00", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -6964,7 +6964,7 @@ function API:Vulnerability_Test()
     return self:LoadFile("https://raw.githubusercontent.com/ltseverydayyou/uuuuuuu/main/VulnTest.lua")
 end
 
--- // @Loop Manager.Module, Build: 1.47
+-- // @Loop Manager.Module, Build: 1.48
 function API:CreateStacks()
     if type(self.Stacks) ~= "table" then
         self.Stacks = {While = {Connection = nil, Coroutines = {}, Active = true},
@@ -7001,6 +7001,64 @@ local function AddService(self, Name, Signal)
     end)
 end
 
+function API:SmartLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
+    if type(WaitBoy) == "function" then
+        local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
+        WaitBoy = nil
+        Callback = Function_1
+        Name = Function_2
+        WaitBefore = Function_3
+    end
+
+    if not Callback or type(Callback) ~= "function" then
+        self:LogLM("SmartLoop requires a callback function")
+        return nil
+    end
+
+    local Wait = WaitBoy or 0
+    local Name = Name or self:RandomString(15)
+    local Local = self
+
+    local function Decision_Optimization()
+        local InWaitCount = 0
+
+        if Local.ActiveConnections then
+            for name, Data in pairs(Local.ActiveConnections) do
+                if Data.Wait == Wait and Data.Running then
+                    InWaitCount = InWaitCount + 1
+                end
+            end
+        end
+
+        if Local.Stacks and Local.Stacks.While then
+            for stackWait, stackData in pairs(Local.Stacks.While) do
+                if stackData.Running then
+                    for name, Data in pairs(stackData.Coroutines) do
+                        if Data.Wait == Wait and Data.Running then
+                            InWaitCount = InWaitCount + 1
+                        end
+                    end
+                end
+            end
+        end
+
+        InWaitCount = InWaitCount + 1
+
+        if InWaitCount >= 5 then return true end
+        if Wait < 0.05 and InWaitCount >= 3 then return true end
+
+        return false
+    end
+
+    if Decision_Optimization() then
+        self:LogLM("Using HeavyLoop for '%s' (Wait: %s, %d+ loops)", Name, Wait, 5)
+        return self:HeavyLoop(Wait, Callback, Name, WaitBefore, Destroyed)
+    else
+        self:LogLM("Using WhileLoop for '%s' (Wait: %s)", Name, Wait)
+        return self:WhileLoop(Wait, Callback, Name, WaitBefore, Destroyed)
+    end
+end
+
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     if type(WaitBoy) == "function" then
         local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
@@ -7026,7 +7084,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         Delay = WaitBefore 
     end
 
-    local Data = { Running = true, Paused = false, Thread = nil, Name = Name, Wait = Wait, WaitBefore = WaitBefore, Destroyed = Destroyed,
+    local Data = { Running = true, Paused = false, Thread = nil, Name = Name, Callback = Callback, Wait = Wait, WaitBefore = WaitBefore, Destroyed = Destroyed,
         Pause = function(s) 
             s.Paused = true 
             Local:LogLM("Paused WhileLoop '%s'", Name)
@@ -7052,8 +7110,8 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         end
     }
 
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = Data
+    Local.ActiveConnections = Local.ActiveConnections or {}
+    Local.ActiveConnections[Name] = Data
 
     Data.Thread = task_create(function()
         if Delay > 0 then
@@ -7189,6 +7247,7 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         IsWaiting = false,
         Coroutine = Source,
         Name = Name,
+        Callback = Callback,
         Wait = Wait,
         WaitBefore = WaitBefore,
         Destroyed = Destroyed,
@@ -7290,8 +7349,8 @@ function API:RenderStep(Callback, Name)
             Local:LogLM("Killed RenderStep '%s'", Name)
         end
     }
-    
-    self.Stacks.RenderStep.Functions[Name] = Data
+
+    Local.Stacks.RenderStep.Functions[Name] = Data
     return Data
 end
 
@@ -7327,7 +7386,7 @@ function API:Heartbeat(Callback, Name)
         end
     }
     
-    self.Stacks.Heartbeat.Functions[Name] = Data
+    Local.Stacks.Heartbeat.Functions[Name] = Data
     return Data
 end
 
@@ -7363,7 +7422,7 @@ function API:Stepped(Callback, Name)
         end
     }
 
-    self.Stacks.Stepped.Functions[Name] = Data
+    Local.Stacks.Stepped.Functions[Name] = Data
     return Data
 end
 
@@ -7409,8 +7468,8 @@ function API:BindRender(Callback, Name, Priority)
     BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, Func)
     Data.Func = Func
 
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = Data
+    Local.ActiveConnections = Local.ActiveConnections or {}
+    Local.ActiveConnections[Name] = Data
 
     return Data
 end
@@ -7467,8 +7526,8 @@ function API:BindKeybind(Key, Callback, BindName)
     Data.Callback = Callback
     Data.InternalFunc = Func
     
-    self.ActiveConnections = self.ActiveConnections or {}
-    self.ActiveConnections[Name] = Data
+    Local.ActiveConnections = Local.ActiveConnections or {}
+    Local.ActiveConnections[Name] = Data
    
     return Data
 end
