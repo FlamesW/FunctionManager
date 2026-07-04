@@ -10,8 +10,8 @@ local cloneref: (Instance) -> Instance = (cloneref or clonereference or function
     return instance
 end)
 
-local type, typeof, pcall, tick, tonumber, warn, print,unpack, next, loadstring, setmetatable =
-    type, typeof, pcall, tick, tonumber, warn, print, unpack, next, loadstring, setmetatable
+local typeof, pcall, tick, tonumber, warn, print,unpack, next, loadstring, setmetatable =
+    typeof, pcall, tick, tonumber, warn, print, unpack, next, loadstring, setmetatable
 
 local math_floor, math_random, math_clamp, math_max, math_min, math_sqrt, math_rad, math_huge =
     math.floor, math.random, math.clamp, math.max, math.min, math.sqrt, math.rad, math.huge
@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.01", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.02", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -127,11 +127,11 @@ local Get_Asset = getcustomasset or getsynasset;
 
 -- // @Signal.luau
 function API:_Connect(Name: string, Object: any)
-    self._Signal = self._Signal or {}; self._Signal[Name] = self._Signal[Name] or {}; local Service = self._Signal[Name]; if type(Object) == "table" then for _, v in ipairs(Object) do Service[#Service + 1] = v end else Service[#Service + 1] = Object end; return Object
+    self._Signal = self._Signal or {}; self._Signal[Name] = self._Signal[Name] or {}; local Service = self._Signal[Name]; if typeof(Object) == "table" then for _, v in ipairs(Object) do Service[#Service + 1] = v end else Service[#Service + 1] = Object end; return Object
 end
 
 function API:_Disconnect(Name: string): () 
-    local Objects = self._Signal and self._Signal[Name]; if not Objects then return end; local function CleanUP(Object) local typeof = typeof(Object); if typeof == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif typeof == "thread" then pcall(function() task_cancel(Object) end) elseif typeof == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif type(Object) == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; for Key in pairs(Object) do Object[Key] = nil end elseif type(Object) == "function" then pcall(Object) end end; for i = 1, #Objects do CleanUP(Objects[i]) end; self._Signal[Name] = nil 
+    local Objects = self._Signal and self._Signal[Name]; if not Objects then return end; local function CleanUP(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do CleanUP(Objects[i]) end; self._Signal[Name] = nil 
 end
 
 function API:_Exit(): ()
@@ -148,7 +148,7 @@ end
 
 -- // @Engine.luau
 local function Build_Engine(Running: Model)
-    if Running and type(Running) ~= "boolean" then
+    if Running and typeof(Running) ~= "boolean" then
         Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart",5), Running:WaitForChild("Humanoid",5);
         Class.Character, Class.Roots, Class.Humanoid = Character, Roots, Humanoid;
 	end
@@ -278,7 +278,7 @@ function API:ClearDrawings()
 end
 
 function API:CreateDrawingManager()
-    if type(self.DrawingManager) ~= "table" then
+    if typeof(self.DrawingManager) ~= "table" then
         self.DrawingManager = {Drawings = {}, AutoCleanup = true,  AutoUpdate = true,
             System = {
                 Player = {
@@ -565,7 +565,7 @@ function API:PlaySound(Id, Options)
         SoundId = self.Sounds.Assets[Id]
     end
     
-    if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+    if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
         SoundId = "rbxassetid://" .. tostring(SoundId)
     end
 
@@ -637,8 +637,9 @@ function API:IsSoundPlaying(Id)
     if self.Sounds.Assets and self.Sounds.Assets[Id] then
         SoundId = self.Sounds.Assets[Id]
     end
-    if type(SoundId) == "number" then
-        SoundId = "rbxassetid://" .. SoundId
+
+    if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
+        SoundId = "rbxassetid://" .. tostring(SoundId)
     end
     
     local Data = self.Sounds[SoundId]
@@ -650,8 +651,9 @@ function API:PauseSound(Id)
     if self.Sounds.Assets and self.Sounds.Assets[Id] then
         SoundId = self.Sounds.Assets[Id]
     end
-    if type(SoundId) == "number" then
-        SoundId = "rbxassetid://" .. SoundId
+
+    if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
+        SoundId = "rbxassetid://" .. tostring(SoundId)
     end
     
     local Data = self.Sounds[SoundId]
@@ -667,8 +669,9 @@ function API:ResumeSound(Id)
     if self.Sounds.Assets and self.Sounds.Assets[Id] then
         SoundId = self.Sounds.Assets[Id]
     end
-    if type(SoundId) == "number" then
-        SoundId = "rbxassetid://" .. SoundId
+
+    if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
+        SoundId = "rbxassetid://" .. tostring(SoundId)
     end
     
     local Data = self.Sounds[SoundId]
@@ -688,7 +691,7 @@ function API:StopSound(...)
             SoundId = self.Sounds.Assets[Id]
         end
         
-        if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+        if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
             SoundId = "rbxassetid://" .. tostring(SoundId)
         end
 
@@ -711,7 +714,7 @@ function API:SetVolume(Id, Volume)
         SoundId = self.Sounds.Assets[Id]
     end
 
-    if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+    if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
         SoundId = "rbxassetid://" .. tostring(SoundId)
     end
 
@@ -733,7 +736,7 @@ function API:Preload(...)
             SoundId = self.Sounds.Assets[Id]
         end
         
-        if type(SoundId) == "number" or (type(SoundId) == "string" and SoundId:match("^%d+$")) then
+        if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
             SoundId = "rbxassetid://" .. tostring(SoundId)
         end
 
@@ -761,7 +764,7 @@ function API:ClearSounds()
     if not self.Sounds then return end
 
     for SoundId, Data in pairs(self.Sounds) do
-        if type(Data) == "table" and Data.Instance then
+        if typeof(Data) == "table" and Data.Instance then
             if Data.Connection then
                 self:_Disconnect(Data.Connection)
             end
@@ -949,14 +952,14 @@ function API:ExecuteFile(FileName)
     local Data = self:LoadData(FileName)
     if not Data then return false end
 
-    if type(Data) == "string" then
+    if typeof(Data) == "string" then
         local Success, Result = pcall(function()
             return loadstring(Data)()
         end)
         return Success, Result
     end
 
-    if type(Data) == "table" and Data.Code then
+    if typeof(Data) == "table" and Data.Code then
         local Success, Result = pcall(function()
             return loadstring(Data.Code)()
         end)
@@ -1125,7 +1128,7 @@ function API:QueueOnTeleport(Flag, State, Script, Callbacks)
         self.Queues_Loaded = true
     end
 
-    if Callbacks and type(Callbacks) == "table" then
+    if Callbacks and typeof(Callbacks) == "table" then
         self.QueueCallbacks = self.QueueCallbacks or {}
         self.QueueCallbacks[Flag] = Callbacks
     end
@@ -1671,7 +1674,7 @@ function API:GetAveragePosition(Targets)
 end
 
 function API:RandomVector3(RangeX, RangeY, RangeZ)
-    if type(RangeX) == "table" then
+    if typeof(RangeX) == "table" then
         if RangeX.X and RangeX.Y and RangeX.Z then
             return Vector3_new(
                 math_random(-RangeX.X, RangeX.X),
@@ -2057,15 +2060,55 @@ function API:IsEmail(String)
     return String:match("^[%w._-]+@[%w.-]+%.[a-zA-Z]{2,}$") ~= nil
 end
 
+function API:Try(Func, Default, ErrorHandler)
+    if typeof(Func) ~= "function" then
+        return false, nil
+    end
+
+    local Success, Result = pcall(Func)
+    
+    if Success then
+        return true, Result, nil
+    else
+        local ErrMsg = tostring(Result)
+        
+        if typeof(ErrorHandler) == "function" then
+            pcall(ErrorHandler, ErrMsg)
+        end
+        
+        if Default ~= nil then
+            return false, Default, ErrMsg
+        end
+        
+        return false, nil, ErrMsg
+    end
+end
+
+function API:TryMultiple(...)
+    local Functions = {...}
+
+    for i = 1, #Functions do
+        local Func = Functions[i]
+        if typeof(Func) == "function" then
+            local Success, Result = pcall(Func)
+            if Success then
+                return true, Result, i
+            end
+        end
+    end
+
+    return false, nil
+end
+
 function API:ResolvePosition(...)
     local args = {...}
     local numArgs = #args
     
-    if numArgs >= 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number" then
+    if numArgs >= 3 and typeof(args[1]) == "number" and typeof(args[2]) == "number" and typeof(args[3]) == "number" then
         return Vector3_new(args[1], args[2], args[3])
     end
     
-    if numArgs >= 2 and type(args[1]) == "number" and type(args[2]) == "number" then
+    if numArgs >= 2 and typeof(args[1]) == "number" and typeof(args[2]) == "number" then
         return Vector3_new(args[1], args[2], numArgs >= 3 and args[3] or 0)
     end
     
@@ -2085,7 +2128,7 @@ function API:ResolvePosition(...)
     end
     
     local function toVector3(x, y, z)
-        if type(x) == "number" and type(y) == "number" then
+        if typeof(x) == "number" and typeof(y) == "number" then
             return Vector3_new(x, y, z or 0)
         end
         return nil
@@ -2105,11 +2148,11 @@ function API:ResolvePosition(...)
         return arg.Position
     end
     
-    if type(arg) == "number" then
+    if typeof(arg) == "number" then
         return Vector3_new(arg, 0, 0)
     end
     
-    if type(arg) == "boolean" then
+    if typeof(arg) == "boolean" then
         if arg then
             return Vector3_new(0, 0, 0)
         end
@@ -2195,7 +2238,7 @@ function API:ResolvePosition(...)
         if result then return result end
     end
     
-    if type(arg) == "table" then
+    if typeof(arg) == "table" then
         local vectorFields = {"position", "Position", "pos", "Pos", "p", "vector", "Vector", "location", "Location"}
         for _, field in ipairs(vectorFields) do
             if arg[field] and typeof(arg[field]) == "Vector3" then
@@ -2210,7 +2253,7 @@ function API:ResolvePosition(...)
         local x = arg.x or arg.X or arg[1]
         local y = arg.y or arg.Y or arg[2]
         local z = arg.z or arg.Z or arg[3]
-        if type(x) == "number" and type(y) == "number" then
+        if typeof(x) == "number" and typeof(y) == "number" then
             return toVector3(x, y, z)
         end
         
@@ -2219,14 +2262,14 @@ function API:ResolvePosition(...)
         end
         
         for _, value in pairs(arg) do
-            if type(value) == "table" then
+            if typeof(value) == "table" then
                 local nested = API:ResolvePosition(value)
                 if nested then return nested end
             end
         end
     end
     
-    if type(arg) == "string" then
+    if typeof(arg) == "string" then
         local str = arg:gsub("%s+", " "):gsub(",", " "):gsub("%(", " "):gsub("%)", " ")
         
         local patterns = {
@@ -2269,8 +2312,8 @@ function API:ResolvePosition(...)
     if argType == "Ray" then
         return arg.Origin
     end
-    
-    if type(arg) == "userdata" then
+
+    if typeof(arg) == "userdata" then
         local props = {"Position", "position", "Location", "location", "Origin", "origin"}
         for _, prop in ipairs(props) do
             if arg[prop] and typeof(arg[prop]) == "Vector3" then
@@ -2476,7 +2519,7 @@ function API:GetGameId()
 end
 
 function API:Raknet_Desync(State)
-    if not typeof(raknet) == "function" then 
+    if typeof(raknet) ~= "function" then 
         return false 
     end
 
@@ -3429,7 +3472,7 @@ function API:BringTools(Radius, Interval, BatchSize, Paths)
 
     if not Paths then
         Paths = {workspace}
-    elseif type(Paths) ~= "table" then
+    elseif typeof(Paths) ~= "table" then
         Paths = {Paths}
     end
 
@@ -3595,7 +3638,7 @@ function API:AntiCollider(State)
         self:_Disconnect("@AntiCollider")
 
         for Name, _ in pairs(self._Signal or {}) do
-            if type(Name) == "string" and (Name:match("@AntiCollider_Added: ") or Name:match("@AntiCollider_Removed: ")) then
+            if typeof(Name) == "string" and (Name:match("@AntiCollider_Added: ") or Name:match("@AntiCollider_Removed: ")) then
                 self:_Disconnect(Name)
             end
         end
@@ -3890,7 +3933,7 @@ function API:SetFlightMinSpeed(Num)
     if not self.FlightData then
         return false
     end
-    if type(Num) ~= "number" or Num < 0 then
+    if typeof(Num) ~= "number" or Num < 0 then
         return false
     end
 
@@ -3906,7 +3949,7 @@ function API:SetFlightMaxSpeed(Num)
     if not self.FlightData then
         return false
     end
-    if type(Num) ~= "number" or Num < 0 then
+    if typeof(Num) ~= "number" or Num < 0 then
         return false
     end
 
@@ -3922,7 +3965,7 @@ function API:SetFlightSpeedStep(Num)
     if not self.FlightData then
         return false
     end
-    if type(Num) ~= "number" or Num <= 0 then
+    if typeof(Num) ~= "number" or Num <= 0 then
         return false
     end
     self.FlightData.SpeedStep = Num
@@ -4080,11 +4123,11 @@ function API:Fling(Input)
     self.Is_Flinging = true
 
     local Success, Resolver1, Resolver2 = pcall(function()
-        if type(Input) == "string" then
+        if typeof(Input) == "string" then
             Target = self:Search(Input)
         elseif typeof(Input) == "Instance" then
             Target = Input
-        elseif type(Input) == "table" and (Input.Character or Input.Model) then
+        elseif typeof(Input) == "table" and (Input.Character or Input.Model) then
             Target = Input.Character or Input.Model or Input
         end
 
@@ -4464,7 +4507,7 @@ function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, Ignore
     if not Origins then return nil end
 
     local Dir = Direction
-    if type(Direction) ~= "Vector3" then
+    if typeof(Direction) ~= "Vector3" then
         Dir = self:ResolvePosition(Direction)
         if not Dir then return nil end
     end
@@ -4822,7 +4865,7 @@ function API:Fakeout(Position, Duration)
         return false
     end
 
-    if type(Position) == "number" and Duration == nil then
+    if typeof(Position) == "number" and Duration == nil then
         Duration = Position
         Position = nil
     end
@@ -4981,7 +5024,7 @@ function API:HasAccessory(Character, Accessories, MinMatches)
 end
 
 function API:Search(Input)
-    if type(Input) ~= "string" then return nil end
+    if typeof(Input) ~= "string" then return nil end
 
     local InputLower = string_lower(Input)
     local Players = self:GetPlayers(true)
@@ -5346,7 +5389,7 @@ function API:DetectType(Object)
         end
     end
 
-    if type(Object) == "table" then
+    if typeof(Object) == "table" then
         local Resolvers = {
             "Model", "model",
             "Character", "character",
@@ -5400,11 +5443,11 @@ function API:Spectate(Input)
 
     local Target = nil
 
-    if type(Input) == "string" then
+    if typeof(Input) == "string" then
         Target = self:Search(Input)
     elseif typeof(Input) == "Instance" then
         Target = Input
-    elseif type(Input) == "table" and Input.Character then
+    elseif typeof(Input) == "table" and Input.Character then
         Target = Input.Character or Input
     end
 
@@ -6114,7 +6157,7 @@ function API:ServerHop(Options)
                         return HttpService:JSONDecode(Body)
                     end)
                     
-                    if Success and type(Data) == "table" and type(Data.data) == "table" then
+                    if Success and typeof(Data) == "table" and typeof(Data.data) == "table" then
                         return Data.data, Data.nextPageCursor
                     end
                 end
@@ -6136,7 +6179,7 @@ function API:ServerHop(Options)
                     return HttpService:JSONDecode(Body)
                 end)
                 
-                if Success and type(Data) == "table" and type(Data.data) == "table" then
+                if Success and typeof(Data) == "table" and typeof(Data.data) == "table" then
                     return Data.data, Data.nextPageCursor
                 end
             end
@@ -6285,7 +6328,7 @@ function API:GetHWID(Method)
     
     if Method == "Executor" then
         local Success, HWID = pcall(function()
-            if type(gethwid) == "function" then
+            if typeof(gethwid) == "function" then
                 return gethwid()
             end
             return nil
@@ -6313,7 +6356,7 @@ end
 
 function API:GetExecutor()
     local Success, Result = pcall(function()
-        if type(identifyexecutor) == "function" then
+        if typeof(identifyexecutor) == "function" then
             return identifyexecutor()
         end
     end)
@@ -6322,7 +6365,7 @@ function API:GetExecutor()
     end
 
     Success, Result = pcall(function()
-        if type(getexecutorname) == "function" then
+        if typeof(getexecutorname) == "function" then
             return getexecutorname()
         end
     end)
@@ -6400,19 +6443,19 @@ function API:Verify(Options)
                 return HttpService:JSONDecode(Content)
             end)
             
-            if success and type(decoded) == "table" then
+            if success and typeof(decoded) == "table" then
                 local function extractFromTable(t)
                     for k, v in pairs(t) do
-                        if type(v) == "string" then
+                        if typeof(v) == "string" then
                             table_insert(allMatches, v)
-                        elseif type(v) == "number" then
+                        elseif typeof(v) == "number" then
                             table_insert(allMatches, tostring(v))
-                        elseif type(v) == "table" then
+                        elseif typeof(v) == "table" then
                             extractFromTable(v)
                         end
-                        if type(k) == "string" then
+                        if typeof(k) == "string" then
                             table_insert(allMatches, k)
-                        elseif type(k) == "number" then
+                        elseif typeof(k) == "number" then
                             table_insert(allMatches, tostring(k))
                         end
                     end
@@ -7102,14 +7145,14 @@ function API:Translate(Text, TargetLang, Source)
         return HttpService:JSONDecode(Response)
     end)
     
-    if not DecodeSuccess or type(Data) ~= "table" then
+    if not DecodeSuccess or typeof(Data) ~= "table" then
         return nil
     end
     
     local TranslatedText = nil
     local OriginalText = nil
     
-    if Data[1] and type(Data[1]) == "table" then
+    if Data[1] and typeof(Data[1]) == "table" then
         local TranslatedParts = {}
         local OriginalParts = {}
         
@@ -7211,7 +7254,7 @@ end
 
 -- // @Loop Manager.Module, Build: 1.48
 function API:CreateStacks()
-    if type(self.Stacks) ~= "table" then
+    if typeof(self.Stacks) ~= "table" then
         self.Stacks = {While = {Connection = nil, Coroutines = {}, Active = true},
 			Heartbeat = {Connection = nil, Functions = {}, Active = true},
             RenderStep = {Connection = nil, Functions = {}, Active = true},
@@ -7236,7 +7279,7 @@ local function AddService(self, Name, Signal)
         local Funcs = Stack.Functions
         for Name, Data in pairs(Funcs) do
             if Data.Running and not Data.Paused then
-                if type(Data.Callback) == "function" then
+                if typeof(Data.Callback) == "function" then
                     task_spawn(Data.Callback, self, ...)
                 else
                     self:LogLM("Callback for '%s' is not a function", Name)
@@ -7247,7 +7290,7 @@ local function AddService(self, Name, Signal)
 end
 
 function API:SmartLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
-    if type(WaitBoy) == "function" then
+    if typeof(WaitBoy) == "function" then
         local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
         WaitBoy = nil
         Callback = Function_1
@@ -7255,7 +7298,7 @@ function API:SmartLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         WaitBefore = Function_3
     end
 
-    if not Callback or type(Callback) ~= "function" then
+    if not Callback or typeof(Callback) ~= "function" then
         self:LogLM("SmartLoop requires a callback function")
         return nil
     end
@@ -7305,7 +7348,7 @@ function API:SmartLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
 end
 
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
-    if type(WaitBoy) == "function" then
+    if typeof(WaitBoy) == "function" then
         local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
         WaitBoy = nil
         Callback = Function_1
@@ -7313,7 +7356,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         WaitBefore = Function_3
     end
 
-    if not Callback or type(Callback) ~= "function" then
+    if not Callback or typeof(Callback) ~= "function" then
         self:LogLM("WhileLoop requires a callback function")
         return nil
     end
@@ -7325,7 +7368,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     local Delay = 0 
     if WaitBefore == true then 
         Delay = Wait 
-    elseif type(WaitBefore) == "number" then 
+    elseif typeof(WaitBefore) == "number" then 
         Delay = WaitBefore 
     end
 
@@ -7341,7 +7384,7 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         end,
 
         SetWait = function(s, New)
-            if type(New) ~= "number" or New < 0 then
+            if typeof(New) ~= "number" or New < 0 then
                 Local:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
                 return
             end
@@ -7384,7 +7427,7 @@ end
 function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     self:CreateStacks()
 
-    if type(WaitBoy) == "function" then
+    if typeof(WaitBoy) == "function" then
         local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
 
         WaitBoy = nil
@@ -7393,7 +7436,7 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         WaitBefore = Function_3
     end
 
-    if not Callback or type(Callback) ~= "function" then
+    if not Callback or typeof(Callback) ~= "function" then
         self:LogLM("HeavyLoop requires a callback function")
         return nil
     end
@@ -7471,7 +7514,7 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     local Delay = 0 
     if WaitBefore == true then 
         Delay = Wait 
-    elseif type(WaitBefore) == "number" then 
+    elseif typeof(WaitBefore) == "number" then 
         Delay = WaitBefore 
     end
 
@@ -7507,7 +7550,7 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         end,
         
         SetWait = function(s, New)
-            if type(New) ~= "number" or New < 0 then
+            if typeof(New) ~= "number" or New < 0 then
                 Local:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
                 return
             end
@@ -7537,7 +7580,7 @@ function API:SetWait(Name, New)
 
     local Entry = self.ActiveConnections and self.ActiveConnections[Name]
     if Entry and Entry.SetWait then
-        if type(New) ~= "number" or New < 0 then
+        if typeof(New) ~= "number" or New < 0 then
             self:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
             return false
         end
@@ -7548,7 +7591,7 @@ function API:SetWait(Name, New)
 
     for Wait, Stack_Data in pairs(self.Stacks.While) do
         if Stack_Data.Coroutines and Stack_Data.Coroutines[Name] then
-            if type(New) ~= "number" or New < 0 then
+            if typeof(New) ~= "number" or New < 0 then
                 self:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
                 return false
             end
@@ -7566,7 +7609,7 @@ end
 function API:RenderStep(Callback, Name)
     self:CreateStacks()
 
-    if type(Callback) ~= "function" then
+    if typeof(Callback) ~= "function" then
         self:LogLM("RenderStep requires a callback function")
         return nil
     end
@@ -7602,7 +7645,7 @@ end
 function API:Heartbeat(Callback, Name)
     self:CreateStacks()
 
-    if type(Callback) ~= "function" then
+    if typeof(Callback) ~= "function" then
         self:LogLM("Heartbeat requires a callback function")
         return nil
     end
@@ -7638,7 +7681,7 @@ end
 function API:Stepped(Callback, Name)
     self:CreateStacks()
 
-    if type(Callback) ~= "function" then
+    if typeof(Callback) ~= "function" then
         self:LogLM("Stepped requires a callback function")
         return nil
     end
@@ -7674,7 +7717,7 @@ end
 function API:BindRender(Callback, Name, Priority)
     self:CreateStacks()
 
-    if type(Callback) ~= "function" then
+    if typeof(Callback) ~= "function" then
         self:LogLM("BindRender requires a callback function")
         return nil
     end
@@ -7727,7 +7770,7 @@ function API:BindKeybind(Key, Callback, BindName)
         return nil
     end
 
-    if type(Callback) ~= "function" then
+    if typeof(Callback) ~= "function" then
         self:LogLM("BindKeybind requires a callback function")
         return nil
     end
@@ -7843,7 +7886,7 @@ function API:ForceStop(Name)
     
     if self.Stacks then
         for Wait, Stack in pairs(self.Stacks.While) do
-            if type(Wait) == "number" and type(Stack) == "table" and Stack.Coroutines and Stack.Coroutines[Name] then
+            if typeof(Wait) == "number" and typeof(Stack) == "table" and Stack.Coroutines and Stack.Coroutines[Name] then
                 local Data = Stack.Coroutines[Name]
 				if Data.Destroyed then
                     pcall(Data.Destroyed, self)
@@ -8033,7 +8076,7 @@ function API:UnloadLM()
     if self.Stacks then
         Count = 0
         for Wait, Stack in pairs(self.Stacks.While) do
-            if type(Wait) == "number" and Stack and Stack.Coroutines then
+            if typeof(Wait) == "number" and Stack and Stack.Coroutines then
                 for Name, _ in pairs(Stack.Coroutines) do
                     self:ForceStop(Name)
                     Count = Count + 1
@@ -8100,61 +8143,50 @@ function API:Unload()
     warn("[@Functions.luau]: Unloaded")
     self:_Disconnect("@Engine.luau")
 
-    self:UnloadLM();
-    self:XRay(false);
-    self:Flight(false, nil);
-    self:BypassWS(false, nil);
-	self:Strengthen(false, nil);
-    -- self:VehicleFlight(false, nil);
-    self:TouchFling(false);
-    self:BypassJP(false, nil);
-	self:AntiCFrameTeleport(false);
-	self:Set3DRendering(false);
-    self:InfiniteJump(false);
-    self:AntiCollider(false);
-	self:AntiVoid2(false);
-	self:AntiVoid1(false);
-	self:SetQueue(false);
+    self:UnloadLM()
+    self:XRay(false)
+    self:Flight(false, nil)
+    self:BypassWS(false, nil)
+    self:Strengthen(false, nil)
+    -- self:VehicleFlight(false, nil)
+    self:TouchFling(false)
+    self:BypassJP(false, nil)
+    self:AntiCFrameTeleport(false)
+    self:Set3DRendering(false)
+    self:InfiniteJump(false)
+    self:AntiCollider(false)
+    self:AntiVoid2(false)
+    self:AntiVoid1(false)
+    self:SetQueue(false)
 
-    self:StopClip();
-    self:StopFling();
-    self:StopFps();
-	self:StopSeating();
-	self:StopBringTools();
-    self:ClearHighlights();
-    self:ClearBaseplates();
-    self:ClearWebSockets();
-    self:ClearGamepasses();
-    self:ClearConflicts();
-	self:ClearDrawingsV();
-	self:ClearDrawings();
-	self:StopSpectate();
-    self:ClearSounds();
-    self:ClearRaknet();
-	self:ClearSpoofs();
-    self:_Exit();
+    self:StopClip()
+    self:StopFling()
+    self:StopFps()
+    self:StopSeating()
+    self:StopBringTools()
+    self:ClearHighlights()
+    self:ClearBaseplates()
+    self:ClearWebSockets()
+    self:ClearGamepasses()
+    self:ClearConflicts()
+    self:ClearDrawingsV()
+    self:ClearDrawings()
+    self:StopSpectate()
+    self:ClearSounds()
+    self:ClearRaknet()
+    self:ClearSpoofs()
+    self:_Exit()
 
     globalEnv._IsLoadedFM = nil
-    task_wait(0.25);
+    task_wait(0.25)
 
-    local Variables = global.FunctionManager_Engine
+    table_clear(global.FunctionManager_Engine)
 
-    for Instance in pairs(Variables) do
-        Variables[Instance] = nil -- // ☝️🤓
-    end
+    setmetatable(global.FunctionManager_Engine, nil)
+    global.FunctionManager_Engine = nil
 
-    setmetatable(Variables, nil)
-    global.FunctionManager_Engine, Variables = nil, nil
-
-    for Instance in pairs(API) do
-        API[Instance] = nil -- // 💀
-    end
-    setmetatable(API, nil)
-
-    for Instance in pairs(self) do
-        self[Instance] = nil -- // 💔🥀
-    end
-    setmetatable(self, nil)
+    table_clear(API) setmetatable(API, nil)
+    table_clear(self) setmetatable(self, nil)
 end
 
 function API:Merge(...) -- // Merges with one another module 😉👍
@@ -8211,7 +8243,7 @@ end
 
 local Functions = 0
 for _, v in pairs(API) do
-    if type(v) == "function" then Functions = Functions + 1 end
+    if typeof(v) == "function" then Functions = Functions + 1 end
 end
 
 local EndTime = os_clock()
