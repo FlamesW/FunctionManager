@@ -1057,17 +1057,17 @@ function API:GetDevice()
 end
 
 function API:IsMobile()
-    local Plat = self:GetPlatform()
+    local Plat = self:GetDevice()
     return Plat == Enum.Platform.IOS or Plat == Enum.Platform.Android
 end
 
 function API:IsConsole()
-    local Plat = self:GetPlatform()
+    local Plat = self:GetDevice()
     return Plat == Enum.Platform.XBox or Plat == Enum.Platform.PS4
 end
 
 function API:IsPC()
-    local Plat = self:GetPlatform()
+    local Plat = self:GetDevice()
     return Plat == Enum.Platform.Windows or Plat == Enum.Platform.MacOS or Plat == Enum.Platform.Linux
 end
 
