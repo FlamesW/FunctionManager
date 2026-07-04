@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.00", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.01", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -463,19 +463,19 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
                 self:ShowDrawing(Data.Drawing)
         
                 if DrawType == "Text" then
-                    Data.Drawing.Position = Vector2.new(screenPos.X, screenPos.Y)
+                    Data.Drawing.Position = Vector2_new(screenPos.X, screenPos.Y)
                 elseif DrawType == "Circle" or DrawType == "Square" then
-                    Data.Drawing.Position = Vector2.new(screenPos.X, screenPos.Y)
+                    Data.Drawing.Position = Vector2_new(screenPos.X, screenPos.Y)
                 elseif DrawType == "Line" and Data.LastScreenPos then
                     Data.Drawing.From = Data.LastScreenPos
-                    Data.Drawing.To = Vector2.new(screenPos.X, screenPos.Y)
+                    Data.Drawing.To = Vector2_new(screenPos.X, screenPos.Y)
                 end
                 
                 if OnUpdate then
                     OnUpdate(Data.Drawing, Data.Target, screenPos, onScreen)
                 end
                 
-                Data.LastScreenPos = Vector2.new(screenPos.X, screenPos.Y)
+                Data.LastScreenPos = Vector2_new(screenPos.X, screenPos.Y)
             else
                 self:HideDrawing(Data.Drawing)
             end
@@ -966,8 +966,109 @@ function API:ExecuteFile(FileName)
     return false
 end
 
+function API:GetFileSize(Path)
+    if not is_file(Path) then return nil end
+    local Data = read_file(Path)
+    return #Data
+end
+
+function API:CreateDirectory(Path)
+    if is_folder(Path) then
+        return false
+    end
+
+    local function Recursive(Find)
+        if Find == "" or is_folder(Find) then
+            return
+        end
+
+        local Parent = Find:match("(.*)/")
+        if Parent and Parent ~= "" then
+            Recursive(Parent)
+        end
+
+        make_folder(Find)
+    end
+    
+    Recursive(Find)
+    return true
+end
+
+function API:DeleteDirectory(Path, Recursive)
+    if not is_folder(Path) then
+        return false
+    end
+    
+    if Recursive then
+        local contents = self:GetDirectoryContents(Path, true)
+        
+        for i = #contents, 1, -1 do
+            local item = contents[i]
+            if item.Type == "Folder" then
+                if is_folder(item.Path) then
+                    del_folder(item.Path)
+                end
+            else
+                if delete_file then
+                    delete_file(item.Path)
+                end
+            end
+        end
+    end
+    
+    del_folder(Path)
+    return true
+end
+
+function API:GetDirectoryContents(Path, Recursive)
+    if not is_folder(Path) then return {} end
+
+    local Contents = {}
+    local Files = list_files(Path)
+    
+    for _, Item in ipairs(Files) do
+        if Item:find("/$") then
+            table_insert(Contents, {
+                Name = Item:gsub("/$", ""),
+                Type = "Folder",
+                Path = Path .. Item
+            })
+            
+            if Recursive then
+                local SubContents = self:GetDirectoryContents(Path .. Item, true)
+                for _, SubItem in ipairs(SubContents) do
+                    table_insert(Contents, SubItem)
+                end
+            end
+        else
+            table_insert(Contents, {
+                Name = Item,
+                Type = "File",
+                Path = Path .. Item
+            })
+        end
+    end
+    
+    return Contents
+end
+
 function API:GetDevice()
     return GetPlatform(UserInputService)
+end
+
+function API:IsMobile()
+    local Plat = self:GetPlatform()
+    return Plat == Enum.Platform.IOS or Plat == Enum.Platform.Android
+end
+
+function API:IsConsole()
+    local Plat = self:GetPlatform()
+    return Plat == Enum.Platform.XBox or Plat == Enum.Platform.PS4
+end
+
+function API:IsPC()
+    local Plat = self:GetPlatform()
+    return Plat == Enum.Platform.Windows or Plat == Enum.Platform.MacOS or Plat == Enum.Platform.Linux
 end
 
 function API:ToPlace(Place)
@@ -1491,11 +1592,6 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
     end
 end
 
-function API:IsMobile()
-    local Plat = self:GetDevice()
-    return Plat == Enum.Platform.IOS or Plat == Enum.Platform.Android
-end
-
 function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
     task_spawn(function()
         Options = Options or {}
@@ -1600,6 +1696,10 @@ function API:RandomVector3(RangeX, RangeY, RangeZ)
         math_random(-RangeY, RangeY),
         math_random(-RangeZ, RangeZ)
     )
+end
+
+function API:RandomDirection()
+    return Vector3_new(math_random() - 0.5, math_random() - 0.5, math_random() - 0.5).Unit
 end
 
 function API:FindCore(Name)
@@ -1911,6 +2011,19 @@ function API:Uwuify(Text)
     return Result
 end
 
+function API:GetTimeOfDay()
+    local Hour = tonumber(os_date("%H"))
+    if Hour >= 6 and Hour < 12 then
+        return "Morning"
+    elseif Hour >= 12 and Hour < 18 then
+        return "Afternoon"
+    elseif Hour >= 18 and Hour < 22 then
+        return "Evening"
+    else
+        return "Night"
+    end
+end
+
 function API:Trim(String)
     return string_match(String, "^%s*(.-)%s*$")
 end
@@ -1938,6 +2051,10 @@ end
 
 function API:IsURL(String)
     return String:match("^https?://[%w-.]+%.[a-zA-Z]{2,}(/.*)?$") ~= nil
+end
+
+function API:IsEmail(String)
+    return String:match("^[%w._-]+@[%w.-]+%.[a-zA-Z]{2,}$") ~= nil
 end
 
 function API:ResolvePosition(...)
@@ -2267,6 +2384,32 @@ function API:ClearSpoofs()
     self._Spoofed = nil
     
     return true
+end
+
+function API:Once(ID, Callback)
+    if not ID then return nil end
+    
+    if not Callback then
+        Callback = ID
+        ID = tostring(ID)
+    end
+    
+    self._OnceFlags = self._OnceFlags or {}
+    
+    if not self._OnceFlags[ID] then
+        self._OnceFlags[ID] = true
+        Callback()
+        return true
+    end
+
+    return false
+end
+
+function API:ScheduleSoon(Delay, Function)
+    task_spawn(function()
+        task_wait(Delay)
+        Function()
+    end)
 end
 
 function API:GetPlayer()
@@ -2635,17 +2778,48 @@ function API:GetToolCount()
     return #self:GetTools()
 end
 
-function API:FindTool(Name)
+function API:HasTool(Name)
+    if not Name then
+        return #self:GetTools() > 0
+    end
+
     local Lower = string_lower(Name)
     for _, Tool in ipairs(self:GetTools()) do
         if string_lower(Tool.Name) == Lower then
-            return Tool
+            return true
         end
     end
+    return false
+end
+
+function API:FindTool(Name, Exact)
+    if not Name then
+        return self:GetHeldTool()
+    end
+    
+    local Lower = string_lower(Name)
+    for _, Tool in ipairs(self:GetTools()) do
+        local ToolName = string_lower(Tool.Name)
+        
+        if Exact then
+            if ToolName == Lower then
+                return Tool
+            end
+        else
+            if ToolName:find(Lower, 1, true) then
+                return Tool
+            end
+        end
+    end
+    
     return nil
 end
 
 function API:EquipTool(Name)
+    if not Name then
+        return true
+    end
+    
     local Tool = self:FindTool(Name)
     if not Tool then
         return false
@@ -2674,6 +2848,10 @@ function API:EquipTool(Name)
 end
 
 function API:UnequipTool(Name)
+    if not Name then
+        return self:UnequipHeldTool()
+    end
+
     local Tool = self:FindTool(Name)
     if not Tool then
         return false
@@ -2687,7 +2865,25 @@ function API:UnequipTool(Name)
     return false
 end
 
+function API:UnequipHeldTool()
+    local HeldTool = self:GetHeldTool()
+    if not HeldTool then
+        return false
+    end
+    
+    if HeldTool.Parent == self:GetCharacter() then
+        HeldTool.Parent = self:GetBackpack()
+        return true
+    end
+    
+    return false
+end
+
 function API:UseTool(Name)
+    if not Name then
+        return self:UseHeldTool()
+    end
+    
     local Tool = self:FindTool(Name)
     if not Tool then
         return false
@@ -2695,14 +2891,20 @@ function API:UseTool(Name)
 
     local HeldTool = self:GetHeldTool()
 
-    if HeldTool ~= Tool then
-        self:EquipTool(Name)
-        task_wait(0.1)
+    if HeldTool == Tool then
+        if HeldTool.Enabled ~= false then
+            HeldTool:Activate()
+            return true
+        end
+        return false
     end
+
+    self:EquipTool(Name)
+    task_wait(0.12)
 
     HeldTool = self:GetHeldTool()
 
-    if HeldTool == Tool then
+    if HeldTool == Tool and HeldTool.Enabled ~= false then
         HeldTool:Activate()
         return true
     end
@@ -2712,7 +2914,9 @@ end
 
 function API:UseHeldTool()
     local HeldTool = self:GetHeldTool()
-    if not HeldTool then return false end
+    if not HeldTool then
+        return false
+    end
 
     if HeldTool.Enabled ~= false then
         HeldTool:Activate()
@@ -2730,17 +2934,19 @@ function API:GetHeldTool()
     return nil
 end
 
-function API:AddPriority(Name, Priority, Condition, Action)
+function API:AddPriority(Name, Priority, Group, Condition, Action)
     self.Priorities = self.Priorities or {}
 
     table_insert(self.Priorities, {
         Name = Name,
         Priority = Priority,
+        BasePriority = Priority,
+        Group = Group or "Base",
         Condition = Condition,
         Action = Action,
         Flags = {}
     })
-    
+
     table_sort(self.Priorities, function(a, b)
         return a.Priority > b.Priority
     end)
@@ -2755,13 +2961,49 @@ function API:GetTasks()
     return nil
 end
 
-function API:Once(Name, Callback)
+function API:GetTaskByGroup(Group)
+    local Tasks = {}
+    for _, Task in ipairs(self.Priorities or {}) do
+        if Task.Group == Group then
+            table_insert(Tasks, Task)
+        end
+    end
+    return Tasks
+end
+
+function API:SetPriority(Name, NewPriority)
+    for _, Task in ipairs(self.Priorities or {}) do
+        if Task.Name == Name then
+            Task.Priority = NewPriority
+            table_sort(self.Priorities, function(a, b)
+                return a.Priority > b.Priority
+            end)
+            return true
+        end
+    end
+    return false
+end
+
+function API:ResetPriority(Name)
+    for _, Task in ipairs(self.Priorities or {}) do
+        if Task.Name == Name then
+            Task.Priority = Task.BasePriority
+            table_sort(self.Priorities, function(a, b)
+                return a.Priority > b.Priority
+            end)
+            return true
+        end
+    end
+    return false
+end
+
+function API:Task_Once(Name, Callback)
     local Selected = self.TaskOnce
     if not Selected then
         Callback()
         return
     end
-    
+
     if not Selected.Flags[Name] then
         Selected.Flags[Name] = true
         Callback()
@@ -2769,15 +3011,32 @@ function API:Once(Name, Callback)
 end
 
 function API:RunTasks()
-    local Task = self:GetTasks()
-    if Task then
-        self.TaskOnce = Task
+    local Tasks = self:GetTasks()
+    if Tasks then
+        self.TaskOnce = Tasks
 
-        Task.Action()
+        Tasks.Action()
 
         self.TaskOnce = nil
-        return Task.name
+        return Tasks.Name
     end
+    return nil
+end
+
+function API:RunTaskByGroup(Group)
+    local Tasks = self:GetTaskByGroup(Group)
+    
+    for _, Task in ipairs(Tasks) do
+        if Task.Condition() then
+            self.TaskOnce = Task
+            
+            Task.Action()
+            
+            self.TaskOnce = nil
+            return Task.Name
+        end
+    end
+
     return nil
 end
 
@@ -3537,16 +3796,14 @@ function API:Flight(State, Speed)
     
     local Strength = 1e9
 
-    local BV = self:CreateInstance("BodyVelocity", {
-        Name = "00x00x00x00x00",
+    local BV = self:CreateInstance("BodyVelocity", { Name = self:RandomString(15),
         MaxForce = Vector3_new(Strength, Strength, Strength),
         Velocity = Vector3_zero,
         Parent = Roots
     })
     self:_Connect("@Flight", BV)
 
-    local BG = self:CreateInstance("BodyGyro", {
-        Name = "11x11x11x11x11",
+    local BG = self:CreateInstance("BodyGyro", { Name = self:RandomString(15),
         MaxTorque = Vector3_new(Strength, Strength, Strength),
         P = 3000,
         D = 500,
@@ -3676,7 +3933,7 @@ function API:SetFlightSpeedControls(State)
     if not self.FlightData or not self.FlightData.SpeedControls then
         return
     end
-    
+
     self.FlightData.SpeedControls.Enabled = State
 end
 
@@ -3725,11 +3982,8 @@ function API:InfiniteJump(State)
     
     State = State or false
 
-    self.JumpData = self.JumpData or {
-        Active = false,
-        Debounce = false,
-    }
-    
+    self.JumpData = self.JumpData or { Active = false, Debounce = false }
+
     local function CleanUP()
         self.JumpData.Active = false
         self.JumpData.Debounce = false
@@ -3776,14 +4030,10 @@ function API:TouchFling(State)
     
     State = State or false
     
-    self.FlingData = self.FlingData or {
-        Active = false,
-        Running = false,
-    }
+    self.FlingData = self.FlingData or { Active = false }
     
     local function CleanUP()
         self.FlingData.Active = false
-        self.FlingData.Running = false
         
 		self:_Disconnect("@TouchFling")
         self:RegisterConflict("TouchFling", false)
@@ -3799,24 +4049,23 @@ function API:TouchFling(State)
     end
     
     self.FlingData.Active = true
-    self.FlingData.Running = true
 
-    local movel = 0.1
+    local Movel = 0.1
 
     local Connection = Heartbeat:Connect(function()
-        if not self.FlingData.Running then return end
+        if not self.FlingData.Active then return end
         
         local Roots = self:GetRoot()
         if not Roots then return end
     
-        local vel = Roots.Velocity
-        Roots.Velocity = vel * 10000 + Vector3_new(0, 10000, 0)
+        local Vell = Roots.Velocity
+        Roots.Velocity = Vell * 10000 + Vector3_new(0, 10000, 0)
         RenderStepped:Wait()
-        Roots.Velocity = vel
+        Roots.Velocity = Vell
         Stepped:Wait()
-        Roots.Velocity = vel + Vector3_new(0, movel, 0)
+        Roots.Velocity = Vell + Vector3_new(0, Movel, 0)
         
-        movel = -movel
+        Movel = -Movel
     end)
 
     self:_Connect("@TouchFling", Connection)
@@ -3851,9 +4100,6 @@ function API:Fling(Input)
         local Character = self:GetCharacter()
         local Humanoid = self:GetHumanoid()
         local RootPart = self:GetRoot()
-
-        if not Humanoid then Humanoid = Character:WaitForChild("Humanoid") end
-        if not RootPart then RootPart = Character:WaitForChild("HumanoidRootPart") end
 
         local Fling_Manager = { FlingOldPos = nil, lFlingOldPos = nil, cFlingOldPos = nil }
 
@@ -4019,7 +4265,7 @@ function API:XRay(State)
         if self.XRayEnabled then return end
 
         self.XRayEnabled = true
-        for _, v in pairs(workspace:GetDescendants()) do
+        for _, v in pairs(Workspace:GetDescendants()) do
             if v:IsA("BasePart") and not v.Parent:FindFirstChildWhichIsA("Humanoid") and not v.Parent.Parent:FindFirstChildWhichIsA("Humanoid") then
                 v.LocalTransparencyModifier = 0.5
             end
@@ -4027,7 +4273,7 @@ function API:XRay(State)
     else
         if not self.XRayEnabled then return end
         
-        for _, v in pairs(workspace:GetDescendants()) do
+        for _, v in pairs(Workspace:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.LocalTransparencyModifier = 0
             end
@@ -4393,6 +4639,16 @@ function API:GetPlayers(SelfIncluded)
     return List
 end
 
+function API:SafeDestroy(Instance)
+    if Instance then
+        pcall(function()
+            Instance:Destroy()
+        end)
+        return true
+    end
+    return false
+end
+
 function API:GetVelocity()
     local Root = self:GetRoot()
     if not Root then return Vector3_zero end
@@ -4415,7 +4671,7 @@ function API:Predict(Projectile, Target, Options)
     Options = Options or {}
     
     local Proj_Pos = self:ResolvePosition(Projectile)
-    if not Proj_Pos then return math.huge end
+    if not Proj_Pos then return math_huge end
 
     local Target_Pos = self:ResolvePosition(Target) or self:GetRoot().Position
     local Target_Vel = self:GetTargetVelocity(Target) or Vector3_zero
@@ -4453,9 +4709,7 @@ function API:GetDistance(Target, UseSquared)
     end
 
     local Root = Roots.Position
-    local dx = Root.X - Pos.X
-    local dy = Root.Y - Pos.Y
-    local dz = Root.Z - Pos.Z
+    local dx, dy, dz = Root.X - Pos.X, Root.Y - Pos.Y, Root.Z - Pos.Z
 
     if UseSquared then
         return dx*dx + dy*dy + dz*dz
@@ -4464,37 +4718,28 @@ function API:GetDistance(Target, UseSquared)
     return math_sqrt(dx*dx + dy*dy + dz*dz)
 end
 
-function API:GetBoundingBox(Model)
-    if not Model or not Model:IsA("Model") then return nil end
+function API:GetBoundingBox(Instance)
+    if not Instance then return nil end
+
+    local Parts = Instance:GetDescendants()
+    local Min = Vector3.new(math_huge, math_huge, math_huge)
+    local Max = Vector3.new(-math_huge, -math_huge, -math_huge)
     
-    local Parts = {}
-    for _, Part in ipairs(Model:GetDescendants()) do
+    for _, Part in ipairs(Parts) do
         if Part:IsA("BasePart") then
-            table_insert(Parts, Part)
+            local Pos = Part.Position
+            Min = Vector3.new(math_min(Min.X, Pos.X), math_min(Min.Y, Pos.Y), math_min(Min.Z, Pos.Z))
+            Max = Vector3.new(math_max(Max.X, Pos.X), math_max(Max.Y, Pos.Y), math_max(Max.Z, Pos.Z))
         end
     end
     
-    if #Parts == 0 then return nil end
-    
-    local MinX, MinY, MinZ = math_huge, math_huge, math_huge
-    local MaxX, MaxY, MaxZ = -math_huge, -math_huge, -math_huge
-    
-    for _, Part in ipairs(Parts) do
-        local Pos = Part.Position
-        local Size = Part.Size / 2
-        
-        MinX = math_min(MinX, Pos.X - Size.X)
-        MinY = math_min(MinY, Pos.Y - Size.Y)
-        MinZ = math_min(MinZ, Pos.Z - Size.Z)
-        MaxX = math_max(MaxX, Pos.X + Size.X)
-        MaxY = math_max(MaxY, Pos.Y + Size.Y)
-        MaxZ = math_max(MaxZ, Pos.Z + Size.Z)
-    end
-    
-    local Center = Vector3_new((MinX + MaxX) / 2, (MinY + MaxY) / 2, (MinZ + MaxZ) / 2)
-    local Size = Vector3_new(MaxX - MinX, MaxY - MinY, MaxZ - MinZ)
-    
-    return Center, Size
+    return Min, Max
+end
+
+function API:GetCenter(Instance)
+    local Min, Max = self:GetBoundingBox(Instance)
+    if not Min or not Max then return nil end
+    return (Min + Max) / 2
 end
 
 function API:IsNPC(Model)
@@ -5597,7 +5842,7 @@ function API:Notify(Title, Description, Duration, Image)
     if not Success then
         return false
     end
-    
+
     if not self.NotificationHandler then
         self.NotificationHandler = Library:New({
             BackgroundColor = Color3.fromRGB(68, 71, 0),
@@ -5608,14 +5853,14 @@ function API:Notify(Title, Description, Duration, Image)
             HorizontalPosition = "Right",
         })
     end
-    
+
     self.NotificationHandler:Create({
         Title = Title or "Notification",
         Description = Description or "",
         Duration = Duration or 3,
         Image = Image,
     })
-    
+
     return true
 end
 
@@ -7910,11 +8155,6 @@ function API:Unload()
         self[Instance] = nil -- // 💔🥀
     end
     setmetatable(self, nil)
-
-    -- // Forces garbage collection if you have it.
-    if type(gc) == "function" then
-        task_wait(0.1) gc()
-    end
 end
 
 function API:Merge(...) -- // Merges with one another module 😉👍
