@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.02", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.03", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -2995,7 +2995,68 @@ function API:AddPriority(Name, Priority, Group, Condition, Action)
     end)
 end
 
+function API:SetCurrentTask(TaskName)
+    local oldTask = self.CurrentTask
+    self.CurrentTask = TaskName
+    
+    if self.OnTaskSwitch then
+        self:OnTaskSwitch(oldTask, TaskName)
+    end
+
+    return oldTask
+end
+
+function API:GetCurrentTask()
+    return self.CurrentTask
+end
+
+function API:OnTaskSwitch(oldTask, newTask)
+    if self.TaskSwitchCallbacks then
+        for _, callback in ipairs(self.TaskSwitchCallbacks) do
+            callback(oldTask, newTask)
+        end
+    end
+end
+
+function API:RegisterSwitchCallback(Callback)
+    self.TaskSwitchCallbacks = self.TaskSwitchCallbacks or {}
+    table_insert(self.TaskSwitchCallbacks, Callback)
+end
+
+function API:ForceTask(Name)
+    for _, Task in ipairs(self.Priorities or {}) do
+        if Task.Name == Name then
+            self.TaskOnce = Task
+
+            local oldTask = self:SetCurrentTask(Task.Name)
+
+            Task.Action()
+
+            self.TaskOnce = nil
+            return true
+        end
+    end
+    return false
+end
+
+function API:ForceGroup(Group)
+    self.ForcedGroup = Group
+end
+
+function API:ClearForcedGroup()
+    self.ForcedGroup = nil
+end
+
 function API:GetTasks()
+    if self.ForcedGroup then
+        for _, Task in ipairs(self.Priorities) do
+            if Task.Group == self.ForcedGroup and Task.Condition() then
+                return Task
+            end
+        end
+        return nil
+    end
+
     for _, Task in ipairs(self.Priorities) do
         if Task.Condition() then
             return Task
@@ -3018,6 +3079,7 @@ function API:SetPriority(Name, NewPriority)
     for _, Task in ipairs(self.Priorities or {}) do
         if Task.Name == Name then
             Task.Priority = NewPriority
+
             table_sort(self.Priorities, function(a, b)
                 return a.Priority > b.Priority
             end)
@@ -3031,6 +3093,7 @@ function API:ResetPriority(Name)
     for _, Task in ipairs(self.Priorities or {}) do
         if Task.Name == Name then
             Task.Priority = Task.BasePriority
+
             table_sort(self.Priorities, function(a, b)
                 return a.Priority > b.Priority
             end)
@@ -3058,28 +3121,33 @@ function API:RunTasks()
     if Tasks then
         self.TaskOnce = Tasks
 
+        local oldTask = self:SetCurrentTask(Tasks.Name)
         Tasks.Action()
 
         self.TaskOnce = nil
         return Tasks.Name
     end
+    
+    self:SetCurrentTask(nil)
     return nil
 end
 
 function API:RunTaskByGroup(Group)
     local Tasks = self:GetTaskByGroup(Group)
-    
+
     for _, Task in ipairs(Tasks) do
         if Task.Condition() then
             self.TaskOnce = Task
-            
+
+            local oldTask = self:SetCurrentTask(Task.Name)
             Task.Action()
-            
+
             self.TaskOnce = nil
             return Task.Name
         end
     end
 
+    self:SetCurrentTask(nil)
     return nil
 end
 
