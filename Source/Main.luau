@@ -2995,25 +2995,25 @@ function API:AddPriority(Name, Priority, Group, Condition, Action)
     end)
 end
 
-function API:SetCurrentTask(TaskName)
-    local oldTask = self.CurrentTask
-    self.CurrentTask = TaskName
+function API:SetCurrentTask(Name)
+    local OldTask = self.CurrentTask
+    self.CurrentTask = Name
     
     if self.OnTaskSwitch then
-        self:OnTaskSwitch(oldTask, TaskName)
+        self:OnTaskSwitch(OldTask, Name)
     end
 
-    return oldTask
+    return OldTask
 end
 
 function API:GetCurrentTask()
     return self.CurrentTask
 end
 
-function API:OnTaskSwitch(oldTask, newTask)
+function API:OnTaskSwitch(OldTask, NewTask)
     if self.TaskSwitchCallbacks then
-        for _, callback in ipairs(self.TaskSwitchCallbacks) do
-            callback(oldTask, newTask)
+        for _, Callback in ipairs(self.TaskSwitchCallbacks) do
+            Callback(OldTask, NewTask)
         end
     end
 end
@@ -3028,7 +3028,7 @@ function API:ForceTask(Name)
         if Task.Name == Name then
             self.TaskOnce = Task
 
-            local oldTask = self:SetCurrentTask(Task.Name)
+            local OldTask = self:SetCurrentTask(Task.Name)
 
             Task.Action()
 
@@ -3121,7 +3121,7 @@ function API:RunTasks()
     if Tasks then
         self.TaskOnce = Tasks
 
-        local oldTask = self:SetCurrentTask(Tasks.Name)
+        local OldTask = self:SetCurrentTask(Tasks.Name)
         Tasks.Action()
 
         self.TaskOnce = nil
