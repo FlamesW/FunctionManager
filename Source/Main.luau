@@ -2429,18 +2429,19 @@ function API:ClearSpoofs()
     return true
 end
 
-function API:Once(ID, Callback)
-    if not ID then return nil end
-    
+function API:Once(Name, Callback)
+    if not Name then return nil end
+
     if not Callback then
-        Callback = ID
-        ID = tostring(ID)
+        Callback = Name
+        Name = tostring(Name)
     end
-    
+
     self._OnceFlags = self._OnceFlags or {}
-    
-    if not self._OnceFlags[ID] then
-        self._OnceFlags[ID] = true
+
+    if not self._OnceFlags[Name] then
+        self._OnceFlags[Name] = true
+
         Callback()
         return true
     end
@@ -2448,9 +2449,11 @@ function API:Once(ID, Callback)
     return false
 end
 
-function API:ScheduleSoon(Delay, Function)
+function API:Schedule(Cooldown, Function)
     task_spawn(function()
-        task_wait(Delay)
+        if Cooldown then
+            task_wait(Cooldown)
+        end
         Function()
     end)
 end
