@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.03", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.04", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -5933,18 +5933,19 @@ end
 --]]
 
 function API:Notify(Title, Description, Duration, Image)
+    -- // Load Notification Library, All credits to lxte 🫶, I've forked it to add gethui suppport and boost runtime performance.
     local Framework = self:LoadData("@Notification.UI")
-    
+
     if not Framework then
         local Success, Result = pcall(function()
             return Game:HttpGet("https://raw.githubusercontent.com/FlamesW/Notification/refs/heads/home/Framework.luau")
         end)
         
         if not Success then
-            warn("[Notify]: Failed to download library")
+            warn("[Notify]: Failed to download framerwork")
             return false
         end
-    
+
         Framework = Result
         self:SaveData("@Notification.UI", Result)
     end
@@ -5976,6 +5977,201 @@ function API:Notify(Title, Description, Duration, Image)
     })
 
     return true
+end
+
+function API:Load_ESP()
+    if self.ESP_Injected then 
+        return self.ESP_Library 
+    end
+
+    -- // Load MSpaintESP Library, Credits to mstudio45 and all its contributors for making this library 💕
+    local Framework, File = ("https://raw.githubusercontent.com/mstudio45/MSESP/refs/heads/main/source.luau"), ("@ESP_Library.luau")
+
+    local function Execute_External(Content)
+        local Chunk, Err = loadstring(Content)
+
+        if not Chunk then warn("[ESP]: Compile error:", Err)
+            return nil
+        end
+
+        local Success, Result = pcall(Chunk)
+        if not Success then warn("[ESP]: Runtime error:", Result)
+            return nil
+        end
+
+        return Result
+    end
+
+    if is_file(File) then
+        local Success, Content = pcall(read_file, File)
+
+        if Success and Content then
+            task_spawn(function()
+                local Update = Game:HttpGet(Framework .. "?nocache=" .. tostring(os_clock()))
+
+                if Update and Update ~= Content then
+                    pcall(write_file, File, Update)
+                end
+            end)
+
+            local Library = Execute_External(Content)
+            if Library then self.ESP_Library, self.ESP_Injected = Library, true
+                return Library
+            end
+        end
+    end
+
+    local Content = Game:HttpGet(Framework .. "?nocache=" .. tostring(os_clock()))
+    pcall(write_file, File, Content)
+
+    local Library = Execute_External(Content)
+    if Library then self.ESP_Library, self.ESP_Injected = Library, true
+        return Library
+    end
+
+    return nil
+end
+
+function API:ESP_Add(Settings)
+    return self:Load_ESP():Add(Settings)
+end
+
+function API:ESP_Clear()
+    return self:Load_ESP():Clear()
+end
+
+function API:ESP_Destroy()
+    return self:Load_ESP():Destroy()
+end
+
+function API:ESP_SetGlobal(Settings)
+    local ESP = self:Load_ESP()
+
+    for Key, Value in pairs(Settings) do
+        ESP.GlobalConfig[Key] = Value
+    end
+    return ESP.GlobalConfig
+end
+
+function API:ESP_GetGlobal()
+    return self:Load_ESP().GlobalConfig
+end
+
+function API:ESP_EnableRainbow(State)
+    local ESP = self:Load_ESP()
+
+    ESP.GlobalConfig.Rainbow = State or false
+    return ESP.GlobalConfig.Rainbow
+end
+
+function API:ESP_IgnoreCharacter(State)
+    local ESP = self:Load_ESP()
+
+    ESP.GlobalConfig.IgnoreCharacter = State or false
+    return ESP.GlobalConfig.IgnoreCharacter
+end
+
+function API:ESP_ToggleComponent(Component, State)
+    local ESP = self:Load_ESP()
+
+    local Valid = {
+        Billboards = true,
+        Distance = true,
+        Highlighters = true,
+        Tracers = true,
+        Arrows = true,
+        Boxes2D = true,
+        Boxes3D = true,
+        Skeleton = true
+    }
+    if Valid[Component] then
+        ESP.GlobalConfig[Component] = State ~= false
+        return true
+    end
+    return false
+end
+
+function API:ESP_SetFont(Font)
+    local ESP = self:Load_ESP()
+
+    ESP.GlobalConfig.Font = Font
+    return ESP.GlobalConfig.Font
+end
+
+function API:ESP_GetAll()
+    return self:Load_ESP().ESP
+end
+
+function API:ESP_Remove(id)
+    local ESP = self:Load_ESP()
+
+    local Instance = ESP.ESP[id]
+    if Instance and Instance.Destroy then
+        Instance:Destroy()
+        return true
+    end
+    return false
+end
+
+function API:ESP_Hide(id)
+    local ESP = self:Load_ESP()
+
+    local Instance = ESP.ESP[id]
+    if Instance and Instance.Hide then
+        Instance:Hide()
+        return true
+    end
+    return false
+end
+
+function API:ESP_Show(id)
+    local ESP = self:Load_ESP()
+
+    local Instance = ESP.ESP[id]
+    if Instance and Instance.Show then
+        Instance:Show()
+        return true
+    end
+    return false
+end
+
+function API:ESP_Toggle(id)
+    local ESP = self:Load_ESP()
+
+    local Instance = ESP.ESP[id]
+    if Instance and Instance.ToggleVisibility then
+        Instance:ToggleVisibility()
+        return true
+    end
+    return false
+end
+
+function API:ESP_SetColor(id, Color, IncludeComponents)
+    local ESP = self:Load_ESP()
+
+    local Instance = ESP.ESP[id]
+    if Instance and Instance.SetEveryColor then
+        Instance:SetEveryColor(Color, IncludeComponents or false)
+        return true
+    end
+    return false
+end
+
+function API:Unload_ESP()
+    if self.ESP_Injected then
+        if self.ESP_Library then
+            if self.ESP_Library.Clear then 
+                self.ESP_Library:Clear() 
+            end
+
+            if self.ESP_Library.Destroy then 
+                self.ESP_Library:Destroy() 
+            end
+        end
+
+        self.ESP_Library = nil
+        self.ESP_Injected = false
+    end
 end
 
 function API:IsColor(Target, Colors)
@@ -8118,7 +8314,7 @@ function API:RestartTask(Name)
     end
 end
 
-function API:UnloadLM()
+function API:Unload_LM()
     self.UnloadedLM = true
 	local Count = 0 
 
@@ -8214,7 +8410,9 @@ function API:Unload()
     warn("[@Functions.luau]: Unloaded")
     self:_Disconnect("@Engine.luau")
 
-    self:UnloadLM()
+    self:Unload_LM()
+    self:Unload_ESP()
+
     self:XRay(false)
     self:Flight(false, nil)
     self:BypassWS(false, nil)
