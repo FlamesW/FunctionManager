@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.04", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.05", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -8401,7 +8401,20 @@ function API:OverrideFunction(Name, Func)
     end
 
     self[self:RandomString(15)] = self[Name]
-    self[Name] = Func
+
+    if self.Overwriteable then
+        local _Meta = getmetatable(self)
+        if typeof(_Meta) == "table" and typeof(_Meta.__newindex) == "function" then
+            local Previous_Index = _Meta.__newindex
+            _Meta.__newindex = nil
+            self[Name] = Func
+            _Meta.__newindex = Previous_Index
+        else
+            self[Name] = Func
+        end
+    else
+        self[Name] = Func
+    end
 
     return true
 end
@@ -8451,18 +8464,21 @@ function API:Unload()
 
     table_clear(global.FunctionManager_Engine)
 
-    setmetatable(global.FunctionManager_Engine, nil)
+    debug.setmetatable(global.FunctionManager_Engine, nil)
     global.FunctionManager_Engine = nil
 
-    table_clear(API) setmetatable(API, nil)
-    table_clear(self) setmetatable(self, nil)
+    table_clear(API) 
+	debug.setmetatable(API, nil)
+
+    table_clear(self) 
+	debug.setmetatable(self, nil)
 end
 
 function API:Merge(...) -- // Merges with one another module 😉👍
     for _, Modules in ipairs({...}) do
         for Method, Func in pairs(Modules) do
             if typeof(Func) == "function" then
-                if self.Core and self.Core[Method] then
+                if self.Functionable and self.Functionable[Method] then
                     continue;
                 end
 
@@ -8477,37 +8493,71 @@ function API:Merge(...) -- // Merges with one another module 😉👍
     return self
 end
 
-function API.Launch(Class)
-    Class.Core = {}
-    
-    -- // @Services
-    Class.Workspace = Workspace
-    Class.Players = Players
-    Class.LocalPlayer = LocalPlayer
-    Class.Character = Character
-    Class.Roots = Roots
-    Class.Humanoid = Humanoid
-    Class.RunService = RunService
-    Class.TweenService = TweenService
-    Class.MarketplaceService = MarketplaceService
-    Class.HttpService = HttpService
-    Class.TeleportService = TeleportService
-    Class.RbxAnalyticsService = RbxAnalyticsService
-    Class.VirtualInputManager = VirtualInputManager
-    Class.LocalizationService = LocalizationService
-    Class.ReplicatedStorage = ReplicatedStorage
-    Class.TextChatService = TextChatService
-    Class.UserInputService = UserInputService
-    Class.SoundService = SoundService
-    Class.StarterGuiService = StarterGuiService
-    Class.Performance = Performance
-    Class.LightingService = LightingService
-    Class.CurrentCamera = CurrentCamera
-    Class.GuiService = GuiService
-    Class.CoreGui = CoreGui
+function API:Launch(Class, Options)
+    Options = Options or {}
 
+    Class = Class or {}
+    Class.Functionable = {}
+    Class.Overwriteable = not Options.Overwriteable or false
+
+    -- // @Services
+    local Services = {
+        Workspace = Workspace,
+        Players = Players,
+        LocalPlayer = LocalPlayer,
+        Character = Character,
+        Roots = Roots,
+        Humanoid = Humanoid,
+        RunService = RunService,
+        TweenService = TweenService,
+        MarketplaceService = MarketplaceService,
+        HttpService = HttpService,
+        TeleportService = TeleportService,
+        RbxAnalyticsService = RbxAnalyticsService,
+        VirtualInputManager = VirtualInputManager,
+        LocalizationService = LocalizationService,
+        ReplicatedStorage = ReplicatedStorage,
+        TextChatService = TextChatService,
+        UserInputService = UserInputService,
+        SoundService = SoundService,
+        StarterGuiService = StarterGuiService,
+        Performance = Performance,
+        LightingService = LightingService,
+        CurrentCamera = CurrentCamera,
+        GuiService = GuiService,
+        CoreGui = CoreGui
+    }
+	
     global.FunctionManager_Engine = Class
-    return setmetatable(Class, { __index = API })
+
+    if not Options.Overwriteable or false then
+        for Instance, Service in pairs(Services) do
+            Class[Instance] = (Service)
+        end
+
+        local Protected_Metatables = { __index = API, __newindex = function(Guardian, Key, Value)
+            if Services[Key] ~= nil then
+                return
+            end
+            if API[Key] ~= nil and Key ~= "_Signal" then
+                warn(string_format("[FunctionManager]: ⚠️ '%s' is protected. Use { Overwriteable = true } to override.", Key))
+                return
+            end
+            rawset(Guardian, Key, Value)
+        end}
+
+        setmetatable(Class, Protected_Metatables)
+    else
+        for Instance, Service in pairs(Services) do
+            if (Class[Instance] == nil) then
+                Class[Instance] = (Service)
+            end
+        end
+
+        setmetatable(Class, { __index = API })
+    end
+
+    return Class
 end
 
 local Functions = 0
