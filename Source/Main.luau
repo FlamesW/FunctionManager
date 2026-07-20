@@ -78,7 +78,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.05", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.06", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -126,12 +126,12 @@ local PlaceId, JobId, GameId  = Game.PlaceId, Game.JobId, Game.GameId;
 local Get_Asset = getcustomasset or getsynasset;
 
 -- // @Signal.luau
-function API:_Connect(Name: string, Object: any)
-    self._Signal = self._Signal or {}; self._Signal[Name] = self._Signal[Name] or {}; local Service = self._Signal[Name]; if typeof(Object) == "table" then for _, v in ipairs(Object) do Service[#Service + 1] = v end else Service[#Service + 1] = Object end; return Object
+function API:_Connect(...): () 
+    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; local function Connect(Name, Object) if type(Name) ~= "string" then return end; self._Signal = self._Signal or {}; self._Signal[Name] = self._Signal[Name] or {}; local Service = self._Signal[Name]; if typeof(Object) == "table" then for _, v in ipairs(Object) do Service[#Service + 1] = v end else Service[#Service + 1] = Object end end; if #Signal >= 2 then for i = 1, #Signal, 2 do local Name = Signal[i]; local Object = Signal[i + 1]; Connect(Name, Object) end end 
 end
 
-function API:_Disconnect(Name: string): () 
-    local Objects = self._Signal and self._Signal[Name]; if not Objects then return end; local function CleanUP(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do CleanUP(Objects[i]) end; self._Signal[Name] = nil 
+function API:_Disconnect(...): () 
+    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; for _, Name in ipairs(Signal) do if type(Name) ~= "string" then continue end; local Objects = self._Signal and self._Signal[Name]; if not Objects then continue end; local function CleanUP(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do CleanUP(Objects[i]) end; self._Signal[Name] = nil end 
 end
 
 function API:_Exit(): ()
@@ -175,39 +175,32 @@ API:_Connect("@WindowListener", {
 -- // @Functions.module
 function API:CreateInstance(ClassName: string, Properties: { [string]: any }?)
     local InstanceObj = Instance_new(ClassName)
-
     if Properties then
-        local k, v = next(Properties)
-        while k do
+        for k, v in pairs(Properties) do
             InstanceObj[k] = v
-            k, v = next(Properties, k)
         end
     end
     return InstanceObj
 end
 
 function API:CreateDrawing(DrawType: string, Properties: { [string]: any }?)
-    local Success, DrawingObj = pcall(function()
-        return Drawing.new(DrawType)
-    end)
-
-    if not Success or not DrawingObj then
+    if type(Drawing) ~= "table" or type(Drawing.new) ~= "function" then
         return nil
     end
 
+    local DrawingObj = Drawing.new(DrawType)
+    
+    if not DrawingObj then return nil end
+
     if Properties then
-        local k, v = next(Properties)
-        while k do
-            pcall(function()
-                DrawingObj[k] = v
-            end)
-            k, v = next(Properties, k)
+        for k, v in pairs(Properties) do
+            DrawingObj[k] = v
         end
     end
-    
+
     self.DrawingsList = self.DrawingsList or {}
     table_insert(self.DrawingsList, DrawingObj)
-    
+
     return DrawingObj
 end
 
@@ -215,12 +208,8 @@ function API:UpdateDrawing(DrawingObj, Properties)
     if not DrawingObj then return nil end
     
     if Properties then
-        local k, v = next(Properties)
-        while k do
-            pcall(function()
-                DrawingObj[k] = v
-            end)
-            k, v = next(Properties, k)
+        for k, v in pairs(Properties) do
+            DrawingObj[k] = v
         end
     end
     
@@ -228,28 +217,25 @@ function API:UpdateDrawing(DrawingObj, Properties)
 end
 
 function API:ShowDrawing(DrawingObj)
-    if not DrawingObj then return end
-    pcall(function()
+    if DrawingObj then
         DrawingObj.Visible = true
-    end)
+    end
 end
 
 function API:HideDrawing(DrawingObj)
-    if not DrawingObj then return end
-    pcall(function()
+    if DrawingObj then
         DrawingObj.Visible = false
-    end)
+    end
 end
 
 function API:RemoveDrawing(DrawingObj)
     if not DrawingObj then return end
-    pcall(function()
-        DrawingObj:Remove()
-    end)
+    
+    DrawingObj:Remove()
     
     if self.DrawingsList then
-        for i, obj in ipairs(self.DrawingsList) do
-            if obj == DrawingObj then
+        for i = #self.DrawingsList, 1, -1 do
+            if self.DrawingsList[i] == DrawingObj then
                 table_remove(self.DrawingsList, i)
                 break
             end
@@ -258,20 +244,18 @@ function API:RemoveDrawing(DrawingObj)
 end
 
 function API:ToggleDrawing(DrawingObj)
-    if not DrawingObj then return end
-    pcall(function()
+    if DrawingObj then
         DrawingObj.Visible = not DrawingObj.Visible
-    end)
-    return DrawingObj.Visible
+        return DrawingObj.Visible
+    end
+    return false
 end
 
 function API:ClearDrawings()
     if not self.DrawingsList then return end
     
     for _, DrawingObj in ipairs(self.DrawingsList) do
-        pcall(function()
-            DrawingObj:Remove()
-        end)
+        DrawingObj:Remove()
     end
     
     self.DrawingsList = {}
@@ -418,45 +402,41 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
         OnUpdate = OnUpdate,
         SpecifiedSystem = SpecifiedSystem,
         IsActive = true,
-        Connections = {},
         LastScreenPos = nil
     }
-    
+
     local Data = self.DrawingManager.Drawings[DrawingID]
-    
+
     if System.onRemove then
         local Removed_Connection = System.onRemove(Target, function()
             if Data.IsActive then
                 if Data.Drawing then
                     self:RemoveDrawing(Data.Drawing)
                 end
-                for _, connName in pairs(Data.Connections) do
-                    self:_Disconnect(connName)
-                end
+
+                self:_Disconnect("@Draw_Remove: " .. DrawingID, "@Draw_Render: " .. DrawingID, "@Draw_Respawn: " .. DrawingID)
                 self.DrawingManager.Drawings[DrawingID] = nil
             end
         end)
-    
-        local Drawing_Removed = "@Draw_Remove: " .. DrawingID
-        self:_Connect(Drawing_Removed, Removed_Connection)
-        table_insert(Data.Connections, Drawing_Removed)
+
+        self:_Connect("@Draw_Remove: " .. DrawingID, Removed_Connection)
     end
-    
+
     local function CreateRendered()
         local Render_Connection = RenderStepped:Connect(function()
             if not Data or not Data.IsActive then return end
-            
+
             if not Data.System.isValid(Data.Target) then
                 self:HideDrawing(Data.Drawing)
                 return
             end
-            
+
             local Position = Data.System.getPosition(Data.Target)
             if not Position then
                 self:HideDrawing(Data.Drawing)
                 return
             end
-            
+
             local screenPos, onScreen = self:WorldToScreen(Position)
             
             if onScreen and screenPos then
@@ -470,7 +450,7 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
                     Data.Drawing.From = Data.LastScreenPos
                     Data.Drawing.To = Vector2_new(screenPos.X, screenPos.Y)
                 end
-                
+
                 if OnUpdate then
                     OnUpdate(Data.Drawing, Data.Target, screenPos, onScreen)
                 end
@@ -485,32 +465,20 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
     end
     
     local CRender_Connection = CreateRendered()
-    local Draw_Rendered = "@Draw_Render: " .. DrawingID
-    self:_Connect(Draw_Rendered, CRender_Connection)
-    table_insert(Data.Connections, Draw_Rendered)
+    self:_Connect("@Draw_Render: " .. DrawingID, CRender_Connection)
     
     if System.onRespawn then
         local function onRespawn()
             if Data and Data.IsActive then
-                for i, Connection in ipairs(Data.Connections) do
-                    if Connection:match("@Draw_Render: ") then
-                        self:_Disconnect(Connection)
-                        Data.Connections[i] = nil
-                        break
-                    end
-                end
+                self:_Disconnect("@Draw_Render: " .. DrawingID)
 
                 local NRender_Connection = CreateRendered()
-                local NDraw_Rendered = "@Draw_Render: " .. DrawingID
-                self:_Connect(NDraw_Rendered, NRender_Connection)
-                table_insert(Data.Connections, NDraw_Rendered)
+                self:_Connect("@Draw_Render: " .. DrawingID, NRender_Connection)
             end
         end
         
         local OnRespawn = System.onRespawn(Target, onRespawn)
-        local Draw_Spawned = "@Draw_Respawn: " .. DrawingID
-        self:_Connect(Draw_Spawned, OnRespawn)
-        table_insert(Data.Connections, Draw_Spawned)
+        self:_Connect("@Draw_Respawn: " .. DrawingID, OnRespawn)
     end
 
     return {
@@ -521,9 +489,8 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
         Remove = function()
             if Data.IsActive then
                 Data.IsActive = false
-                for _, Connection in pairs(Data.Connections) do
-                    self:_Disconnect(Connection)
-                end
+                self:_Disconnect("@Draw_Remove: " .. DrawingID, "@Draw_Render: " .. DrawingID, "@Draw_Respawn: " .. DrawingID)
+
                 if Data.Drawing then
                     self:RemoveDrawing(Data.Drawing)
                 end
@@ -544,9 +511,8 @@ function API:ClearDrawingsV()
     for id, Data in pairs(self.DrawingManager.Drawings) do
         if Data and Data.IsActive then
             Data.IsActive = false
-            for _, Connection in pairs(Data.Connections or {}) do
-                self:_Disconnect(Connection)
-            end
+            self:_Disconnect("@Draw_Remove: " .. DrawingID, "@Draw_Render: " .. DrawingID, "@Draw_Respawn: " .. DrawingID)
+
             if Data.Drawing then
                 self:RemoveDrawing(Data.Drawing)
             end
@@ -611,16 +577,16 @@ function API:PlaySound(Id, Options)
     local Connection = Data.Instance.Ended:Connect(function()
         Data.Instance:Stop()
         Data.Instance:Destroy()
-        
+
         for Key, Value in pairs(self.Sounds) do
             if Value == Data then
                 self.Sounds[Key] = nil
                 break
             end
         end
-        
+
         self:_Disconnect(Manager)
-        
+
         if Options.OnEnded then
             Options.OnEnded(Data.Instance)
         end
@@ -914,6 +880,64 @@ function API:HasClass(Instance, Class, GetChildren)
     return false
 end
 
+function API:CreateEventBus()
+    return {
+        _Events = {}, _OnceEvents = {},
+
+        On = function(self, Name, Callback)
+            if not self._Events[Name] then
+                self._Events[Name] = {}
+            end
+            table_insert(self._Events[Name], Callback)
+        end,
+
+        Once = function(self, Name, Callback)
+            if not self._OnceEvents[Name] then
+                self._OnceEvents[Name] = {}
+            end
+            table_insert(self._OnceEvents[Name], Callback)
+        end,
+        
+        Off = function(self, Name, Callback)
+            if self._Events[Name] then
+                for i, cb in ipairs(self._Events[Name]) do
+                    if cb == Callback then
+                        table_remove(self._Events[Name], i)
+                        break
+                    end
+                end
+            end
+        end,
+        
+        Emit = function(self, Name, ...)
+            local args = {...}
+            
+            if self._Events[Name] then
+                for _, Callback in ipairs(self._Events[Name]) do
+                    task_spawn(function()
+                        Callback(unpack(args))
+                    end)
+                end
+            end
+
+            if self._OnceEvents[Name] then
+                local Get_Events = self._OnceEvents[Name]
+
+                self._OnceEvents[Name] = {}
+                for _, Callback in ipairs(Get_Events) do
+                    task_spawn(function()
+                        Callback(unpack(args))
+                    end)
+                end
+            end
+        end,
+
+        Clear = function(self)
+            self._Events, self._OnceEvents = {}, {}
+        end
+    }
+end
+
 function API:SaveData(FileName, Data)
     local Success, Encoded = pcall(function()
         return HttpService:JSONEncode(Data)
@@ -967,6 +991,137 @@ function API:ExecuteFile(FileName)
     end
 
     return false
+end
+
+function API:CreateConfig(Defaults)
+    local Config = {}
+    local Events, Current_File = self:CreateEventBus(), "Config.json"
+
+    local function Recrusive(Table, Path)
+        Path = Path or {}
+    
+        local Meta = {__index = function(t, k)
+                return rawget(t, k)
+            end,
+            __newindex = function(t, k, v)
+                local old = rawget(t, k)
+
+                local Full_Path = table_concat(Path, ".")
+                local Full_Key = Full_Path ~= "" and (Full_Path .. "." .. k) or k
+                
+                Events:Emit("_Change", Full_Key, v, old)
+                Events:Emit("_Change_" .. Full_Key, v, old)
+                
+                if Full_Path ~= "" then
+                    Events:Emit("_Change_" .. Full_Path, v, old)
+                end
+                
+                Events:Emit("_Change_Key", k, v, old, Full_Key)
+
+                rawset(t, k, v)
+
+                if typeof(v) == "table" then
+                    local New_Path = {}
+
+                    for _, p in ipairs(Path) do
+                        table_insert(New_Path, p)
+                    end
+                    table_insert(New_Path, k)
+
+                    Recrusive(v, New_Path)
+                end
+            end,
+        }
+        setmetatable(Table, Meta)
+    end
+
+    Recrusive(Config)
+    
+    for k, v in pairs(Defaults) do
+        Config[k] = v
+    end
+    
+    function Config:OnChange(Callback)
+        Events:On("_Change", Callback)
+    end
+    
+    function Config:OnceChange(Callback)
+        Events:Once("_Change", Callback)
+    end
+    
+    function Config:OnChangeKey(Key, Callback)
+        Events:On("_Change_" .. Key, Callback)
+    end
+    
+    function Config:OnChangeDirectory(Directory, Callback)
+        Events:On("_Change_" .. Directory, Callback)
+    end
+    
+    function Config:OnAnyKey(Callback)
+        Events:On("_Change_Key", Callback)
+    end
+    
+    function Config:OnReset(Callback)
+        Events:On("_Reset", Callback)
+    end
+    
+    function Config:OffChange(Callback)
+        Events:Off("_Change", Callback)
+    end
+
+    function Config:OffReset(Callback)
+        Events:Off("_Reset", Callback)
+    end
+
+    function Config:GetAll()
+        local result = {}
+        for k, v in pairs(Defaults) do
+            result[k] = self[k]
+        end
+        return result
+    end
+
+    function Config:Reset(Remove_File)
+        if Remove_File then
+            self:DeleteData(Current_File)
+        end
+
+        for k, v in pairs(Defaults) do
+            self[k] = v
+        end
+        Events:Emit("_Reset", self:GetAll())
+    end
+
+    function Config:Save(File)
+        Current_File = File or Current_File
+        return self:SaveData(Current_File, self:GetAll())
+    end
+
+    function Config:Load(File)
+        Current_File = File or Current_File
+        local Data = self:LoadData(Current_File)
+    
+        if Data then
+            for k, v in pairs(Data) do
+                if Defaults[k] ~= nil then
+                    self[k] = v
+                end
+            end
+            Events:Emit("_Change", "Loaded", Data, nil) -- > Use key == "Loaded" to detect if config was loaded.
+            return true
+        end
+        return false
+    end
+    
+    function Config:DeleteFile(File)
+        return self:DeleteData(File or Current_File)
+    end
+
+    function Config:GetCurrentFile()
+        return Current_File
+    end
+
+    return Config
 end
 
 function API:GetFileSize(Path)
@@ -8421,6 +8576,9 @@ end
 
 function API:Unload()
     warn("[@Functions.luau]: Unloaded")
+    Build_Engine, Window_Focused, Class = nil, nil, nil
+    LocalPlayer, Character, Roots, Humanoid, CurrentCamera = nil, nil, nil, nil, nil
+
     self:_Disconnect("@Engine.luau")
 
     self:Unload_LM()
@@ -8460,8 +8618,8 @@ function API:Unload()
     self:_Exit()
 
     globalEnv._IsLoadedFM = nil
-    task_wait(0.25)
 
+    task_wait(0.25)
     table_clear(global.FunctionManager_Engine)
 
     debug.setmetatable(global.FunctionManager_Engine, nil)
@@ -8540,7 +8698,7 @@ function API:Launch(Class, Options)
                 return
             end
             if API[Key] ~= nil and Key ~= "_Signal" then
-                warn(string_format("[FunctionManager]: ⚠️ '%s' is protected. Use { Overwriteable = true } to override.", Key))
+                -- warn(string_format("[FunctionManager]: ⚠️ '%s' is protected. Use { Overwriteable = true } to override.", Key))
                 return
             end
             rawset(Guardian, Key, Value)
