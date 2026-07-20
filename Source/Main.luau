@@ -8694,11 +8694,7 @@ function API:Launch(Class, Options)
         end
 
         local Protected_Metatables = { __index = API, __newindex = function(Guardian, Key, Value)
-            if Services[Key] ~= nil then
-                return
-            end
-            if API[Key] ~= nil and Key ~= "_Signal" then
-                -- warn(string_format("[FunctionManager]: ⚠️ '%s' is protected. Use { Overwriteable = true } to override.", Key))
+            if (API[Key] ~= nil and Key ~= "_Signal") or Services[Key] ~= nil then
                 return
             end
             rawset(Guardian, Key, Value)
