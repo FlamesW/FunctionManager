@@ -38,47 +38,13 @@ local write_file, read_file, is_file, make_folder, is_folder, del_folder, del_fi
 
 local globalEnv = (getgenv and getgenv() or _G) :: any;
 
---[[
-local clonefunction: (Function) -> Function = (clonefunction or copyfunction or function(func: Function)
-    return func
-end)
-
-if typeof(clonefunction) == "function" then
-    local isfolder_dummy, isfile_dummy, listfiles_dummy = clonefunction(isfolder), clonefunction(isfile), clonefunction(listfiles)
-
-    local isfolder_success, isfolder_error = pcall(function()
-        return isfolder_dummy(tostring(math_random(1000000, 9999999)))
-    end)
-
-    if isfolder_success == false or typeof(isfolder_error) ~= "boolean" then
-
-        globalEnv.isfolder = function(Folder)
-            local Success, Data = pcall(isfolder_dummy, Folder)
-            return Success and Data or false
-        end
-
-        globalEnv.isfile = function(File)
-            local Success, Data = pcall(isfile_dummy, File)
-            return Success and Data or false
-        end
-
-        globalEnv.listfiles = function(Folder)
-            local Success, Data = pcall(listfiles_dummy, Folder)
-            return Success and Data or {}
-        end
-
-		is_folder, is_file, list_files = globalEnv.isfolder, globalEnv.isfile, globalEnv.listfiles
-    end
-end
---]]
-
 -- // @API.module
 local API = {}
 API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.06", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.07", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -131,10 +97,10 @@ function API:_Connect(...): ()
 end
 
 function API:_Disconnect(...): () 
-    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; for _, Name in ipairs(Signal) do if type(Name) ~= "string" then continue end; local Objects = self._Signal and self._Signal[Name]; if not Objects then continue end; local function CleanUP(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do CleanUP(Objects[i]) end; self._Signal[Name] = nil end 
+    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; for _, Name in ipairs(Signal) do if type(Name) ~= "string" then continue end; local Objects = self._Signal and self._Signal[Name]; if not Objects then continue end; local function Disconnect(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do Disconnect(Objects[i]) end; self._Signal[Name] = nil end 
 end
 
-function API:_Exit(): ()
+function API:_ExitFM(): ()
     for Name, _ in pairs(self._Signal or {}) do self:_Disconnect(Name) end; self._Signal = nil
 end
 
@@ -258,92 +224,105 @@ function API:ClearDrawings()
         DrawingObj:Remove()
     end
     
-    self.DrawingsList = {}
+    table_clear(self.DrawingsList)
 end
 
 function API:CreateDrawingManager()
     if typeof(self.DrawingManager) ~= "table" then
-        self.DrawingManager = {Drawings = {}, AutoCleanup = true,  AutoUpdate = true,
+        self.DrawingManager = {
+            Drawings = {}, 
+            AutoCleanup = true,  
+            AutoUpdate = true,
+            Connections = {},
             System = {
                 Player = {
                     type = "Player",
                     getPosition = function(Target) 
-                        if Target.Character and Target.Character:FindFirstChild("HumanoidRootPart") then
-                            return Target.Character.HumanoidRootPart.Position
-                        end
-                        return nil
+                        return self:ResolvePosition(Target) or nil
                     end,
                     isValid = function(Target) 
                         return Target and Target.Parent ~= nil
                     end,
                     onRespawn = function(Target, Callback)
-                        return Target.CharacterAdded:Connect(Callback)
+                        local Connection = Target.CharacterAdded:Connect(Callback)
+                        self:_Connect("@Draw_Respawn_Manager", Connection)
+                        return Connection
                     end,
                     onRemove = function(Target, Callback)
-                        return Target.AncestryChanged:Connect(function()
+                        local Connection = Target.AncestryChanged:Connect(function()
                             if not Target.Parent then Callback() end
                         end)
+                        self:_Connect("@Draw_Remove_Manager", Connection)
+                        return Connection
                     end
                 },
                 Character = {
                     type = "Model",
                     getPosition = function(Target)
-                        local Roots = Target:FindFirstChild("HumanoidRootPart") or Target:FindFirstChildWhichIsA("BasePart")
-                        return Roots and Roots.Position or nil
+                        return self:ResolvePosition(Target) or nil
                     end,
                     isValid = function(Target)
                         return Target and Target.Parent ~= nil and Target:FindFirstChild("Humanoid") ~= nil
                     end,
                     onRespawn = nil,
                     onRemove = function(Target, Callback)
-                        return Target.AncestryChanged:Connect(function()
+                        local Connection = Target.AncestryChanged:Connect(function()
                             if not Target.Parent then Callback() end
                         end)
+                        self:_Connect("@Draw_Remove_Manager", Connection)
+                        return Connection
                     end
                 },
                 Part = {
                     type = "BasePart",
-                    getPosition = function(Target) return Target.Position end,
-                    isValid = function(Target) return Target and Target.Parent ~= nil end,
+                    getPosition = function(Target) 
+                        return self:ResolvePosition(Target) or nil
+                    end,
+                    isValid = function(Target) 
+                        return Target and Target.Parent ~= nil 
+                    end,
                     onRespawn = nil,
                     onRemove = function(Target, Callback)
-                        return Target.AncestryChanged:Connect(function()
+                        local Connection = Target.AncestryChanged:Connect(function()
                             if not Target.Parent then Callback() end
                         end)
+                        self:_Connect("@Draw_Remove_Manager", Connection)
+                        return Connection
                     end
                 },
                 Vector3 = {
                     type = "Vector3",
-                    getPosition = function(Target) return Target end,
-                    isValid = function(Target) return true end,
+                    getPosition = function(Target) 
+                        return self:ResolvePosition(Target) or nil
+                    end,
+                    isValid = function(Target) 
+                        return true 
+                    end,
                     onRespawn = nil,
                     onRemove = nil
                 },
                 Instance = {
                     type = "Instance",
                     getPosition = function(Target)
-                        if Target:IsA("BasePart") then return Target.Position
-                        elseif Target:IsA("Model") then
-                            local root = Target:FindFirstChild("HumanoidRootPart") or Target:FindFirstChildWhichIsA("BasePart")
-                            return root and root.Position or nil
-                        elseif Target:IsA("Player") then
-                            if Target.Character and Target.Character:FindFirstChild("HumanoidRootPart") then
-                                return Target.Character.HumanoidRootPart.Position
-                            end
-                        end
-                        return nil
+                        return self:ResolvePosition(Target) or nil
                     end,
-                    isValid = function(Target) return Target and Target.Parent ~= nil end,
+                    isValid = function(Target) 
+                        return Target and Target.Parent ~= nil 
+                    end,
                     onRespawn = function(Target, Callback)
                         if Target:IsA("Player") then
-                            return Target.CharacterAdded:Connect(Callback)
+                            local Connection = Target.CharacterAdded:Connect(Callback)
+                            self:_Connect("@Draw_Respawn_Manager", Connection)
+                            return Connection
                         end
                         return nil
                     end,
                     onRemove = function(Target, Callback)
-                        return Target.AncestryChanged:Connect(function()
+                        local Connection = Target.AncestryChanged:Connect(function()
                             if not Target.Parent then Callback() end
                         end)
+                        self:_Connect("@Draw_Remove_Manager", Connection)
+                        return Connection
                     end
                 }
             }
@@ -390,7 +369,7 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
     else
         System = self:GetDrawingSystem(Target)
     end
-    
+
     if not System then return DrawingObj end
 
     local DrawingID = self:RandomString(15)
@@ -407,6 +386,8 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
 
     local Data = self.DrawingManager.Drawings[DrawingID]
 
+    local Connections = {Remove = "@Draw_Remove: " .. DrawingID, Render = "@Draw_Render: " .. DrawingID, Respawn = "@Draw_Respawn: " .. DrawingID}
+
     if System.onRemove then
         local Removed_Connection = System.onRemove(Target, function()
             if Data.IsActive then
@@ -414,12 +395,12 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
                     self:RemoveDrawing(Data.Drawing)
                 end
 
-                self:_Disconnect("@Draw_Remove: " .. DrawingID, "@Draw_Render: " .. DrawingID, "@Draw_Respawn: " .. DrawingID)
+                self:_Disconnect(Connections.Remove, Connections.Render, Connections.Respawn)
                 self.DrawingManager.Drawings[DrawingID] = nil
             end
         end)
 
-        self:_Connect("@Draw_Remove: " .. DrawingID, Removed_Connection)
+        self:_Connect(Connections.Remove, Removed_Connection)
     end
 
     local function CreateRendered()
@@ -437,48 +418,45 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
                 return
             end
 
-            local screenPos, onScreen = self:WorldToScreen(Position)
+            local ScreenPos, OnScreen = self:WorldToScreen(Position)
             
-            if onScreen and screenPos then
+            if OnScreen and ScreenPos then
                 self:ShowDrawing(Data.Drawing)
         
                 if DrawType == "Text" then
-                    Data.Drawing.Position = Vector2_new(screenPos.X, screenPos.Y)
+                    Data.Drawing.Position = Vector2_new(ScreenPos.X, ScreenPos.Y)
                 elseif DrawType == "Circle" or DrawType == "Square" then
-                    Data.Drawing.Position = Vector2_new(screenPos.X, screenPos.Y)
+                    Data.Drawing.Position = Vector2_new(ScreenPos.X, ScreenPos.Y)
                 elseif DrawType == "Line" and Data.LastScreenPos then
                     Data.Drawing.From = Data.LastScreenPos
-                    Data.Drawing.To = Vector2_new(screenPos.X, screenPos.Y)
+                    Data.Drawing.To = Vector2_new(ScreenPos.X, ScreenPos.Y)
                 end
 
                 if OnUpdate then
-                    OnUpdate(Data.Drawing, Data.Target, screenPos, onScreen)
+                    OnUpdate(Data.Drawing, Data.Target, ScreenPos, OnScreen)
                 end
                 
-                Data.LastScreenPos = Vector2_new(screenPos.X, screenPos.Y)
+                Data.LastScreenPos = Vector2_new(ScreenPos.X, ScreenPos.Y)
             else
                 self:HideDrawing(Data.Drawing)
             end
         end)
-        
+
         return Render_Connection
     end
     
-    local CRender_Connection = CreateRendered()
-    self:_Connect("@Draw_Render: " .. DrawingID, CRender_Connection)
+    self:_Connect(Connections.Render, CreateRendered())
     
     if System.onRespawn then
-        local function onRespawn()
+        local function On_Respawn()
             if Data and Data.IsActive then
-                self:_Disconnect("@Draw_Render: " .. DrawingID)
+                self:_Disconnect(Connections.Render)
 
-                local NRender_Connection = CreateRendered()
-                self:_Connect("@Draw_Render: " .. DrawingID, NRender_Connection)
+                self:_Connect(Connections.Render, CreateRendered())
             end
         end
-        
-        local OnRespawn = System.onRespawn(Target, onRespawn)
-        self:_Connect("@Draw_Respawn: " .. DrawingID, OnRespawn)
+
+        self:_Connect(Connections.Respawn, System.onRespawn(Target, On_Respawn))
     end
 
     return {
@@ -489,7 +467,7 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
         Remove = function()
             if Data.IsActive then
                 Data.IsActive = false
-                self:_Disconnect("@Draw_Remove: " .. DrawingID, "@Draw_Render: " .. DrawingID, "@Draw_Respawn: " .. DrawingID)
+                self:_Disconnect(Connections.Remove, Connections.Render, Connections.Respawn)
 
                 if Data.Drawing then
                     self:RemoveDrawing(Data.Drawing)
@@ -508,10 +486,10 @@ end
 function API:ClearDrawingsV()
     if not self.DrawingManager then return end
 
-    for id, Data in pairs(self.DrawingManager.Drawings) do
+    for Instance, Data in pairs(self.DrawingManager.Drawings) do
         if Data and Data.IsActive then
             Data.IsActive = false
-            self:_Disconnect("@Draw_Remove: " .. DrawingID, "@Draw_Render: " .. DrawingID, "@Draw_Respawn: " .. DrawingID)
+            self:_Disconnect("@Draw_Remove: " .. Instance, "@Draw_Render: " .. Instance, "@Draw_Respawn: " .. Instance, "@Draw_Remove_Manager", "@Draw_Respawn_Manager")
 
             if Data.Drawing then
                 self:RemoveDrawing(Data.Drawing)
@@ -519,7 +497,7 @@ function API:ClearDrawingsV()
         end
     end
 
-    self.DrawingManager.Drawings = {}
+    table_clear(self.DrawingManager.Drawings)
 end
 
 function API:PlaySound(Id, Options)
@@ -741,8 +719,8 @@ function API:ClearSounds()
             end)
         end
     end
-    
-    self.Sounds = nil
+
+    table_clear(self.Sounds)
 end
 
 function API:LoadCustomAsset(Asset, Url)
@@ -767,19 +745,21 @@ end
 
 function API:GetAssetInfo(Id)
     self.AssetCache = self.AssetCache or {}
-    local Cached = self.AssetCache[Id]
-    if Cached then return Cached end
-    
+
+    if self.AssetCache[Id] then 
+        return self.AssetCache[Id] 
+    end
+
     local Success, Info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, Id)
     if not Success or not Info then return nil end
     
-    local AssetTypes = {
-        [1]="Image",[2]="TShirt",[3]="Audio",[4]="Mesh",[5]="Lua",
-        [8]="Hat",[9]="Place",[10]="Model",[11]="Shirt",[12]="Pants",
-        [13]="Decal",[17]="Head",[18]="Face",[19]="Gear",[21]="Badge",
-        [24]="Animation",[27]="Torso",[28]="RightArm",[29]="LeftArm",
-        [30]="LeftLeg",[31]="RightLeg",[32]="Package",[34]="GamePass",
-        [38]="Plugin",[41]="MeshPart",[42]="Video",[43]="Tool"
+    local Asset_Types = {
+        [1] = "Image", [2] = "TShirt", [3] = "Audio", [4] = "Mesh", [5] = "Lua",
+        [8] = "Hat", [9] = "Place",[10] = "Model", [11] = "Shirt", [12] = "Pants",
+        [13] = "Decal", [17] = "Head",[18] = "Face", [19] = "Gear", [21] = "Badge",
+        [24] = "Animation", [27] = "Torso", [28] = "RightArm", [29] = "LeftArm",
+        [30] = "LeftLeg", [31] = "RightLeg", [32] = "Package", [34] = "GamePass",
+        [38] = "Plugin",[41] = "MeshPart",[42] = "Video",[43] = "Tool"
     }
     
     local Result = {
@@ -788,7 +768,7 @@ function API:GetAssetInfo(Id)
         Creator = Info.Creator and Info.Creator.Name,
         CreatorId = Info.Creator and Info.Creator.Id,
         TypeId = Info.AssetTypeId,
-        TypeName = AssetTypes[Info.AssetTypeId] or "Unknown",
+        TypeName = Asset_Types[Info.AssetTypeId] or "Unknown",
         Description = Info.Description,
         Created = Info.Created,
         Updated = Info.Updated,
@@ -808,6 +788,7 @@ end
 
 function API:GetDescendants(Instance, Class, Limit)
     local Descendants = Instance:GetDescendants()
+
     local Total = #Descendants
     Limit = Limit or Total
     
@@ -938,35 +919,73 @@ function API:CreateEventBus()
     }
 end
 
+function API:Hotpath(Path)
+    if not Path or Path == "" then return "" end
+    Path = Path:gsub("\\", "/")
+    Path = Path:gsub("//+", "/")
+    Path = Path:gsub("/$", "")
+    return Path
+end
+
 function API:SaveData(FileName, Data)
+    FileName = self:Hotpath(FileName)
+
+    if FileName == "" then return false end
+    
+    local Directory = FileName:match("(.+)/")
+    if Directory and Directory ~= "" then
+        local Created = self:CreateDirectory(Directory)
+        if not Created then
+            return false
+        end
+    end
+
     local Success, Encoded = pcall(function()
         return HttpService:JSONEncode(Data)
     end)
-    if not Success then return false end
+    if not Success then 
+        return false 
+    end
 
     local Success, Err = pcall(function()
         write_file(FileName, Encoded)
     end)
+    
     return Success
 end
 
 function API:LoadData(FileName)
-    if not is_file(FileName) then return nil end
+    FileName = self:Hotpath(FileName)
+
+    if FileName == "" then return nil end
     
+    if not is_file(FileName) then 
+        return nil 
+    end
+
     local Success, Content = pcall(function()
         return read_file(FileName)
     end)
-    if not Success then return nil end
+    if not Success then 
+        return nil 
+    end
     
     local Success, Decoded = pcall(function()
         return HttpService:JSONDecode(Content)
     end)
+
     return Success and Decoded or nil
 end
 
 function API:DeleteData(FileName)
-    if is_file(FileName) then
-        pcall(function() del_file(FileName) end)
+    FileName = self:Hotpath(FileName)
+
+    if not is_file(FileName) then
+        return false
+    end
+    
+    if del_file then
+        del_file(FileName)
         return true
     end
     return false
@@ -991,6 +1010,113 @@ function API:ExecuteFile(FileName)
     end
 
     return false
+end
+
+function API:GetFileSize(Path)
+    if not is_file(Path) then return nil end
+    local Data = read_file(Path)
+    return #Data
+end
+
+function API:CreateDirectory(Path)
+    Path = self:Hotpath(Path)
+
+    if Path == "" then return false end
+    
+    if is_folder(Path) then
+        return true
+    end
+
+    local function Recursive(Find)
+        Find = self:Hotpath(Find)
+        if Find == "" or is_folder(Find) then
+            return
+        end
+
+        local Parent = Find:match("(.*)/")
+        if Parent and Parent ~= "" then
+            Recursive(Parent)
+        end
+
+        make_folder(Find)
+    end
+    
+    Recursive(Path)
+    return true
+end
+
+function API:DeleteDirectory(Path, Recursive)
+    Path = self:Hotpath(Path)
+
+    if not is_folder(Path) then
+        return false
+    end
+    
+    if Recursive then
+        local contents = self:GetDirectoryContents(Path, true)
+        
+        for i = #contents, 1, -1 do
+            local item = contents[i]
+            if item.Type == "Folder" then
+                if is_folder(item.Path) then
+                    del_folder(item.Path)
+                end
+            else
+                if del_file then
+                    del_file(item.Path)
+                end
+            end
+        end
+    end
+
+    del_folder(Path)
+    return true
+end
+
+function API:GetDirectoryContents(Path, Recursive)
+    Path = self:Hotpath(Path)
+
+    if not is_folder(Path) then 
+        return {} 
+    end
+
+    local Contents = {}
+    local Files = list_files(Path)
+    
+    for _, Item in ipairs(Files) do
+        if Item:find("/$") then
+            table_insert(Contents, {
+                Name = Item:gsub("/$", ""),
+                Type = "Folder",
+                Path = Path .. Item
+            })
+
+            if Recursive then
+                local SubContents = self:GetDirectoryContents(Path .. Item, true)
+                for _, SubItem in ipairs(SubContents) do
+                    table_insert(Contents, SubItem)
+                end
+            end
+        else
+            table_insert(Contents, {
+                Name = Item,
+                Type = "File",
+                Path = Path .. Item
+            })
+        end
+    end
+    
+    return Contents
+end
+
+function API:FileExists(FileName)
+    FileName = self:Hotpath(FileName)
+    return is_file(FileName) or false
+end
+
+function API:FolderExists(Path)
+    Path = self:Hotpath(Path)
+    return is_folder(Path) or false
 end
 
 function API:CreateConfig(Defaults)
@@ -1074,11 +1200,11 @@ function API:CreateConfig(Defaults)
     end
 
     function Config:GetAll()
-        local result = {}
+        local Result = {}
         for k, v in pairs(Defaults) do
-            result[k] = self[k]
+            Result[k] = self[k]
         end
-        return result
+        return Result
     end
 
     function Config:Reset(Remove_File)
@@ -1107,7 +1233,7 @@ function API:CreateConfig(Defaults)
                     self[k] = v
                 end
             end
-            Events:Emit("_Change", "Loaded", Data, nil) -- > Use key == "Loaded" to detect if config was loaded.
+            Events:Emit("_Change", "Loaded", Data, nil) -- > @Use key == "Loaded" to detect if config was loaded.
             return true
         end
         return false
@@ -1122,92 +1248,6 @@ function API:CreateConfig(Defaults)
     end
 
     return Config
-end
-
-function API:GetFileSize(Path)
-    if not is_file(Path) then return nil end
-    local Data = read_file(Path)
-    return #Data
-end
-
-function API:CreateDirectory(Path)
-    if is_folder(Path) then
-        return false
-    end
-
-    local function Recursive(Find)
-        if Find == "" or is_folder(Find) then
-            return
-        end
-
-        local Parent = Find:match("(.*)/")
-        if Parent and Parent ~= "" then
-            Recursive(Parent)
-        end
-
-        make_folder(Find)
-    end
-    
-    Recursive(Find)
-    return true
-end
-
-function API:DeleteDirectory(Path, Recursive)
-    if not is_folder(Path) then
-        return false
-    end
-    
-    if Recursive then
-        local contents = self:GetDirectoryContents(Path, true)
-        
-        for i = #contents, 1, -1 do
-            local item = contents[i]
-            if item.Type == "Folder" then
-                if is_folder(item.Path) then
-                    del_folder(item.Path)
-                end
-            else
-                if delete_file then
-                    delete_file(item.Path)
-                end
-            end
-        end
-    end
-    
-    del_folder(Path)
-    return true
-end
-
-function API:GetDirectoryContents(Path, Recursive)
-    if not is_folder(Path) then return {} end
-
-    local Contents = {}
-    local Files = list_files(Path)
-    
-    for _, Item in ipairs(Files) do
-        if Item:find("/$") then
-            table_insert(Contents, {
-                Name = Item:gsub("/$", ""),
-                Type = "Folder",
-                Path = Path .. Item
-            })
-            
-            if Recursive then
-                local SubContents = self:GetDirectoryContents(Path .. Item, true)
-                for _, SubItem in ipairs(SubContents) do
-                    table_insert(Contents, SubItem)
-                end
-            end
-        else
-            table_insert(Contents, {
-                Name = Item,
-                Type = "File",
-                Path = Path .. Item
-            })
-        end
-    end
-    
-    return Contents
 end
 
 function API:GetDevice()
@@ -1233,43 +1273,59 @@ function API:ToPlace(Place)
     TeleportService:Teleport(Place)
 end
 
-function API:Time()
-    return os_date("%H:%M:%S")
+function API:Time(Format, Offset)
+    Format = Format or "%H:%M:%S"
+    local Current_Time = os_time()
+    
+    if Offset then
+        local Utc = os_time(os_date("!*t", Current_Time))
+        Current_Time = Utc + (Offset * 3600)
+        return os_date("!" .. Format, Current_Time)
+    end
+    
+    return os_date(Format, Current_Time)
 end
 
-function API:Date()
-    return os_date("%Y/%m/%d")
+function API:Date(Format, Offset)
+    Format = Format or "%Y/%m/%d"
+    local Current_Time = os_time()
+    
+    if Offset then
+        local Utc = os_time(os_date("!*t", Current_Time))
+        Current_Time = Utc + (Offset * 3600)
+        return os_date("!" .. Format, Current_Time)
+    end
+    
+    return os_date(Format, Current_Time)
 end
 
-function API:GetPing()
+function API:GetPing(Format)
     local Ping = Performance.Network.ServerStatsItem["Data Ping"]:GetValue()
-    return tonumber(string_format("%.2f", Ping))
+    Format = Format or "%.2f"
+    return tonumber(string_format(Format, Ping))
 end
 
-function API:GetFps()
-    if not self.FpsCounter then
-        local Frames = tick()
-        self.CurrentFPS = 0
+function API:GetFps(Format)
+    Format = Format or "%.1f"
 
-        self.FpsCounter = RenderStepped:Connect(function()
-            local Now = tick()
-            local Delta = Now - Frames
+    if not self.Fps_Counter then
+        self.Current_Fps = 0
+
+        self.Fps_Counter = RenderStepped:Connect(function(Delta)
             if Delta > 0 then
-                self.CurrentFPS = 1 / Delta
+                self.Current_Fps = 1 / Delta
             end
-            Frames = Now
         end)
 
-        self:_Connect("@Fps", self.FpsCounter)
+        self:_Connect("@Statistics_Fps", self.Fps_Counter)
     end
 
-    return tonumber(string_format("%.1f", self.CurrentFPS or 0))
+    return string_format(Format, self.Current_Fps or 0)
 end
 
 function API:StopFps()
-    self:_Disconnect("@Fps")
-    self.FpsCounter = nil
-    self.CurrentFPS = 0
+    self:_Disconnect("@Statistics_Fps")
+    self.Fps_Counter, self.Current_Fps = nil,0
 end
 
 function API:QueueOnTeleport(Flag, State, Script, Callbacks)
@@ -1315,7 +1371,7 @@ function API:QueueOnTeleport(Flag, State, Script, Callbacks)
                 end
             end
         end)
-        self:_Connect("@TeleportQueue", self.TeleportListener)
+        self:_Connect("@Teleport_Queue", self.TeleportListener)
     end
 
     local Call = self.QueueCallbacks and self.QueueCallbacks[Flag]
@@ -1330,7 +1386,8 @@ function API:SetQueue(Flag, State)
     self.Teleport_Queues = self.Teleport_Queues or {}
 
     if Flag == false and State == nil then
-        self:_Disconnect("@TeleportQueue")
+        self:_Disconnect("@Teleport_Queue")
+        table_clear(self.Teleport_Queues)
         return
     end
 
@@ -1353,23 +1410,19 @@ function API:LoadFile(Url)
     return Success and Result or nil
 end
 
-function API:GetWebSocket()
-    return (pcall(function() return WebSocket end) and WebSocket) or nil
-end
-
 function API:ConnectSocket(Url)
-    local WebSocketLib = self:GetWebSocket()
-    
-    if not WebSocketLib then
-        return false, "WebSocket not available"
+    local SocketBoy = WebSocket
+
+    if not SocketBoy then
+        return false
     end
-    
+
     if self.Websocket and self.Websocket.Connected then
-        return true, "Already connected"
+        return true
     end
     
     local Success, Connection = pcall(function()
-        return WebSocketLib.connect(Url)
+        return SocketBoy.connect(Url)
     end)
     
     if Success and Connection then
@@ -1407,10 +1460,10 @@ function API:ConnectSocket(Url)
             end))
         end
         
-        return true, "Connected"
+        return true
     end
 
-    return false, "Connection failed: " .. tostring(Success)
+    return false
 end
 
 function API:OnSocketMessage(Callback)
@@ -1425,36 +1478,12 @@ end
 
 function API:SendSocket(Message)
     if not self.Websocket or not self.Websocket.Connection or not self.Websocket.Connected then
-        return false, "Not connected"
+        return false
     end
     
-    local Success, Err = pcall(function()
+    return pcall(function()
         self.Websocket.Connection:Send(Message)
     end)
-    
-    if Success then
-        return true, "Message sent"
-    else
-        return false, "Send failed: " .. tostring(Err)
-    end
-end
-
-function API:DisconnectSocket()
-    if not self.Websocket or not self.Websocket.Connection then
-        return false, "Not connected"
-    end
-
-    local Success, Err = pcall(function()
-        self.Websocket.Connection:Close()
-        self.Websocket.Connected = false
-        self.Websocket = nil
-    end)
-    
-    if Success then
-        return true, "Disconnected"
-    else
-        return false, "Disconnect failed: " .. tostring(Err)
-    end
 end
 
 function API:IsSocketConnected()
@@ -1478,17 +1507,16 @@ end
 function API:ClearWebSockets()
     if not self.Websocket then return end
 
-    self:_Disconnect("@WebSocket_Message")
-    self:_Disconnect("@WebSocket_Close")
-    self:_Disconnect("@WebSocket_Error")
+    self:_Disconnect("@WebSocket_Message", "@WebSocket_Close", "@WebSocket_Error")
 
-    if self.Websocket.Connection then
-        pcall(function()
-            self.Websocket.Connection:Close()
-        end)
-    end
+    local Success = pcall(function()
+        self.Websocket.Connection:Close()
+    end)
 
-    self.Websocket = nil
+    self.Websocket.Connected = false
+    table_clear(self.Websocket)
+
+    return Success
 end
 
 function API:ToColor3(Color)
@@ -1578,12 +1606,14 @@ end
 
 function API:Rainbowify(Speed)
     Speed = Speed or 1
+
     local Time = tick() * Speed
     return Color3_fromHSV(Time % 1, 1, 1)
 end
 
 function API:LightenColor(Color, Amount)
     Amount = Amount or 0.15
+
     local Color3 = self:ToColor3(Color)
     local H, S, V = Color3:ToHSV()
     V = math_clamp(V + Amount, 0, 1)
@@ -1592,6 +1622,7 @@ end
 
 function API:DarkenColor(Color, Amount)
     Amount = Amount or 0.15
+
     local Color3 = self:ToColor3(Color)
     local H, S, V = Color3:ToHSV()
     V = math_clamp(V - Amount, 0, 1)
@@ -1616,14 +1647,14 @@ end
 function API:RandomString(Length)
     Length = Length or 15
     local Characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    local t = table_create(Length)
-    
+    local Testicles = table_create(Length)
+
     for i = 1, Length do
         local RandomIndex = math_random(1, #Characters)
-        t[i] = string_sub(Characters, RandomIndex, RandomIndex)
+        Testicles[i] = string_sub(Characters, RandomIndex, RandomIndex)
     end
-    
-    return table_concat(t)
+
+    return table_concat(Testicles)
 end
 
 function API:SpeedTest(Func, Iterations, ...)
@@ -1641,10 +1672,9 @@ function API:SpeedTest(Func, Iterations, ...)
         Average = TotalMs / Iterations,
         Iterations = Iterations
     }
-    
-    print(string_format("[SpeedTest] %d iterations: %.2f ms total (avg: %.3f ms)", 
-        Iterations, TotalMs, Result.Average))
-    
+
+    print(string_format("[SpeedTest]: %d iterations: %.2f ms total (avg: %.3f ms)", Iterations, TotalMs, Result.Average))
+
     return Result
 end
 
@@ -1676,7 +1706,7 @@ function API:Version()
     return Project;
 end
 
-function API:LogCommit(Repo, Branch, Version) -- // Github Only
+function API:LogCommit(Repo, Branch, Version)
     local Owner, RepoName
 
     local Matches = {Repo:match("github%.com/([^/]+)/([^/]+)")}
@@ -1711,25 +1741,25 @@ function API:LogCommit(Repo, Branch, Version) -- // Github Only
         local Entry = Response:match("<entry>(.-)</entry>", StartPoint)
         if not Entry then break end
 
-        local author = StripString(Entry:match("<name>(.-)</name>"))
-        local message = StripString(Entry:match("<title>(.-)</title>"))
-        local updated = Entry:match("<updated>(.-)</updated>")
-        local fullSha = StripString(Entry:match("<id>.-[Cc]ommit/(.-)</id>"))
-        local sha = fullSha and fullSha:sub(1, 7) or "Unknown"
+        local Author = StripString(Entry:match("<name>(.-)</name>"))
+        local Message = StripString(Entry:match("<title>(.-)</title>"))
+        local Updated = Entry:match("<updated>(.-)</updated>")
+        local FullSha = StripString(Entry:match("<id>.-[Cc]ommit/(.-)</id>"))
+        local Sha = FullSha and FullSha:sub(1, 7) or "Unknown"
 
-        if updated and fullSha then
-            local commitTime = DateTime.fromIsoDate(updated)
+        if Updated and FullSha then
+            local commitTime = DateTime.fromIsoDate(Updated)
             local now = DateTime.now()
             local timeAgo = self:HowLong(now.UnixTimestamp - commitTime.UnixTimestamp)
 
             table_insert(Commits, {
-                Author = author,
-                Message = message,
-                Sha = sha,
-                FullSha = fullSha,
+                Author = Author,
+                Message = Message,
+                Sha = Sha,
+                FullSha = FullSha,
                 TimeAgo = timeAgo,
                 Timestamp = commitTime,
-                RawDate = updated,
+                RawDate = Updated,
                 Version = #Commits + 1
             })
         end
@@ -1768,7 +1798,7 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
         local Success, Remote = pcall(function()
             return Game:HttpGet(RemoteUrl .. "?v=" .. os_time())
         end)
-        if not Success then return warn("Failed: " .. RemoteUrl) end
+        if not Success then return warn("[Update Tracker]: Failed: " .. RemoteUrl) end
         
         local StoredContent = Remote
         local Truncated = false
@@ -1866,8 +1896,75 @@ function API:FindCore(Name)
         or (CoreGui.RobloxGui and CoreGui.RobloxGui:FindFirstChild(Name, true))
 end
 
-function API:GetTitles()
-    return {
+function API:LoadDictionaries()
+    local Words_Data = self:LoadData("@EnglishDictionary/Words.json")
+    if Words_Data then
+        self.English_Dictionary = Words_Data
+    else
+        local Success, Data = pcall(function()
+            return Game:HttpGet("https://raw.githubusercontent.com/words/an-array-of-english-words/master/index.json")
+        end)
+
+        if Success and Data then
+            local Decoded = HttpService:JSONDecode(Data)
+            self.English_Dictionary = {}
+            for _, Word in ipairs(Decoded) do
+                self.English_Dictionary[Word:lower()] = true
+            end
+            self:SaveData("@EnglishDictionary/Words.json", self.English_Dictionary)
+        else
+            self.English_Dictionary = {}
+        end
+    end
+
+    local Names_Data = self:LoadData("@EnglishDictionary/Names.json")
+    if Names_Data then
+        self.Names_Dictionary = Names_Data
+    else
+        local Success, Data = pcall(function()
+            return Game:HttpGet("https://raw.githubusercontent.com/smashew/NameDatabases/master/NamesDatabases/first%20names/all.txt")
+        end)
+
+        if Success and Data then
+            self.Names_Dictionary = {}
+            for Name in Data:gmatch("[^\r\n]+") do
+                if Name ~= "" then
+                    self.Names_Dictionary[Name:lower()] = true
+                end
+            end
+            self:SaveData("@EnglishDictionary/Names.json", self.Names_Dictionary)
+        else
+            self.Names_Dictionary = {}
+        end
+    end
+
+    return (self.English_Dictionary and self.Names_Dictionary)
+end
+
+function API:IsDictionary(Word)
+    if not Word or Word == "" then return false end
+    Word = Word:lower()
+
+    if not self.English_Dictionary or not self.Names_Dictionary then
+        self:LoadDictionaries()
+    end
+
+    return (self.English_Dictionary[Word] == true) or (self.Names_Dictionary[Word] == true)
+end
+
+function API:AutoCorrect(String)
+    if not String or String == "" then return "" end
+
+    local SplitWords = {}
+    for Word in String:gmatch("%S+") do
+        local CleanWord = Word:gsub("[%p]+$", "")
+        local TrailingPunctuation = Word:match("[%p]+$") or ""
+        table_insert(SplitWords, {word = CleanWord, punct = TrailingPunctuation, original = Word})
+    end
+
+    local ProcessedWords, NextWordCapitalized = {}, true
+
+    local Titles = {
         "mr", "mrs", "ms", "miss", "mx", "dr", "doc", "doctor", "prof", "professor",
         "phd", "md", "dds", "dvm", "jd", "esq", "attorney", "lawyer", "judge",
         "justice", "chief", "head", "dean", "principal", "superintendent", "director",
@@ -1921,129 +2018,75 @@ function API:GetTitles()
         "coach", "trainer", "instructor", "guide", "mentor", "tutor", "advisor",
         "assistant", "aide", "deputy", "vice", "acting", "interim", "temporary",
         "honorary", "emeritus", "retired", "former", "late", "young", "little",
-        "gentleman", "lady", "young lady", "young man", "ma'am"
+        "gentleman", "lady", "young lady", "young man", "ma'am", "mommy"
     }
-end
 
-function API:LoadEnglishDictionary()
-    local Data = self:LoadData("@EnglishDictionary.json")
-    if Data then
-        self.English_Dictionary = Data
-        return true
-    end
-
-    local Dictionary = "https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json"
-
-    local Success, Data = pcall(function()
-        return Game:HttpGet(Dictionary)
-    end)
-
-    if Success and Data then
-        local Decoded = HttpService:JSONDecode(Data)
-        self.English_Dictionary = {}
-        
-        for Word, _ in pairs(Decoded) do
-            self.English_Dictionary[Word:lower()] = true
-        end
-
-        self:SaveData("@EnglishDictionary.json", self.English_Dictionary)
-        return true
-    end
-    
-    return false
-end
-
-function API:IsDictionary(Word)
-    if not Word or Word == "" then return false end
-    Word = Word:lower()
-    
-    if not self.English_Dictionary then
-        self:LoadEnglishDictionary()
-    end
-    
-    return self.English_Dictionary[Word] == true
-end
-
-function API:AutoCorrect(String)
-    if not String or String == "" then return "" end
-    
-    local SplitWords = {}
-    for Word in String:gmatch("%S+") do
-        local CleanWord = Word:gsub("[%p]+$", "")
-        local TrailingPunctuation = Word:match("[%p]+$") or ""
-        table_insert(SplitWords, {word = CleanWord, punct = TrailingPunctuation, original = Word})
-    end
-
-    local ProcessedWords = {}
-    local NextWordCapitalized = true
-    local TitleList = self:GetTitles() 
-    
     for Index, CurrentWord in ipairs(SplitWords) do
         local BaseWord = CurrentWord.word
-        local LowerBaseWord = BaseWord:lower()
-        local NeedsCapital = false
-        
+        local LowerBaseWord, NeedsCapital = BaseWord:lower(), false
+        local PreviousWord = Index > 1 and SplitWords[Index-1].word or ""
+        local PreviousLower = PreviousWord:lower()
+
         if Index == 1 then
             NeedsCapital = true
         elseif NextWordCapitalized then
             NeedsCapital = true
-        elseif LowerBaseWord == "i" then
+        end
+
+        if LowerBaseWord == "i" then
             NeedsCapital = true
         end
-        
-        local IsTitleWord = false
-        for _, TitleName in ipairs(TitleList) do
-            if LowerBaseWord == TitleName then
-                IsTitleWord = true
-                NeedsCapital = true
-                break
-            end
-        end
-        
+
         if Index > 1 and not NeedsCapital then
-            local PreviousLower = SplitWords[Index-1].word:lower()
-            for _, TitleName in ipairs(TitleList) do
+            for _, TitleName in ipairs(Titles) do
                 if PreviousLower == TitleName then
                     NeedsCapital = true
                     break
                 end
             end
         end
-        
-        local IsAllCapsSlang = self:IsDictionary(BaseWord) and BaseWord == BaseWord:upper()
-        
-        if IsAllCapsSlang then
-            BaseWord = BaseWord:upper()
-            NextWordCapitalized = false
-        elseif NeedsCapital then
-            BaseWord = BaseWord:sub(1, 1):upper() .. BaseWord:sub(2):lower()
-            NextWordCapitalized = false
-        else
-            if not self:IsDictionary(BaseWord) and #BaseWord > 2 then
-                BaseWord = BaseWord:sub(1, 1):upper() .. BaseWord:sub(2):lower()
-            else
-                BaseWord = BaseWord:lower()
+
+        local IsTitleWord = false
+        for _, TitleName in ipairs(Titles) do
+            if LowerBaseWord == TitleName then
+                IsTitleWord = true
+                NeedsCapital = true
+                break
             end
         end
-    
+
+        local IsCommonWord = self.English_Dictionary and self.English_Dictionary[LowerBaseWord] == true
+
+        local IsName = false
+        if not IsCommonWord then
+            IsName = self:IsDictionary(BaseWord) and self.Names_Dictionary[LowerBaseWord] == true
+        end
+
+        if IsTitleWord or NeedsCapital then
+            BaseWord = BaseWord:sub(1, 1):upper() .. BaseWord:sub(2):lower()
+        elseif IsName then
+            BaseWord = BaseWord:sub(1, 1):upper() .. BaseWord:sub(2):lower()
+        else
+            BaseWord = BaseWord:lower()
+        end
+
         table_insert(ProcessedWords, BaseWord .. CurrentWord.punct)
-        
+
         if CurrentWord.punct:match("[.!?]") then
             NextWordCapitalized = true
         else
             NextWordCapitalized = false
         end
     end
-    
+
     local FinalText = table_concat(ProcessedWords, " ")
-    
     FinalText = FinalText:gsub("%s+([%.,%?%!;:])", "%1")
     FinalText = FinalText:gsub("([%.,%?%!;:])(%w)", "%1 %2")
-    
+
     if not FinalText:match("[%p]$") and FinalText:match("%w$") then
         FinalText = FinalText .. "."
     end
-    
+
     return FinalText
 end
 
@@ -2072,7 +2115,7 @@ end
 
 function API:Nerdify(Text)
     if not Text or Text == "" then return "Erm, actually... ☝️🤓" end
-    
+
     local Corrected = self:AutoCorrect(Text)
     
     Corrected = Corrected:gsub("%.$", "")
@@ -2262,37 +2305,32 @@ function API:ResolvePosition(...)
     if numArgs >= 3 and typeof(args[1]) == "number" and typeof(args[2]) == "number" and typeof(args[3]) == "number" then
         return Vector3_new(args[1], args[2], args[3])
     end
-    
+
     if numArgs >= 2 and typeof(args[1]) == "number" and typeof(args[2]) == "number" then
         return Vector3_new(args[1], args[2], numArgs >= 3 and args[3] or 0)
     end
-    
+
     local arg = args[1]
     
-    local function safePCall(func, ...)
-        local success, result = pcall(func, ...)
-        return success and result or nil
-    end
-    
-    local function extractNumbers(str)
-        local numbers = {}
-        for num in string_gmatch(str, "(-?%d+%.?%d*)") do
-            table_insert(numbers, tonumber(num))
+    local function ExtractNumbers(String)
+        local Numbers = {}
+        for Number in string_gmatch(String, "(-?%d+%.?%d*)") do
+            table_insert(Numbers, tonumber(Number))
         end
-        return numbers
+        return Numbers
     end
-    
-    local function toVector3(x, y, z)
+
+    local function ConvertV3(x, y, z)
         if typeof(x) == "number" and typeof(y) == "number" then
             return Vector3_new(x, y, z or 0)
         end
         return nil
     end
-    
+
     if arg == nil then
         return nil
     end
-    
+
     local argType = typeof(arg)
     
     if argType == "Vector3" then
@@ -2307,127 +2345,118 @@ function API:ResolvePosition(...)
         return Vector3_new(arg, 0, 0)
     end
     
-    if typeof(arg) == "boolean" then
-        if arg then
-            return Vector3_new(0, 0, 0)
-        end
-        return nil
-    end
-    
     if argType == "Instance" then
-        local function getPositionFromInstance(instance)
-            if not instance then return nil end
+        local function GetPosition(Instance)
+            if not Instance then return nil end
         
-            if instance:IsA("BasePart") then
-                return instance.Position
+            if Instance:IsA("BasePart") then
+                return Instance.Position
+            end
+
+            if Instance:IsA("BackpackItem") or Instance:IsA("Tool") then
+                local Handle = Instance:FindFirstChild("Handle")
+                if Handle and Handle:IsA("BasePart") then
+                    return Handle.Position
+                end
+                local BasePart = Instance:FindFirstChildWhichIsA("BasePart")
+                if BasePart then
+                    return BasePart.Position
+                end
+                local Pivot = pcall(Instance.GetPivot, Instance)
+                if Pivot then return Pivot.Position end
             end
             
-            if instance:IsA("BackpackItem") or instance:IsA("Tool") then
-                local handle = instance:FindFirstChild("Handle")
-                if handle and handle:IsA("BasePart") then
-                    return handle.Position
+            if Instance:IsA("Model") then
+                if Instance.PrimaryPart and Instance.PrimaryPart:IsA("BasePart") then
+                    return Instance.PrimaryPart.Position
                 end
-                local anyPart = instance:FindFirstChildWhichIsA("BasePart")
-                if anyPart then
-                    return anyPart.Position
-                end
-                local pivot = safePCall(function() return instance:GetPivot() end)
-                if pivot then return pivot.Position end
-            end
-            
-            if instance:IsA("Model") then
-                if instance.PrimaryPart and instance.PrimaryPart:IsA("BasePart") then
-                    return instance.PrimaryPart.Position
-                end
-                local rootPart = instance:FindFirstChild("HumanoidRootPart")
-                if rootPart and rootPart:IsA("BasePart") then
-                    return rootPart.Position
-                end
-            end
-            
-            if instance:IsA("Player") and instance.Character then
-                local root = instance.Character:FindFirstChild("HumanoidRootPart")
-                if root then
-                    return root.Position
-                end
-                local pivot = safePCall(function() return instance.Character:GetPivot() end)
-                if pivot then return pivot.Position end
-            end
-            
-            if instance:IsA("Humanoid") and instance.Parent then
-                local root = instance.Parent:FindFirstChild("HumanoidRootPart")
-                if root then
-                    return root.Position
-                end
-                local pivot = safePCall(function() return instance.Parent:GetPivot() end)
-                if pivot then return pivot.Position end
-            end
-            
-            if instance.GetPivot then
-                local pivot = safePCall(function() return instance:GetPivot() end)
-                if pivot and typeof(pivot) == "CFrame" then
-                    return pivot.Position
+                local Roots = Instance:FindFirstChild("HumanoidRootPart")
+                if Roots and Roots:IsA("BasePart") then
+                    return Roots.Position
                 end
             end
             
-            local anyPart = instance:FindFirstChildWhichIsA("BasePart")
-            if anyPart then
-                return anyPart.Position
+            if Instance:IsA("Player") and Instance.Character then
+                local Roots = Instance.Character:FindFirstChild("HumanoidRootPart")
+                if Roots then
+                    return Roots.Position
+                end
+                local Pivot = pcall(Instance.Character.GetPivot, Instance.Character)
+                if Pivot then return Pivot.Position end
+            end
+
+            if Instance:IsA("Humanoid") and Instance.Parent then
+                local Roots = Instance.Parent:FindFirstChild("HumanoidRootPart")
+                if Roots then
+                    return Roots.Position
+                end
+                local Pivot = pcall(Instance.Parent.GetPivot, Instance.Parent)
+                if Pivot then return Pivot.Position end
+            end
+
+            if Instance.GetPivot then
+                local Pivot = pcall(Instance.GetPivot, Instance)
+                if Pivot and typeof(Pivot) == "CFrame" then
+                    return Pivot.Position
+                end
+            end
+
+            local BasePart = Instance:FindFirstChildWhichIsA("BasePart")
+            if BasePart then
+                return BasePart.Position
             end
             
-            local function findAnyPartRecursive(inst)
-                for _, child in ipairs(inst:GetChildren()) do
-                    if child:IsA("BasePart") then
-                        return child.Position
+            local function RecursivePart(inst)
+                for _, Child in ipairs(inst:GetChildren()) do
+                    if Child:IsA("BasePart") then
+                        return Child.Position
                     end
-                    local found = findAnyPartRecursive(child)
-                    if found then return found end
+                    local Found = RecursivePart(Child)
+                    if Found then return Found end
                 end
                 return nil
             end
-            
-            return findAnyPartRecursive(instance)
+
+            return RecursivePart(Instance)
         end
-        
-        local result = getPositionFromInstance(arg)
-        if result then return result end
+
+        local Result = GetPosition(arg)
+        if Result then return Result end
     end
-    
+
     if typeof(arg) == "table" then
-        local vectorFields = {"position", "Position", "pos", "Pos", "p", "vector", "Vector", "location", "Location"}
-        for _, field in ipairs(vectorFields) do
-            if arg[field] and typeof(arg[field]) == "Vector3" then
-                return arg[field]
+        for _, Vector in ipairs({"position", "Position", "pos", "Pos", "p", "vector", "Vector", "location", "Location"}) do
+            if arg[Vector] and typeof(arg[Vector]) == "Vector3" then
+                return arg[Vector]
             end
         end
-        
+
         if arg.CFrame and typeof(arg.CFrame) == "CFrame" then
             return arg.CFrame.Position
         end
-        
-        local x = arg.x or arg.X or arg[1]
-        local y = arg.y or arg.Y or arg[2]
-        local z = arg.z or arg.Z or arg[3]
+
+        local x, y, z = (arg.x or arg.X or arg[1] or 0), (arg.y or arg.Y or arg[2] or 0), (arg.z or arg.Z or arg[3] or 0)
+
         if typeof(x) == "number" and typeof(y) == "number" then
-            return toVector3(x, y, z)
+            return ConvertV3(x, y, z)
         end
-        
+
         if #arg >= 3 then
-            return toVector3(arg[1], arg[2], arg[3])
+            return ConvertV3(arg[1], arg[2], arg[3])
         end
-        
-        for _, value in pairs(arg) do
-            if typeof(value) == "table" then
-                local nested = API:ResolvePosition(value)
-                if nested then return nested end
+
+        for _, Value in pairs(arg) do
+            if typeof(Value) == "table" then
+                local Nested = API:ResolvePosition(Value)
+                if Nested then return Nested end
             end
         end
     end
     
     if typeof(arg) == "string" then
-        local str = arg:gsub("%s+", " "):gsub(",", " "):gsub("%(", " "):gsub("%)", " ")
-        
-        local patterns = {
+        local String = arg:gsub("%s+", " "):gsub(",", " "):gsub("%(", " "):gsub("%)", " ")
+
+        local Patterns = {
             "(-?%d+%.?%d*)%s+(-?%d+%.?%d*)%s+(-?%d+%.?%d*)",
             "[Vv]ector3?%s*[%(%[]%s*(-?%d+%.?%d*)%s*[, ]%s*(-?%d+%.?%d*)%s*[, ]%s*(-?%d+%.?%d*)%s*[%)%]]",
             "[Cc]frame.*%s*[%(%[]%s*(-?%d+%.?%d*)%s*[, ]%s*(-?%d+%.?%d*)%s*[, ]%s*(-?%d+%.?%d*)",
@@ -2435,20 +2464,20 @@ function API:ResolvePosition(...)
             "(-?%d+%.?%d*),(-?%d+%.?%d*),(-?%d+%.?%d*)",
         }
         
-        for _, pattern in ipairs(patterns) do
-            local x, y, z = str:match(pattern)
+        for _, Pattern in ipairs(Patterns) do
+            local x, y, z = String:match(Pattern)
             if x and y and z then
-                return toVector3(tonumber(x), tonumber(y), tonumber(z))
+                return ConvertV3(tonumber(x), tonumber(y), tonumber(z))
             end
         end
-        
-        local numbers = extractNumbers(str)
-        if #numbers >= 3 then
-            return toVector3(numbers[1], numbers[2], numbers[3])
-        elseif #numbers == 2 then
-            return toVector3(numbers[1], numbers[2], 0)
-        elseif #numbers == 1 then
-            return toVector3(numbers[1], 0, 0)
+
+        local Numbers = ExtractNumbers(String)
+        if #Numbers >= 3 then
+            return ConvertV3(Numbers[1], Numbers[2], Numbers[3])
+        elseif #Numbers == 2 then
+            return ConvertV3(Numbers[1], Numbers[2], 0)
+        elseif #Numbers == 1 then
+            return ConvertV3(Numbers[1], 0, 0)
         end
     end
     
@@ -2460,28 +2489,24 @@ function API:ResolvePosition(...)
         return Vector3_new(arg.Offset, 0, 0)
     end
     
-    if argType == "Region3" then
-        return arg.CFrame.Position + (arg.Size / 2)
-    end
-    
     if argType == "Ray" then
         return arg.Origin
     end
 
     if typeof(arg) == "userdata" then
-        local props = {"Position", "position", "Location", "location", "Origin", "origin"}
-        for _, prop in ipairs(props) do
-            if arg[prop] and typeof(arg[prop]) == "Vector3" then
-                return arg[prop]
+        local Props = {"Position", "position", "Location", "location", "Origin", "origin"}
+        for _, Prop in ipairs(Props) do
+            if arg[Prop] and typeof(arg[Prop]) == "Vector3" then
+                return arg[Prop]
             end
         end
         
         if arg.CFrame and typeof(arg.CFrame) == "CFrame" then
             return arg.CFrame.Position
         end
-        
+
         if arg.GetPivot then
-            local pivot = safePCall(function() return arg:GetPivot() end)
+            local pivot = pcall(arg.GetPivot, arg)
             if pivot and typeof(pivot) == "CFrame" then
                 return pivot.Position
             end
@@ -2493,7 +2518,6 @@ end
 
 function API:Spoof(Instance, Property, Value)
     if not Instance or not Property then
-        warn("[Spoof] Failed: Instance or Property is nil")
         return false
     end
 
@@ -2544,7 +2568,6 @@ end
 
 function API:Unspoof(Instance, Property)
     if not Instance or not Property then
-		warn("[Spoof] Failed: Instance or Property is nil")
         return false
     end
 
@@ -2579,8 +2602,8 @@ function API:ClearSpoofs()
         self._Hook = nil
     end
 
-    self._Spoofed = nil
-    
+    table_clear(self._Spoofed)
+
     return true
 end
 
@@ -2643,14 +2666,14 @@ function API:ForceReset()
 end
 
 function API:GetBackpack()
-    local Plr = self:GetPlayer()
+    local Plr = (LocalPlayer)
     if not Plr then return nil end
     
     return Plr:FindFirstChild("Backpack") or Plr:WaitForChild("Backpack")
 end
 
 function API:GetTeam()
-    local Plr = self:GetPlayer()
+    local Plr = (LocalPlayer)
     return Plr.Team
 end
 
@@ -2661,7 +2684,7 @@ end
 
 function API:IsAFriend(Player)
     if not Player then return false end
-    return Player:IsFriendsWith(self:GetPlayer().UserId)
+    return Player:IsFriendsWith(LocalPlayer.UserId)
 end
 
 function API:GetPlaceId()
@@ -2681,48 +2704,47 @@ function API:Raknet_Desync(State)
         return false 
     end
 
+    self:ClearRaknet()
+
     if State then
-        raknet.add_send_hook(function(packet)
-            if packet.PacketId == 0x1B then
-                local data = packet.AsBuffer
-                buffer.writeu32(data, 1, 0xFFFFFFFF)
-                packet:SetData(data)
+        self.RaknetHooked = true
+
+        local function Hooking(Packet)
+            if Packet.PacketId == 0x1B then
+                local Data = Packet.AsBuffer
+
+                buffer.writeu32(Data, 1, 0xFFFFFFFF)
+                Packet:SetData(Data)
             end
-        end)
-    else
-        raknet.remove_send_hook(function(packet)
-            if packet.PacketId == 0x1B then
-                local data = packet.AsBuffer
-                buffer.writeu32(data, 1, 0xFFFFFFFF)
-                packet:SetData(data)
-            end
-        end)
+        end
+
+        raknet.add_send_hook(Hooking)
+    
+        self.Used_Raknet = Hooking
     end
+    
     return true
 end
 
 function API:ClearRaknet()
-    if typeof(raknet) == "function" then
-        pcall(function() 
-            raknet.remove_send_hook(function(packet)
-                if packet.PacketId == 0x1B then
-                    local data = packet.AsBuffer
-                    buffer.writeu32(data, 1, 0xFFFFFFFF)
-                    packet:SetData(data)
-                end
-            end)
-        end)
+    if typeof(raknet) ~= "function" then 
+        return 
+    end
+
+    if self.Used_Raknet then
+        raknet.remove_send_hook(self.Used_Raknet)
+
+        self.Used_Raknet, self.RaknetHooked = nil, nil
     end
 end
 
 function API:SmartTimer(Name, Delay)
-    self.Timers = self.Timers or {}
+    self.Smart_Timers = self.Smart_Timers or {}
 
-    local CT = tick()
-    local Last = self.Timers[Name] or 0;
+    local Tick, Last = tick(), self.Smart_Timers[Name] or 0
 
-    if CT - Last >= Delay then
-        self.Timers[Name] = CT;
+    if Tick - Last >= Delay then
+        self.Smart_Timers[Name] = Tick;
         return true;
     end
 
@@ -2777,20 +2799,18 @@ function API:ResolvePriority(Result, Key, NewestFirst)
         return Result
     end
     
-    self.Recency_Stores = self.Recency_Stores or {}
-    local Recency = self.Recency_Stores[Key] or {}
+    self.Resolved_Tables = self.Resolved_Tables or {}
+    local Resolved = self.Resolved_Tables[Key] or {}
 
     local Current = {}
     for i = 1, #Result do
         Current[Result[i]] = true
     end
     
-    local NewRec = {}
-    local Seen = {}
-    local len = 0
+    local NewRec, Seen, len = {}, {}, 0
     
-    for i = 1, #Recency do
-        local Item = Recency[i]
+    for i = 1, #Resolved do
+        local Item = Resolved[i]
         if Current[Item] and not Seen[Item] then
             len = len + 1
             NewRec[len] = Item
@@ -2806,7 +2826,7 @@ function API:ResolvePriority(Result, Key, NewestFirst)
         end
     end
     
-    self.Recency_Stores[Key] = NewRec
+    self.Resolved_Tables[Key] = NewRec
     
     if NewestFirst then
         return self:TableReverse(NewRec)
@@ -3430,7 +3450,7 @@ end
 function API:AntiAFK()
     if global.AFK_Service then return end
 
-    if GetConnections then
+    if (GetConnections) then
         for _, Con in pairs(GetConnections(LocalPlayer.Idled)) do
             if Con.Disable then Con:Disable();
             elseif Con.Disconnect then
@@ -3479,7 +3499,7 @@ function API:SetGravity(Amount)
 end
 
 function API:SetCameraOcclusion(Mode)
-    local Plr = self:GetPlayer()
+    local Plr = (LocalPlayer)
     if Plr then
         if Mode == "Invisicam" then
             Plr.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
@@ -3492,17 +3512,16 @@ function API:SetCameraOcclusion(Mode)
 end
 
 function API:Zoom(Amount)
-    local Plr = self:GetPlayer()
+    local Plr = (LocalPlayer)
     if Plr then
-        Plr.CameraMinZoomDistance = Amount
         Plr.CameraMaxZoomDistance = Amount
     end
 end
 
 function API:ThirdPerson(Enabled)
-    local Plr = self:GetPlayer()
+    local Plr = (LocalPlayer)
     if Plr then
-        Plr.CameraMode = Enabled and Enum.CameraMode.Classic or Enum.CameraMode.LockFirstPerson
+        Plr.CameraMode = Enabled and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
     end
 end
 
@@ -3559,12 +3578,6 @@ function API:SetHipHeight(Amount)
 end
 
 function API:BypassWS(State, Speed)
-    if State then
-        self:RegisterConflict("BypassWS", true)
-    else
-        self:RegisterConflict("BypassWS", false)
-    end
-    
     State = State or false
     Speed = Speed or 5
     
@@ -3578,7 +3591,6 @@ function API:BypassWS(State, Speed)
         self.WSData.Active = false
         self.WSData.Running = false
 		self:_Disconnect("@TPWalk")
-        self:RegisterConflict("BypassWS", false)
     end
 
     if not State then
@@ -3627,12 +3639,6 @@ function API:SetBypassedWS(Speed)
 end
 
 function API:BypassJP(State, Amount)
-    if State then
-        self:RegisterConflict("BypassJP", true)
-    else
-        self:RegisterConflict("BypassJP", false)
-    end
-    
     State = State or false
     Amount = Amount or 20
     
@@ -3645,9 +3651,7 @@ function API:BypassJP(State, Amount)
     local function CleanUP()
         self.JPData.Active = false
         self.JPData.Running = false
-        
 		self:_Disconnect("@TPJump")
-        self:RegisterConflict("BypassJP", false)
     end
     
     if not State then
@@ -3690,11 +3694,13 @@ function API:SetBypassedJP(Amount)
     return true
 end
 
-function API:BringTools(Radius, Interval, BatchSize, Paths)
-    Radius = Radius or math_huge
-    Interval = Interval or 0.5
-    BatchSize = BatchSize or math_huge
-    Paths = Paths or {workspace}
+function API:BringTools(Options)
+    Options = Options or {}
+    
+    local Radius = Options.Radius or math_huge
+    local Interval = Options.Interval or 0.5
+    local BatchSize = Options.BatchSize or math_huge
+    local Paths = Options.Paths or {workspace}
 
     if not Paths then
         Paths = {workspace}
@@ -3702,18 +3708,9 @@ function API:BringTools(Radius, Interval, BatchSize, Paths)
         Paths = {Paths}
     end
 
-    if self.Tools_Connection then
-        self:_Disconnect("@BringTools")
-        self.Tools_Connection = nil
-    end
+    self:StopBringTools()
 
-    self.BroughtTools = self.BroughtTools or {}
-    self.ToolsActive = true
-    self.ToolsRadius = Radius
-    self.ToolsBatchSize = BatchSize
-    self.ToolsPaths = Paths
-    
-    local Elapsed = 0
+    self.BroughtTools, self.ToolsActive, Elapsed = self.BroughtTools or {}, true, 0
     
     local function Tools_Task()
         if not self.ToolsActive then return end
@@ -3723,13 +3720,13 @@ function API:BringTools(Radius, Interval, BatchSize, Paths)
 
         local Tools = {}
 
-        for _, v in ipairs(self.ToolsPaths) do
+        for _, v in ipairs(Paths) do
             if v and v:IsA("Instance") then
                 for _, v in ipairs(v:GetChildren()) do
                     if v:IsA("BackpackItem") and v:FindFirstChild("Handle") then
                         if not self.BroughtTools[v] then
                             local Distance = self:GetDistance(v)
-                            if Distance <= self.ToolsRadius then
+                            if Distance <= Radius then
                                 table_insert(Tools, v)
                             end
                         end
@@ -3768,29 +3765,21 @@ function API:BringTools(Radius, Interval, BatchSize, Paths)
 end
 
 function API:StopBringTools()
-    self.ToolsActive = false
-    self:_Disconnect("@BringTools")
-    self.Tools_Connection = nil
-    self.BroughtTools = {}
-    return true
+    if self.Tools_Connection then
+        self:_Disconnect("@BringTools")
+
+        self.Tools_Connection, self.ToolsActive = nil, false
+        table_clear(self.BroughtTools)
+    end
 end
 
-function API:AntiCollider(State)
-    if State then
-        if not self:RegisterConflict("AntiCollider", true) then
-            return false
-        end
-    else
-        self:RegisterConflict("AntiCollider", false)
-    end
-    
+function API:AntiCollider(State)   
     if State then
         if self.AntiCollide then return true end
         self.AntiCollide = true
     
-        local LocalPlayer = self:GetPlayer()
-        if not LocalPlayer then 
-            self:RegisterConflict("AntiCollider", false)
+        local LPlayer = (LocalPlayer)
+        if not LPlayer then 
             return false 
         end
         
@@ -3829,13 +3818,13 @@ function API:AntiCollider(State)
         end
 
         for _, Plr in pairs(self:GetPlayers(true)) do
-            if Plr ~= LocalPlayer and Plr.Character then
+            if Plr ~= LPlayer and Plr.Character then
                 HandleCharacter(Plr.Character)
             end
         end
-        
+
         self:_Connect("@AntiCollider_Players", Players.PlayerAdded:Connect(function(Plr)
-            if Plr ~= LocalPlayer and Plr.Character then
+            if Plr ~= LPlayer and Plr.Character then
                 HandleCharacter(Plr.Character)
             end
         end))
@@ -3871,7 +3860,6 @@ function API:AntiCollider(State)
 
         self.AntiCollide = nil
         self.AntiColliderOrigin = nil
-        self:RegisterConflict("AntiCollider", false)
         return true
     end
 end
@@ -3918,19 +3906,12 @@ function API:AntiCFrameTeleport(State)
     end
 end
 
-function API:Strengthen(State, Density)
-    if State then
-        self:RegisterConflict("Strengthen", true)
-    else
-        self:RegisterConflict("Strengthen", false)
-    end
-    
+function API:Strengthen(State, Density)   
     Density = Density or 100
     Density = math_clamp(Density, 0.01, 100)
     
     local Character = self:GetCharacter()
     if not Character then 
-        if State then self:RegisterConflict("Strengthen", false) end
         return false 
     end
     
@@ -3969,7 +3950,7 @@ function API:Strengthen(State, Density)
             self:_Disconnect("@StrengthListener")
             self.StrengthenListener = nil
         end
-        
+
         self.StrengthenListener = LocalPlayer.CharacterAdded:Connect(function(NewChar)
             task_wait(0.5);
             PhysicalPropertiesV(NewChar, true, self.StrengthenDensity or Density)
@@ -3979,12 +3960,11 @@ function API:Strengthen(State, Density)
         PhysicalPropertiesV(Character, false)
         self.Strengthened = false
         self.StrengthenDensity = nil
-        
+
         if self.StrengthenListener then
             self:_Disconnect("@StrengthListener")
             self.StrengthenListener = nil
         end
-        self:RegisterConflict("Strengthen", false)
     end
 
     return true
@@ -4015,28 +3995,17 @@ function API:FlightConfig(Config)
 end
 
 function API:Flight(State, Speed)
-    if State then
-        self:RegisterConflict("Flight", true)
-    else
-        self:RegisterConflict("Flight", false)
-    end
-    
     State = State or false
     
     self.FlightData = self.FlightData or {Active = false, Speed = 50, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
 
     if not self.FlightData.SpeedControls then
-        self.FlightData.SpeedControls = {
-            Enabled = true,
-            IncreaseKey = Enum.KeyCode.Equals,
-            DecreaseKey = Enum.KeyCode.Minus,
-        }
+        self.FlightData.SpeedControls = {Enabled = true, IncreaseKey = Enum.KeyCode.Equals, DecreaseKey = Enum.KeyCode.Minus}
     end
 
     local function CleanUP()
         self.FlightData.Active = false
         self:_Disconnect("@Flight")
-        self:RegisterConflict("Flight", false)
     end
     
     if not State then
@@ -4051,7 +4020,6 @@ function API:Flight(State, Speed)
     local Roots = self:GetRoot()
 
     if not Roots then
-        self:RegisterConflict("Flight", false)
         return false
     end
     
@@ -4242,13 +4210,7 @@ function API:GetFlightSpeedStep()
     return self.FlightData and self.FlightData.SpeedStep or 0
 end
 
-function API:InfiniteJump(State)
-    if State then
-        self:RegisterConflict("InfiniteJump", true)
-    else
-        self:RegisterConflict("InfiniteJump", false)
-    end
-    
+function API:InfiniteJump(State) 
     State = State or false
 
     self.JumpData = self.JumpData or { Active = false, Debounce = false }
@@ -4256,11 +4218,9 @@ function API:InfiniteJump(State)
     local function CleanUP()
         self.JumpData.Active = false
         self.JumpData.Debounce = false
-
 		self:_Disconnect("@InfiniteJump")
-        self:RegisterConflict("InfiniteJump", false)
     end
-    
+
     if not State then
         CleanUP()
         return false
@@ -4277,6 +4237,7 @@ function API:InfiniteJump(State)
             self.JumpData.Debounce = true
             
             local Humanoid = self:GetHumanoid()
+
             if Humanoid then
                 Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
@@ -4291,21 +4252,13 @@ function API:InfiniteJump(State)
 end
 
 function API:TouchFling(State)
-    if State then
-        self:RegisterConflict("TouchFling", true)
-    else
-        self:RegisterConflict("TouchFling", false)
-    end
-    
     State = State or false
     
     self.FlingData = self.FlingData or { Active = false }
-    
+
     local function CleanUP()
         self.FlingData.Active = false
-        
 		self:_Disconnect("@TouchFling")
-        self:RegisterConflict("TouchFling", false)
     end
     
     if not State then
@@ -4318,7 +4271,6 @@ function API:TouchFling(State)
     end
     
     self.FlingData.Active = true
-
     local Movel = 0.1
 
     local Connection = Heartbeat:Connect(function()
@@ -4361,8 +4313,8 @@ function API:Fling(Input)
             return false
         end
 	
-		local LocalPlayer = self:GetPlayer()
-		if Target == LocalPlayer or (typeof(Target) == "Instance" and Target == LocalPlayer.Character) then
+		local LPlayer = (LocalPlayer)
+		if Target == LPlayer or (typeof(Target) == "Instance" and Target == LPlayer.Character) then
 		    return false
 		end
 
@@ -4663,11 +4615,11 @@ function API:GetMousePosition()
 end
 
 function API:GetMouse()
-    return self:GetPlayer():GetMouse()
+    return LocalPlayer:GetMouse()
 end
 
 function API:SetMouseIcon(Icon)
-    local Plr = self:GetPlayer()
+    local Plr = (LocalPlayer)
     Plr.MouseIcon = Icon
 end
 
@@ -4692,12 +4644,12 @@ function API:Chat(Message)
 end
 
 function API:GetFriends()
-    local LocalPlayer = self:GetPlayer()
-    if not LocalPlayer then return {} end
+    local LPlayer = (LocalPlayer)
+    if not LPlayer then return {} end
 
-    local UserId = LocalPlayer.UserId
+    local UserId = LPlayer.UserId
     local Success, Response = pcall(function()
-        return HttpGet("https://friends.roblox.com/v1/users/" .. UserId .. "/friends")
+        return Game:HttpGet("https://friends.roblox.com/v1/users/" .. UserId .. "/friends")
     end)
     
     if not Success then return {} end
@@ -4715,11 +4667,7 @@ function API:GetFriends()
         if Success then
             local UserData = HttpService:JSONDecode(Response)
             if UserData and UserData.name then
-                table_insert(Friends, {
-                    UserId = Friend.id,
-                    Name = UserData.name,
-                    DisplayName = UserData.displayName or UserData.name
-                })
+                table_insert(Friends, {UserId = Friend.id, Name = UserData.name, DisplayName = UserData.displayName or UserData.name})
             end
         end
         task_wait(0.1);
@@ -4764,6 +4712,7 @@ end
 
 function API:GetScreenCenter()
     local Camera = CurrentCamera
+
     if not Camera then return nil end
     return Vector2_new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
 end
@@ -4781,7 +4730,7 @@ function API:IsBehindWall(Target, Character)
 
     local Head = self:GetHead()
     local Parts = Selected:FindFirstChild("Head") or Selected:FindFirstChild("HumanoidRootPart")
-    
+
     if not Head or not Parts then return true end
 
     local Direction = (Parts.Position - Head.Position)
@@ -4991,14 +4940,14 @@ function API:GetBoundingBox(Instance)
     if not Instance then return nil end
 
     local Parts = Instance:GetDescendants()
-    local Min = Vector3.new(math_huge, math_huge, math_huge)
-    local Max = Vector3.new(-math_huge, -math_huge, -math_huge)
+    local Min = Vector3_new(math_huge, math_huge, math_huge)
+    local Max = Vector3_new(-math_huge, -math_huge, -math_huge)
     
     for _, Part in ipairs(Parts) do
         if Part:IsA("BasePart") then
             local Pos = Part.Position
-            Min = Vector3.new(math_min(Min.X, Pos.X), math_min(Min.Y, Pos.Y), math_min(Min.Z, Pos.Z))
-            Max = Vector3.new(math_max(Max.X, Pos.X), math_max(Max.Y, Pos.Y), math_max(Max.Z, Pos.Z))
+            Min = Vector3_new(math_min(Min.X, Pos.X), math_min(Min.Y, Pos.Y), math_min(Min.Z, Pos.Z))
+            Max = Vector3_new(math_max(Max.X, Pos.X), math_max(Max.Y, Pos.Y), math_max(Max.Z, Pos.Z))
         end
     end
     
@@ -5200,7 +5149,7 @@ function API:GetClosestPlayer(Radius)
             end
         end
     end
-    
+
     if Closest then
         return Closest, math_sqrt(ClosestDistSquared)
     end
@@ -5220,7 +5169,7 @@ function API:GetFarthestPlayer(Radius)
             end
         end
     end
-    
+
     if Farthest then
         return Farthest, math_sqrt(FarthestDistSquared)
     end
@@ -5759,334 +5708,6 @@ function API:GetSpectateTarget()
     return self.Spectate_Target
 end
 
---[[
-function API:FindVehicle(Part)
-    if not Part then return nil end
-
-    local Plr = self:GetPlayer()
-    
-    local Vehicle = Part:FindFirstAncestor(Plr and Plr.Name or "" .. "'s Car")
-    if Vehicle then return Vehicle end
-    
-    Vehicle = Part:FindFirstAncestor("Body")
-    if Vehicle and Vehicle.Parent then return Vehicle.Parent end
-    
-    Vehicle = Part:FindFirstAncestor("Misc")
-    if Vehicle and Vehicle.Parent then return Vehicle.Parent end
-    
-    return Part:FindFirstAncestorWhichIsA("Model")
-end
-
-function API:VehicleFlightConfig(Config)
-    if not self.VehicleFlyData then
-        self.VehicleFlyData = {
-            Active = false,
-            Speed = 6,
-            SpeedMin = 1,
-            SpeedMax = 30,
-            SpeedStep = 0.05,
-            Parent = nil,
-            FlightConnection = nil,
-            SeatCheckConnection = nil,
-            SeatWaitThread = nil,
-            CurrentVehicle = nil,
-            CurrentSeat = nil,
-        }
-    end
-
-    self.VehicleFlyData.SpeedMin = Config.SpeedMin or self.VehicleFlyData.SpeedMin or 1
-    self.VehicleFlyData.SpeedMax = Config.SpeedMax or self.VehicleFlyData.SpeedMax or 30
-    self.VehicleFlyData.SpeedStep = Config.SpeedStep or self.VehicleFlyData.SpeedStep or 0.05
-    
-    if self.VehicleFlyData.Active then
-        self.VehicleFlyData.Speed = math_clamp(self.VehicleFlyData.Speed, 
-            self.VehicleFlyData.SpeedMin, 
-            self.VehicleFlyData.SpeedMax)
-    end
-    
-    return true
-end
-
-function API:SetupVehicleFlight()
-    local Humanoid = self:GetHumanoid()
-    if Humanoid then
-        local SeatConnection = Humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
-            if not self.VehicleFlyData.Active then return end
-            
-            local RecentSeat = Humanoid.SeatPart
-            
-            if RecentSeat and RecentSeat:IsA("VehicleSeat") then
-                local Car = self:FindVehicle(RecentSeat)
-                
-                if Car then
-                    if not Car.PrimaryPart then
-                        Car.PrimaryPart = (Car.Parent == Car and Car) or Car:FindFirstChildWhichIsA("BasePart")
-                    end
-                    
-                    self.VehicleFlyData.CurrentVehicle = Car
-                    self.VehicleFlyData.CurrentSeat = RecentSeat
-                    
-                    local Character = self:GetCharacter()
-                    if Character then
-                        if not self.VehicleFlyData.Parent then
-                            self.VehicleFlyData.Parent = Character.Parent
-                        end
-                        Character.Parent = Car
-                    end
-                    
-                    RecentSeat.Anchored = false
-                    RecentSeat.CanCollide = false
-                    RecentSeat.AssemblyLinearVelocity = Vector3_zero
-                    RecentSeat.AssemblyAngularVelocity = Vector3_zero
-                end
-            elseif not RecentSeat then  
-                local Character = self:GetCharacter()
-                if Character and self.VehicleFlyData.Parent then
-                    Character.Parent = self.VehicleFlyData.Parent
-                end
-                
-                self.VehicleFlyData.CurrentSeat = nil
-                self.VehicleFlyData.CurrentVehicle = nil
-            end
-        end)
-        
-        self:_Connect("@VehicleFlight_SeatCheck", SeatConnection)
-    end
-    
-    local Connection = Heartbeat:Connect(function()
-        if not self.VehicleFlyData.Active then return end
-        
-        local currentHumanoid = self:GetHumanoid()
-        if not currentHumanoid then return end
-        
-        local CurrentSeat = currentHumanoid.SeatPart
-        if not CurrentSeat or not CurrentSeat:IsA("VehicleSeat") then
-            return
-        end
-        
-        local CurrentVehicle = self:FindVehicle(CurrentSeat)
-        if not CurrentVehicle or not CurrentVehicle:IsA("Model") then
-            return
-        end
-        
-        if CurrentVehicle ~= self.VehicleFlyData.CurrentVehicle then
-            self.VehicleFlyData.CurrentVehicle = CurrentVehicle
-            self.VehicleFlyData.CurrentSeat = CurrentSeat
-            
-            local character = self:GetCharacter()
-            if character and character.Parent ~= CurrentVehicle then
-                character.Parent = CurrentVehicle
-            end
-        end
-        
-        local currentCharacter = self:GetCharacter()
-        if currentCharacter and currentCharacter.Parent ~= CurrentVehicle then
-            currentCharacter.Parent = CurrentVehicle
-        end
-        
-        if CurrentSeat.CanCollide then
-            CurrentSeat.CanCollide = false
-        end
-        if CurrentSeat.Anchored then
-            CurrentSeat.Anchored = false
-        end
-        
-        CurrentSeat.AssemblyLinearVelocity = Vector3_zero
-        CurrentSeat.AssemblyAngularVelocity = Vector3_zero
-        
-        if not CurrentVehicle.PrimaryPart then
-            CurrentVehicle.PrimaryPart = (CurrentSeat.Parent == CurrentVehicle and CurrentSeat) or CurrentVehicle:FindFirstChildWhichIsA("BasePart")
-            if not CurrentVehicle.PrimaryPart then
-                return
-            end
-        end
-        
-        local Camera = CurrentCamera
-        if not Camera then return end
-        
-        local Camera_CFrame = Camera.CFrame
-        local Current_Speed = self.VehicleFlyData.Speed
-        
-        local Movement = Vector3_zero
-        
-        if IsKeyDown(UserInputService, Enum.KeyCode.W) then
-            Movement = Movement + Camera_CFrame.LookVector
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.S) then
-            Movement = Movement - Camera_CFrame.LookVector
-        end
-        
-        if IsKeyDown(UserInputService, Enum.KeyCode.D) then
-            Movement = Movement + Camera_CFrame.RightVector
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.A) then
-            Movement = Movement - Camera_CFrame.RightVector
-        end
-        
-        if IsKeyDown(UserInputService, Enum.KeyCode.E) or IsKeyDown(UserInputService, Enum.KeyCode.Space) then
-            Movement = Movement + Camera_CFrame.UpVector
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.Q) or IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
-            Movement = Movement - Camera_CFrame.UpVector
-        end
-    
-        if IsKeyDown(UserInputService, Enum.KeyCode.Equals) or IsKeyDown(UserInputService, Enum.KeyCode.KeypadPlus) then
-            self.VehicleFlyData.Speed = math_clamp(self.VehicleFlyData.Speed + self.VehicleFlyData.SpeedStep, self.VehicleFlyData.SpeedMin, self.VehicleFlyData.SpeedMax)
-        end
-        if IsKeyDown(UserInputService, Enum.KeyCode.Minus) or IsKeyDown(UserInputService, Enum.KeyCode.KeypadMinus) then
-            self.VehicleFlyData.Speed = math_clamp(self.VehicleFlyData.Speed - self.VehicleFlyData.SpeedStep, self.VehicleFlyData.SpeedMin, self.VehicleFlyData.SpeedMax)
-        end
-
-        if Movement.Magnitude > 0 then
-            Movement = Movement.Unit * Current_Speed
-        end
-    
-        local Position = CurrentVehicle:GetPrimaryPartCFrame().Position + Movement
-        CurrentVehicle:SetPrimaryPartCFrame(CFrame_new(Position, Position + Camera_CFrame.LookVector))
-    end)
-
-    self:_Connect("@VehicleFlight", Connection)
-    self.VehicleFlyData.FlightConnection = "@VehicleFlight"
-end
-
-function API:VehicleFlight(State, Speed)
-    State = State or false
-    Speed = Speed or 6
-
-    self.VehicleFlyData = self.VehicleFlyData or {
-        Active = false,
-        Speed = 6,
-        SpeedMin = 1,
-        SpeedMax = 30,
-        SpeedStep = 0.05,
-
-        Parent = nil,
-        FlightConnection = nil,
-        SeatCheckConnection = nil,
-        SeatWaitThread = nil,
-    
-        CurrentVehicle = nil,
-        CurrentSeat = nil,
-    }
-
-    local function CleanUP()
-        self.VehicleFlyData.Active = false
-        
-        if self.VehicleFlyData.FlightConnection then
-            self:_Disconnect(self.VehicleFlyData.FlightConnection)
-            self.VehicleFlyData.FlightConnection = nil
-        end
-        
-        self:_Disconnect("@VehicleFlight_SeatCheck")
-        
-        if self.VehicleFlyData.SeatWaitThread then
-            task_cancel(self.VehicleFlyData.SeatWaitThread)
-            self.VehicleFlyData.SeatWaitThread = nil
-        end
-        
-        local character = self:GetCharacter()
-        if character and self.VehicleFlyData.Parent then
-            character.Parent = self.VehicleFlyData.Parent
-            self.VehicleFlyData.Parent = nil
-        end
-        
-        if self.VehicleFlyData.CurrentSeat then
-            local seat = self.VehicleFlyData.CurrentSeat
-            if seat and seat.Parent then
-                seat.AssemblyLinearVelocity = Vector3_zero
-                seat.AssemblyAngularVelocity = Vector3_zero
-                seat.CanCollide = true
-            end
-        end
-        
-        self.VehicleFlyData.CurrentVehicle = nil
-        self.VehicleFlyData.CurrentSeat = nil
-    end
-    
-    if not State then
-        CleanUP()
-        return false
-    end
-    
-    if self.VehicleFlyData.Active then
-        return true
-    end
-    
-    local function StartFlight(Seat)
-        if not Seat or not Seat:IsA("VehicleSeat") then
-            return false
-        end
-        
-        local Model = self:FindVehicle(Seat)
-        if not Model or not Model:IsA("Model") then
-            return false
-        end
-        
-        if not Model.PrimaryPart then
-            Model.PrimaryPart = (Seat.Parent == Model and Seat) or Model:FindFirstChildWhichIsA("BasePart")
-            if not Model.PrimaryPart then
-                return false
-            end
-        end
-        
-        self.VehicleFlyData.CurrentVehicle = Model
-        self.VehicleFlyData.CurrentSeat = Seat
-        
-        local Character = self:GetCharacter()
-        if Character then
-            self.VehicleFlyData.Parent = Character.Parent
-            Character.Parent = Model
-        end
-        
-        Seat.Anchored = false
-        Seat.CanCollide = false
-        
-        Seat.AssemblyLinearVelocity = Vector3_zero
-        Seat.AssemblyAngularVelocity = Vector3_zero
-        
-        return true
-    end
-    
-    local Humanoid = self:GetHumanoid()
-    if Humanoid and Humanoid.SeatPart then
-        if not StartFlight(Humanoid.SeatPart) then
-            return false
-        end
-    else
-        self.VehicleFlyData.Active = true
-
-        self.VehicleFlyData.SeatWaitThread = task_spawn(function()
-            while self.VehicleFlyData.Active do
-                local Humanoid = self:GetHumanoid()
-                if Humanoid and Humanoid.SeatPart and Humanoid.SeatPart:IsA("VehicleSeat") then
-                    if StartFlight(Humanoid.SeatPart) then
-                        self:SetupVehicleFlight()
-                        break
-                    end
-                end
-                task_wait(0.35)
-            end
-        end)
-        
-        return true
-    end
-    
-    self.VehicleFlyData.Active = true
-    self:SetupVehicleFlight()
-    
-    return true
-end
-
-function API:SetVehicleFlySpeed(Speed)
-    if not self.VehicleFlyData or not self.VehicleFlyData.Active then
-        return false
-    end
-    
-    self.VehicleFlyData.Speed = math_clamp(Speed, 10, 2000)
-    return true
-end
---]]
-
 function API:Notify(Title, Description, Duration, Image)
     -- // Load Notification Library, All credits to lxte 🫶, I've forked it to add gethui suppport and boost runtime performance.
     local Framework = self:LoadData("@Notification.UI")
@@ -6097,7 +5718,7 @@ function API:Notify(Title, Description, Duration, Image)
         end)
         
         if not Success then
-            warn("[Notify]: Failed to download framerwork")
+            warn("[Notify]: Failed to download framework")
             return false
         end
 
@@ -6108,23 +5729,23 @@ function API:Notify(Title, Description, Duration, Image)
     local Success, Library = pcall(function()
         return loadstring(Framework)()
     end)
-    
+
     if not Success then
         return false
     end
 
-    if not self.NotificationHandler then
-        self.NotificationHandler = Library:New({
-            BackgroundColor = Color3.fromRGB(68, 71, 0),
-            TitleColor = Color3.fromRGB(255, 255, 255),
-            DescriptionColor = Color3.fromRGB(200, 200, 200),
+    if not self.Notification_Handler then
+        self.Notification_Handler = Library:New({
+            BackgroundColor = Color3_fromRGB(68, 71, 0),
+            TitleColor = Color3_fromRGB(255, 255, 255),
+            DescriptionColor = Color3_fromRGB(200, 200, 200),
             Mode = "Dark",
             VerticalPosition = "Top",
             HorizontalPosition = "Right",
         })
     end
 
-    self.NotificationHandler:Create({
+    self.Notification_Handler:Create({
         Title = Title or "Notification",
         Description = Description or "",
         Duration = Duration or 3,
@@ -6257,10 +5878,10 @@ function API:ESP_GetAll()
     return self:Load_ESP().ESP
 end
 
-function API:ESP_Remove(id)
+function API:ESP_Remove(Ident)
     local ESP = self:Load_ESP()
 
-    local Instance = ESP.ESP[id]
+    local Instance = ESP.ESP[Ident]
     if Instance and Instance.Destroy then
         Instance:Destroy()
         return true
@@ -6268,10 +5889,10 @@ function API:ESP_Remove(id)
     return false
 end
 
-function API:ESP_Hide(id)
+function API:ESP_Hide(Ident)
     local ESP = self:Load_ESP()
 
-    local Instance = ESP.ESP[id]
+    local Instance = ESP.ESP[Ident]
     if Instance and Instance.Hide then
         Instance:Hide()
         return true
@@ -6279,10 +5900,10 @@ function API:ESP_Hide(id)
     return false
 end
 
-function API:ESP_Show(id)
+function API:ESP_Show(Ident)
     local ESP = self:Load_ESP()
 
-    local Instance = ESP.ESP[id]
+    local Instance = ESP.ESP[Ident]
     if Instance and Instance.Show then
         Instance:Show()
         return true
@@ -6290,10 +5911,10 @@ function API:ESP_Show(id)
     return false
 end
 
-function API:ESP_Toggle(id)
+function API:ESP_Toggle(Ident)
     local ESP = self:Load_ESP()
 
-    local Instance = ESP.ESP[id]
+    local Instance = ESP.ESP[Ident]
     if Instance and Instance.ToggleVisibility then
         Instance:ToggleVisibility()
         return true
@@ -6301,10 +5922,10 @@ function API:ESP_Toggle(id)
     return false
 end
 
-function API:ESP_SetColor(id, Color, IncludeComponents)
+function API:ESP_SetColor(Ident, Color, IncludeComponents)
     local ESP = self:Load_ESP()
 
-    local Instance = ESP.ESP[id]
+    local Instance = ESP.ESP[Ident]
     if Instance and Instance.SetEveryColor then
         Instance:SetEveryColor(Color, IncludeComponents or false)
         return true
@@ -6324,8 +5945,7 @@ function API:Unload_ESP()
             end
         end
 
-        self.ESP_Library = nil
-        self.ESP_Injected = false
+        self.ESP_Library, self.ESP_Injected = nil, false
     end
 end
 
@@ -6375,7 +5995,7 @@ function API:LogGamepasses(State)
         self:_Connect("@Gamepasses_Gamepass", MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(_, id) Capture("Gamepass", id) end))
         self:_Connect("@Gamepasses_Purchase", MarketplaceService.PromptPurchaseFinished:Connect(function(_, id) Capture("Purchase", id) end))
         self:_Connect("@Gamepasses_Bulk", MarketplaceService.PromptBulkPurchaseFinished:Connect(function(_, id) Capture("Bulk", id) end))
-        
+
         self.LogConnection = true
         
     elseif State == false then
@@ -6398,13 +6018,10 @@ function API:GetGamepass(Type, Asset)
 end
 
 function API:ClearGamepasses()
-    self:_Disconnect("@Gamepasses_Product")
-    self:_Disconnect("@Gamepasses_Gamepass")
-    self:_Disconnect("@Gamepasses_Purchase")
-    self:_Disconnect("@Gamepasses_Bulk")
-    
-    self.LogConnection = nil
-    self.LoggedGamepasses = nil
+    if self.LogConnection then
+        self:_Disconnect("@Gamepasses_Product", "@Gamepasses_Gamepass", "@Gamepasses_Purchase", "@Gamepasses_Bulk")
+        self.LogConnection = nil; table_clear(self.LoggedGamepasses)
+    end
 end
 
 function API:SelectEverything(Dropdown, List) -- // @Obsidian Only
@@ -6413,21 +6030,20 @@ function API:SelectEverything(Dropdown, List) -- // @Obsidian Only
     end
 
     local CurrentValues = Dropdown.Value or {}
-    local AddedValues = {}
-    local All = true;
+    local AddedValues, All = {}, true
 
     for _, Item in ipairs(List) do
         if not CurrentValues[Item] then
-            All = false;
+            All = false
             break
         end
     end
 
     local State = not All
-    for _, item in ipairs(List) do
+
+    for _, Item in ipairs(List) do
         AddedValues[Item] = State;
     end
-    
     Dropdown:SetValue(AddedValues);
     Library:Notify(State and "Selected" or "Unselected" .. " Everything!", 2);
 
@@ -6435,7 +6051,7 @@ function API:SelectEverything(Dropdown, List) -- // @Obsidian Only
 end
 
 function API:Rejoin()
-    local Plr = self:GetPlayer()
+    local Plr = (LocalPlayer)
 
     if #Players:GetPlayers() <= 1 then
         Plr:Kick("Rejoining...")
@@ -6452,6 +6068,7 @@ function API:RejoinRe()
 
     if Roots then
         local Position = Roots.Position
+
         Saved_Data = {X = Position.X, Y = Position.Y, Z = Position.Z}
         self:SaveData("@RejoinRe.json", Saved_Data)
     end
@@ -6471,19 +6088,18 @@ function API:RejoinRe()
         until Roots
 
         local TargetPos = Vector3.new(%f, %f, %f)
-        local StartTime = os.clock()
-        local Timeout = 10
+        local StartTime, Timeout = os.clock(), 10
 
         repeat
             Roots.CFrame = CFrame.new(TargetPos)
             task.wait(0.5)
-            
+
             local Distance = (Roots.Position - TargetPos).Magnitude
             
             if Distance <= 20 then
                 break
             end
-            
+
             if os.clock() - StartTime >= Timeout then
                 warn("[RejoinRe]: Timeout reached, stopping teleport attempts")
                 break
@@ -6509,12 +6125,12 @@ function API:ServerHop(Options)
     local Mode = Options.Mode
     local MinPlayers = Options.MinPlayers
     local MaxPlayers = Options.MaxPlayers
+
     local MaxPing = Options.MaxPing
     local MaxRetries = Options.MaxRetries or 5
     local Timeout = Options.Timeout or 676767
 
     local RetryDelay = Options.RetryDelay or 2
-    local VerifyDelay = Options.VerifyDelay or 3
 
     if Mode == nil and MinPlayers == nil and MaxPlayers == nil and MaxPing == nil then
         Mode = "high"
@@ -6701,10 +6317,9 @@ function API:ServerHop(Options)
 			end
 
             if Best_Id then
-				-- task_wait(1)
                 TeleportService:TeleportToPlaceInstance(PlaceId, Best_Id, LocalPlayer)
 
-                task_wait(VerifyDelay)
+                task_wait(4)
                 warn("[Serverhop]: Teleport failed or server unavailable, retrying...")
             end
 
@@ -6747,28 +6362,28 @@ end
 
 function API:GetHWID(Method)
     Method = Method or "Roblox"
-    
+
     if Method == "Executor" then
-        local Success, HWID = pcall(function()
+        local Success, Result = pcall(function()
             if typeof(gethwid) == "function" then
                 return gethwid()
             end
             return nil
         end)
-        
-        if Success and HWID then
-            return HWID
+
+        if Success and Result then
+            return Result
         end
         return nil
     elseif Method == "Roblox" then
         return RbxAnalyticsService:GetClientId()
     elseif Method == "IP" then
-        local Success, IP = pcall(function()
+        local Success, Result = pcall(function()
             return Game:HttpGet("https://api.ipify.org")
         end)
 
-        if Success and IP then
-            return IP
+        if Success and Result then
+            return Result
         end
         return nil
     end
@@ -6800,15 +6415,15 @@ end
 
 function API:Kick(Reason)
     Reason = Reason or "Disconnected by API";
-    self:GetPlayer():Kick(Reason);
+    LocalPlayer:Kick(Reason);
 end
 
 function API:FireRemote(Remote, ...)
     local Event = ReplicatedStorage:FindFirstChild(Remote)
     if not Event then
-        return false, "Remote not found"
+        return false
     end
-    
+
     if Event:IsA("RemoteEvent") then
         Event:FireServer(...)
         return true
@@ -6818,13 +6433,13 @@ function API:FireRemote(Remote, ...)
         return Event:InvokeServer(...)
     end
     
-    return false, "Unknown remote type"
+    return false
 end
 
 function API:ListenRemote(Remote, Callback)
     local Event = ReplicatedStorage:FindFirstChild(Remote)
     if not Event then
-        return false, "Remote not found"
+        return false
     end
     
     if Event:IsA("RemoteEvent") then
@@ -6837,17 +6452,14 @@ function API:ListenRemote(Remote, Callback)
         return true
     end
     
-    return false, "Unknown remote type"
+    return false
 end
 
 function API:Verify(Options)
     Options = Options or {}
-    
-    local LPlayer = self:GetPlayer()
-    local AllowedList = {}
-    
-    local RobloxId = self:GetHWID("Roblox")
-    local ExecutorHwid = self:GetHWID("Executor")
+
+    local LPlayer, List = (LocalPlayer), {}
+    local RobloxId, ExecutorHwid = self:GetHWID("Roblox"), self:GetHWID("Executor")
 
     if not RobloxId and not ExecutorHwid then
         return false, nil, nil
@@ -6859,62 +6471,61 @@ function API:Verify(Options)
         end)
     
         if Success then
-            local allMatches = {}
+            local Matches = {}
             
-            local success, decoded = pcall(function()
+            local Success, Decoded = pcall(function()
                 return HttpService:JSONDecode(Content)
             end)
-            
-            if success and typeof(decoded) == "table" then
-                local function extractFromTable(t)
+
+            if Success and typeof(Decoded) == "table" then
+                local function Decode_Table(t)
                     for k, v in pairs(t) do
                         if typeof(v) == "string" then
-                            table_insert(allMatches, v)
+                            table_insert(Matches, v)
                         elseif typeof(v) == "number" then
-                            table_insert(allMatches, tostring(v))
+                            table_insert(Matches, tostring(v))
                         elseif typeof(v) == "table" then
-                            extractFromTable(v)
+                            Decode_Table(v)
                         end
                         if typeof(k) == "string" then
-                            table_insert(allMatches, k)
+                            table_insert(Matches, k)
                         elseif typeof(k) == "number" then
-                            table_insert(allMatches, tostring(k))
+                            table_insert(Matches, tostring(k))
                         end
                     end
                 end
-                extractFromTable(decoded)
+                Decode_Table(Decoded)
             end
             
-            local function splitByAnyDelimiter(text)
-                local results = {}
-                local delimiters = {",", ";", "|", "\t", "\n", "\r", "  "}
-                for _, delim in ipairs(delimiters) do
-                    text = string_gsub(text, delim, " ")
+            local function SplitByDelimiter(Text)
+                local Results = {}
+                for _, Delimiter in ipairs({",", ";", "|", "\t", "\n", "\r", "  "}) do
+                    Text = string_gsub(Text, Delimiter, " ")
                 end
-                for word in string_gmatch(text, "[^%s]+") do
-                    table_insert(results, word)
+                for Word in string_gmatch(Text, "[^%s]+") do
+                    table_insert(Results, Word)
                 end
-                return results
+                return Results
             end
             
-            for line in string_gmatch(Content, "[^\r\n]+") do
-                line = line:gsub("^%s+", ""):gsub("%s+$", "")
-                if line ~= "" and not line:match("^%s*%-%-") and not line:match("^%s*#") and not line:match("^%s*//") then
-                    local words = splitByAnyDelimiter(line)
-                    for _, word in ipairs(words) do
-                        table_insert(allMatches, word)
+            for Line in string_gmatch(Content, "[^\r\n]+") do
+                Line = Line:gsub("^%s+", ""):gsub("%s+$", "")
+                if Line ~= "" and not Line:match("^%s*%-%-") and not Line:match("^%s*#") and not Line:match("^%s*//") then
+                    local Words = SplitByDelimiter(Line)
+                    for _, Word in ipairs(Words) do
+                        table_insert(Matches, Word)
                     end
                 end
             end
             
-            for _, match in ipairs(allMatches) do
-                match = match:gsub("^%s+", ""):gsub("%s+$", "")
-                match = match:gsub('"', "")
-                match = match:gsub("'", "")
-                match = match:gsub("[{}%[%]()]", "")
+            for _, Match in ipairs(Matches) do
+                Match = Match:gsub("^%s+", ""):gsub("%s+$", "")
+                Match = Match:gsub('"', "")
+                Match = Match:gsub("'", "")
+                Match = Match:gsub("[{}%[%]()]", "")
                 
-                if match ~= "" then
-                    table_insert(AllowedList, match)
+                if Match ~= "" then
+                    table_insert(List, Match)
                 end
             end
         else
@@ -6922,187 +6533,65 @@ function API:Verify(Options)
         end
     end
     
-    for _, item in ipairs(Options.Hwids or {}) do
-        if item and item ~= "" then
-            table_insert(AllowedList, tostring(item))
+    for _, Item in ipairs(Options.Hwids or {}) do
+        if Item and Item ~= "" then
+            table_insert(List, tostring(Item))
         end
     end
     
-    local function unique(t)
-        local seen = {}
-        local result = {}
-        for _, v in ipairs(t) do
-            if not seen[v] then
-                seen[v] = true
-                table_insert(result, v)
+    local function Unique(Table)
+        local Seen, Result = {}, {}
+
+        for _, v in ipairs(Table) do
+            if not Seen[v] then
+                Seen[v] = true
+                table_insert(Result, v)
             end
         end
-        return result
+        return Result
     end
     
-    AllowedList = unique(AllowedList)
-    
-    local IsWhitelisted = false
-    local Type, Value = nil, nil
+    List = Unique(List)
+
+    local Authenticated, Value = false, nil
     
     if RobloxId then
-        for _, item in ipairs(AllowedList) do
-            if tostring(RobloxId):lower() == tostring(item):lower() then
-                IsWhitelisted = true
-                Type = "Roblox HWID"
+        for _, Item in ipairs(List) do
+            if tostring(RobloxId):lower() == tostring(Item):lower() then
+                Authenticated = true
                 Value = RobloxId
                 break
             end
         end
     end
-    
-    if not IsWhitelisted and ExecutorHwid then
-        for _, item in ipairs(AllowedList) do
-            if tostring(ExecutorHwid):lower() == tostring(item):lower() then
-                IsWhitelisted = true
-                Type = "Executor HWID"
+
+    if not Authenticated and ExecutorHwid then
+        for _, Item in ipairs(List) do
+            if tostring(ExecutorHwid):lower() == tostring(Item):lower() then
+                Authenticated = true
                 Value = ExecutorHwid
                 break
             end
         end
     end
-    
-    if not IsWhitelisted then
-        for _, item in ipairs(AllowedList) do
-            local itemStr = tostring(item):lower()
-            if itemStr == tostring(LPlayer.UserId) or itemStr == LPlayer.Name:lower() then
-                IsWhitelisted = true
-                Type = "User"
-                Value = item
+
+    if not Authenticated then
+        for _, Item in ipairs(List) do
+            local String = tostring(Item):lower()
+
+            if String == tostring(LPlayer.UserId) or String == LPlayer.Name:lower() then
+                Authenticated = true
+                Value = Item
                 break
             end
         end
     end
-    
-    if IsWhitelisted then
+
+    if Authenticated then
         return true, Type, Value
     end
     
     return false, nil, nil
-end
-
-function API:ConflictsResolver()
-    if self.ConflictHandler then return true end
-
-    self.ConflictHandler = { ActiveFeatures = {},
-        Conflicts = { Flight = { "AntiCollider"}, AntiCollider = {"Flight", "Strengthen", "TouchFling"} }
-    }
-
-    return true
-end
-
-function API:RegisterConflict(Conflict, State)
-    self:ConflictsResolver()
-
-    if State == false then
-        if self.ConflictHandler.ActiveFeatures[Conflict] then
-            self.ConflictHandler.ActiveFeatures[Conflict] = nil
-        end
-        return true
-    end
-
-    local Conflicts = self.ConflictHandler.Conflicts[Conflict] or {}
-
-    for _, Conflict in ipairs(Conflicts) do
-        if self.ConflictHandler.ActiveFeatures[Conflict] then
-            self:StopConflict(Conflict)
-        end
-    end
-
-    self.ConflictHandler.ActiveFeatures[Conflict] = { Name = Conflict, Activated_At = os_clock() }
-    
-    return true
-end
-
-function API:StopConflict(Conflict)
-    local Feature_Actions = {
-        Flight = function()
-            if self.FlightData and self.FlightData.Active then
-                self:Flight(false, nil)
-                return true
-            end
-            return false
-        end,
-        --[[
-        VehicleFlight = function()
-            if self.VehicleFlightData and self.VehicleFlightData.Active then
-                self:VehicleFlight(false, nil)
-                return true
-            end
-            return false
-        end,
-        --]]
-        AntiCollider = function()
-            if self.AntiCollide then
-                self:AntiCollider(false, nil)
-                return true
-            end
-            return false
-        end,
-        Strengthen = function()
-            if self.Strengthened then
-                self:Strengthen(false, nil)
-                return true
-            end
-            return false
-        end,
-        TouchFling = function()
-            if self.FlingData and self.FlingData.Active then
-                self:TouchFling(false, nil)
-                return true
-            end
-            return false
-        end,
-        BypassWS = function()
-            if self.WSData and self.WSData.Active then
-                self:BypassWS(false, nil)
-                return true
-            end
-            return false
-        end,
-        BypassJP = function()
-            if self.JPData and self.JPData.Active then
-                self:BypassJP(false, nil)
-                return true
-            end
-            return false
-        end,
-        InfiniteJump = function()
-            if self.JumpData and self.JumpData.Active then
-                self:InfiniteJump(false)
-                return true
-            end
-            return false
-        end
-    }
-
-    local Action = Feature_Actions[Conflict]
-    if Action then
-        local Success = Action()
-        if Success then
-            if self.ConflictHandler and self.ConflictHandler.ActiveFeatures then
-                self.ConflictHandler.ActiveFeatures[Conflict] = nil
-            end
-        end
-        return Success
-    end
-    
-    return false
-end
-
-function API:ClearConflicts()
-    if not self.ConflictHandler then return end
-
-    for Conflict, _ in pairs(self.ConflictHandler.ActiveFeatures) do
-        self:StopConflict(Conflict)
-    end
-    
-    self.ConflictHandler.ActiveFeatures = {}
 end
 
 function API:CreateBaseplate(Options)
@@ -7127,7 +6616,7 @@ function API:CreateBaseplate(Options)
         Anchored = Anchored,
         Parent = Parent
     })
-    
+
     local function UpdatePosition()
         local Char = self:GetCharacter()
         if not Char then return end
@@ -7137,7 +6626,6 @@ function API:CreateBaseplate(Options)
             Baseplate.CFrame = Hum.CFrame + Offset
         end
     end
-
     UpdatePosition()
     
     local Connection = nil
@@ -7165,7 +6653,7 @@ function API:CreateBaseplate(Options)
                 self:_Disconnect(Connection)
                 Connection = nil
             end
-            
+
             if Followed then
                 Connection = "@Baseplate_" .. self:RandomString(15)
                 self:_Connect(Connection, RenderStepped:Connect(UpdatePosition))
@@ -7194,11 +6682,7 @@ function API:CreateBaseplate(Options)
     }
 
     self.CreatedBaseplates = self.CreatedBaseplates or {}
-    table_insert(self.CreatedBaseplates, {
-        Baseplate = Baseplate,
-        Connection = Connection,
-        Usage = Usage
-    })
+    table_insert(self.CreatedBaseplates, {Baseplate = Baseplate, Connection = Connection, Usage = Usage})
     
     return Usage
 end
@@ -7207,22 +6691,21 @@ function API:ClearBaseplates()
     self.CreatedBaseplates = self.CreatedBaseplates or {}
 
     for _, Data in ipairs(self.CreatedBaseplates) do
-        pcall(function()
-            if Data.Baseplate then
-                Data.Baseplate:Destroy()
-            end
-            if Data.Connection then
-                self:_Disconnect(Data.Connection)
-            end
-        end)
+        if Data.Baseplate then
+            Data.Baseplate:Destroy()
+        end
+
+        if Data.Connection then
+            self:_Disconnect(Data.Connection)
+        end
     end
 
-    self.CreatedBaseplates = {}
+    table_clear(self.CreatedBaseplates)
 end
 
 function API:GetCountry(Locale)
     local locale = Locale or LocalizationService.SystemLocaleId or "en-us"
-    
+
     local Countries = {
         ["en-us"] = {Code = "US", Country = "United States", Language = "English", Flag = "🇺🇸", LangCode = "en"},
         ["en-ca"] = {Code = "CA", Country = "Canada", Language = "English", Flag = "🇨🇦", LangCode = "en"},
@@ -7420,8 +6903,6 @@ function API:GetCountry(Locale)
         ["en-mh"] = {Code = "MH", Country = "Marshall Islands", Language = "English", Flag = "🇲🇭", LangCode = "en"},
         ["ch-gu"] = {Code = "GU", Country = "Guam", Language = "Chamorro", Flag = "🇬🇺", LangCode = "ch"},
         ["en-gu"] = {Code = "GU", Country = "Guam", Language = "English", Flag = "🇬🇺", LangCode = "en"},
-        
-        ["en"] = {Code = "US", Country = "United States", Language = "English", Flag = "🇺🇸", LangCode = "en"},
     }
     
     local Result = Countries[locale] or Countries[locale:sub(1,2)] or Countries["en-us"]
@@ -7429,7 +6910,7 @@ function API:GetCountry(Locale)
     return Result.Code, Result.Country, Result.Language, Result.Flag, locale, Result.LangCode
 end
 
-function API:_GetLanguage(Input)
+function API:GetLanguage(Input)
     if not Input then return nil end
 
     local Lowered = tostring(Input):lower()
@@ -7484,8 +6965,8 @@ end
 function API:Translate(Text, TargetLang, Source)
     if not Text or Text == "" then return nil end
     
-    TargetLang = self:_GetLanguage(TargetLang or "en")
-    Source = self:_GetLanguage(Source or "auto")
+    TargetLang = self:GetLanguage(TargetLang or "en")
+    Source = self:GetLanguage(Source or "auto")
     
     if not TargetLang then TargetLang = "en" end
     if not Source then Source = "auto" end
@@ -7503,16 +6984,11 @@ function API:Translate(Text, TargetLang, Source)
     for Word in string_gmatch(Text, "[^%s]+") do
         local CleanWord = string_gsub(Word, "[%p%c]", "")
         if CleanWord ~= "" then
-            table_insert(Words, {
-                Original = Word,
-                Clean = CleanWord
-            })
+            table_insert(Words, {Original = Word, Clean = CleanWord})
         end
     end
-    
-    local TranslatedWords = {}
-    local UncachedWords = {}
-    local NeedsTranslation = false
+
+    local TranslatedWords, UncachedWords, NeedsTranslation = {}, {}, false
 
     if Source ~= "auto" then
         self.TranslateMemoryCache[TargetLang][Source] = self.TranslateMemoryCache[TargetLang][Source] or {}
@@ -7534,11 +7010,7 @@ function API:Translate(Text, TargetLang, Source)
                     MemCache[WordData.Clean] = Cached.Translated
                     TranslatedWords[Index] = Cached.Translated
                 else
-                    table_insert(UncachedWords, {
-                        Index = Index,
-                        Word = WordData.Original,
-                        Clean = WordData.Clean
-                    })
+                    table_insert(UncachedWords, {Index = Index, Word = WordData.Original, Clean = WordData.Clean})
                     NeedsTranslation = true
                 end
             end
@@ -7558,7 +7030,7 @@ function API:Translate(Text, TargetLang, Source)
     local RequestSuccess, Response = pcall(function()
         return Game:HttpGet(TranslateAPI)
     end)
-
+    
     if not RequestSuccess or not Response then 
         return nil 
     end
@@ -7622,22 +7094,16 @@ function API:Translate(Text, TargetLang, Source)
         local TranslatedWordList = {}
         for Word in string_gmatch(TranslatedText, "[^%s]+") do
             local CleanWord = string_gsub(Word, "[%p%c]", "")
-            table_insert(TranslatedWordList, {
-                Original = Word,
-                Clean = CleanWord
-            })
+
+            table_insert(TranslatedWordList, {Original = Word, Clean = CleanWord})
         end
-        
+
         for Index, WordData in ipairs(Words) do
             if TranslatedWordList[Index] then
                 MemCache[WordData.Clean] = TranslatedWordList[Index].Original
-                
+
                 local CacheFile = SourcePath .. WordData.Clean .. ".json"
-                
-                self:SaveData(CacheFile, {
-                    Original = WordData.Original,
-                    Translated = TranslatedWordList[Index].Original
-                })
+                self:SaveData(CacheFile, {Original = WordData.Original, Translated = TranslatedWordList[Index].Original})
             end
         end
     end
@@ -7645,7 +7111,7 @@ function API:Translate(Text, TargetLang, Source)
     return TranslatedText, TargetCode, OriginalText, DetectedSource
 end
 
--- // Developer Tool Scripts
+-- // @Developer Tool Scripts
 function API:Infinite_Yield()
     return self:LoadFile("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
 end
@@ -7674,44 +7140,75 @@ function API:Vulnerability_Test()
     return self:LoadFile("https://raw.githubusercontent.com/ltseverydayyou/uuuuuuu/main/VulnTest.lua")
 end
 
--- // @Loop Manager.Module, Build: 1.48
-function API:CreateStacks()
-    if typeof(self.Stacks) ~= "table" then
-        self.Stacks = {While = {Connection = nil, Coroutines = {}, Active = true},
-			Heartbeat = {Connection = nil, Functions = {}, Active = true},
-            RenderStep = {Connection = nil, Functions = {}, Active = true},
-            Stepped = {Connection = nil, Functions = {}, Active = true},
+-- // @LoopManager Reborn V2
+function API:CreateLM()
+    if typeof(self.LM) ~= "table" then
+        self.LM = {
+            Stacks = {
+                WhileLoop = {
+                    Loops = {},
+                    Connections = {}
+                },
+                HeavyLoop = {
+                    Loops = {},
+                    Connections = {}
+                },
+                Heartbeat = {
+                    Loops = {},
+                    Connection = nil
+                },
+                RenderStep = {
+                    Loops = {},
+                    Connection = nil
+                },
+                Stepped = {
+                    Loops = {},
+                    Connection = nil
+                },
+                BindToRenderStep = {
+                    Loops = {},
+                },
+                Keybind = {
+                    Loops = {},
+                },
+                Task = {
+                    Loops = {},
+                }
+            },
+            Debug = false, Unloaded = false,
         }
     end
 end
 
 function API:LogLM(Message, ...)
-    if not self.LM_Debug then return end
+    if not self.LM or not self.LM.Debug then return end
     if not Message then return end
     warn("[@Loop Manager]: " .. string_format(Message, ...))
 end
 
-local function AddService(self, Name, Signal)
-    local Stack = self.Stacks[Name]
+function API:AddService(Name, Signal)
+    local Local = self
+    Local:CreateLM()
+
+    local Stack = Local.LM.Stacks[Name]
+    if not Stack then return end
     if Stack.Connection then return end
 
     Stack.Connection = Signal:Connect(function(...)
-        if self.UnloadedLM then return end
+        if Local.LM.Unloaded then return end
 
-        local Funcs = Stack.Functions
-        for Name, Data in pairs(Funcs) do
+        for _, Data in pairs(Stack.Loops) do
             if Data.Running and not Data.Paused then
-                if typeof(Data.Callback) == "function" then
-                    task_spawn(Data.Callback, self, ...)
-                else
-                    self:LogLM("Callback for '%s' is not a function", Name)
-                end
+                task_spawn(Data.Callback, Local, ...)
             end
         end
     end)
 end
 
 function API:SmartLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
+    local Local = self
+    Local:CreateLM()
+    
     if typeof(WaitBoy) == "function" then
         local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
         WaitBoy = nil
@@ -7721,55 +7218,42 @@ function API:SmartLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     end
 
     if not Callback or typeof(Callback) ~= "function" then
-        self:LogLM("SmartLoop requires a callback function")
+        Local:LogLM("SmartLoop requires a callback function")
         return nil
     end
 
-    local Wait = WaitBoy or 0
-    local Name = Name or self:RandomString(15)
-    local Local = self
+    local Wait, Name = WaitBoy or 0, Name or Local:RandomString(15)
 
     local function Decision_Optimization()
-        local InWaitCount = 0
-
-        if Local.ActiveConnections then
-            for name, Data in pairs(Local.ActiveConnections) do
-                if Data.Wait == Wait and Data.Running then
-                    InWaitCount = InWaitCount + 1
-                end
+        local Count = 0
+        for _, Data in pairs(Local.LM.Stacks.WhileLoop.Loops) do
+            if Data.Wait == Wait and Data.Running then
+                Count = Count + 1
             end
         end
-
-        if Local.Stacks and Local.Stacks.While then
-            for stackWait, stackData in pairs(Local.Stacks.While) do
-                if stackData.Running then
-                    for name, Data in pairs(stackData.Coroutines) do
-                        if Data.Wait == Wait and Data.Running then
-                            InWaitCount = InWaitCount + 1
-                        end
-                    end
-                end
+        for _, Data in pairs(Local.LM.Stacks.HeavyLoop.Loops) do
+            if Data.Wait == Wait and Data.Running then
+                Count = Count + 1
             end
         end
-
-        InWaitCount = InWaitCount + 1
-
-        if InWaitCount >= 5 then return true end
-        if Wait < 0.05 and InWaitCount >= 3 then return true end
-
-        return false
+        return Count + 1
     end
 
-    if Decision_Optimization() then
-        self:LogLM("Using HeavyLoop for '%s' (Wait: %s, %d+ loops)", Name, Wait, 5)
-        return self:HeavyLoop(Wait, Callback, Name, WaitBefore, Destroyed)
+    local Decision = Decision_Optimization()
+
+    if Decision >= 5 or (Wait < 0.05 and Decision >= 3) then
+        Local:LogLM("Using HeavyLoop for '%s' (Wait: %s, %d+ loops)", Name, Wait, Decision)
+        return Local:HeavyLoop(Wait, Callback, Name, WaitBefore, Destroyed)
     else
-        self:LogLM("Using WhileLoop for '%s' (Wait: %s)", Name, Wait)
-        return self:WhileLoop(Wait, Callback, Name, WaitBefore, Destroyed)
+        Local:LogLM("Using WhileLoop for '%s' (Wait: %s)", Name, Wait)
+        return Local:WhileLoop(Wait, Callback, Name, WaitBefore, Destroyed)
     end
 end
 
 function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
+    local Local = self
+    Local:CreateLM()
+    
     if typeof(WaitBoy) == "function" then
         local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
         WaitBoy = nil
@@ -7779,13 +7263,11 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     end
 
     if not Callback or typeof(Callback) ~= "function" then
-        self:LogLM("WhileLoop requires a callback function")
+        Local:LogLM("WhileLoop requires a callback function")
         return nil
     end
 
-    local Wait = WaitBoy or 0
-    local Name = Name or self:RandomString(15)
-    local Local = self
+    local Wait, Name = WaitBoy or 0, Name or Local:RandomString(15)
 
     local Delay = 0 
     if WaitBefore == true then 
@@ -7794,17 +7276,24 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         Delay = WaitBefore 
     end
 
-    local Data = { Running = true, Paused = false, Thread = nil, Name = Name, Callback = Callback, Wait = Wait, WaitBefore = WaitBefore, Destroyed = Destroyed,
+    local Data = {
+        Type = "WhileLoop",
+        Running = true,
+        Paused = false,
+        Thread = nil,
+        Name = Name,
+        Callback = Callback,
+        Wait = Wait,
+        WaitBefore = WaitBefore,
+        Destroyed = Destroyed,
         Pause = function(s) 
             s.Paused = true 
             Local:LogLM("Paused WhileLoop '%s'", Name)
         end,
-        
         Unpause = function(s) 
             s.Paused = false 
             Local:LogLM("Unpaused WhileLoop '%s'", Name)
         end,
-
         SetWait = function(s, New)
             if typeof(New) ~= "number" or New < 0 then
                 Local:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
@@ -7813,15 +7302,13 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
             s.Wait = New
             Local:LogLM("Set wait for '%s' to %s seconds", Name, New)
         end,
-
         Kill = function(s) 
             Local:ForceStop(Name)
             Local:LogLM("Killed WhileLoop '%s'", Name)
         end
     }
 
-    Local.ActiveConnections = Local.ActiveConnections or {}
-    Local.ActiveConnections[Name] = Data
+    Local.LM.Stacks.WhileLoop.Loops[Name] = Data
 
     Data.Thread = task_create(function()
         if Delay > 0 then
@@ -7829,10 +7316,10 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         end
 
         while Data.Running do
-            if Local.UnloadedLM then return end
+            if Local.LM.Unloaded then return end
 
             if not Data.Paused then
-                Callback(self)
+                Data.Callback(Local)
                 if Wait > 0 then
                     task_wait(Wait)
                 end
@@ -7847,11 +7334,11 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
 end
 
 function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
-    self:CreateStacks()
+    local Local = self
+    Local:CreateLM()
 
     if typeof(WaitBoy) == "function" then
         local Function_1, Function_2, Function_3 = WaitBoy, Callback, Name
-
         WaitBoy = nil
         Callback = Function_1
         Name = Function_2
@@ -7859,33 +7346,22 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     end
 
     if not Callback or typeof(Callback) ~= "function" then
-        self:LogLM("HeavyLoop requires a callback function")
+        Local:LogLM("HeavyLoop requires a callback function")
         return nil
     end
 
-    local Wait = WaitBoy or 0
-    local Name = Name or self:RandomString(15)
-    local Local = self
-    local Waiting = {}
+    local Wait, Name, Waiting = WaitBoy or 0, Name or Local:RandomString(15), {}
 
-    local Stack_Data = self.Stacks.While[Wait]
-    if not Stack_Data then
-        Stack_Data = {
-            Coroutines = {},
-            Running = true,
-            Connection = nil,
-            Wait = Wait,
-            LastRun = nil
-        }
-        self.Stacks.While[Wait] = Stack_Data
+    if not Local.LM.Stacks.HeavyLoop.Connections[Wait] then
+        Local.LM.Stacks.HeavyLoop.Connections[Wait] = {Coroutines = {}, Running = true, Connection = nil, Wait = Wait, LastRun = nil}
+        local Stack_Data = Local.LM.Stacks.HeavyLoop.Connections[Wait]
         
-        Stack_Data.Connection = Heartbeat:Connect(function(deltaTime)
-            if Local.UnloadedLM then return end
+        Stack_Data.Connection = Heartbeat:Connect(function(Delta)
+            if Local.LM.Unloaded then return end
             if not Stack_Data.Running then return end
 
-            local Time = os_clock()
-
-            local Running = false
+            local Time, Running = os_clock(), false
+            
             if Wait == 0 then
                 Running = true
             elseif Stack_Data.LastRun == nil then
@@ -7896,24 +7372,24 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
                 Stack_Data.LastRun = Time
             end
             
-            for name, data in pairs(Stack_Data.Coroutines) do
-                if data.Running and not data.Paused then
-                    local Floop = Waiting[data.Coroutine]
-                    if Floop then Floop.Remaining = Floop.Remaining - deltaTime
+            for Name, Data in pairs(Stack_Data.Coroutines) do
+                if Data.Running and not Data.Paused then
+                    local Floop = Waiting[Data.Coroutine]
+                    if Floop then
+                        Floop.Remaining = Floop.Remaining - Delta
                         if Floop.Remaining <= 0 then
-                            Waiting[data.Coroutine] = nil
-                            data.IsWaiting = false
+                            Waiting[Data.Coroutine] = nil
+                            Data.IsWaiting = false
                         end
                     end
                 end
             end
             
             if Running then
-                for name, data in pairs(Stack_Data.Coroutines) do
-                    if data.Running and not data.Paused and not data.IsWaiting then
-                        local Floop = Waiting[data.Coroutine]
-                        if not Floop then
-                            task_resume(data.Coroutine, Local, deltaTime)
+                for Name, Data in pairs(Stack_Data.Coroutines) do
+                    if Data.Running and not Data.Paused and not Data.IsWaiting then
+                        if not Waiting[Data.Coroutine] then
+                            task_resume(Data.Coroutine, Local, Delta)
                         end
                     end
                 end
@@ -7921,12 +7397,14 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         end)
     end
 
+    local Stack_Data = Local.LM.Stacks.HeavyLoop.Connections[Wait]
+
     local function Cooldown(Seconds)
-        local co = task_running()
-        Waiting[co] = {Remaining = Seconds}
-        for name, data in pairs(Stack_Data.Coroutines) do
-            if data.Coroutine == co then
-                data.IsWaiting = true
+        local CO2 = task_running()
+        Waiting[CO2] = {Remaining = Seconds}
+        for Name, Data in pairs(Stack_Data.Coroutines) do
+            if Data.Coroutine == CO2 then
+                Data.IsWaiting = true
                 break
             end
         end
@@ -7940,18 +7418,19 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         Delay = WaitBefore 
     end
 
-    local Source = task_create(function(self, deltaTime)
+    local Source = task_create(function(self, Dt)
         if Delay > 0 then
             Cooldown(Delay)
         end
     
         while Stack_Data.Running do
-            Callback(self, deltaTime, Cooldown)
+            Callback(self, Dt, Cooldown)
             task_yield()
         end
     end)
 
     local Data = {
+        Type = "HeavyLoop",
         Running = true,
         Paused = false,
         IsWaiting = false,
@@ -7961,7 +7440,6 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
         Wait = Wait,
         WaitBefore = WaitBefore,
         Destroyed = Destroyed,
-
         Pause = function(s) 
             s.Paused = true 
             Local:LogLM("Paused HeavyLoop '%s'", Name)
@@ -7970,19 +7448,15 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
             s.Paused = false 
             Local:LogLM("Unpaused HeavyLoop '%s'", Name)
         end,
-        
         SetWait = function(s, New)
             if typeof(New) ~= "number" or New < 0 then
                 Local:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
                 return
             end
-            if Stack_Data then
-                Stack_Data.Wait = New
-                s.Wait = New
-                Local:LogLM("Set wait for '%s' to %s seconds", Name, New)
-            end
+            Stack_Data.Wait = New
+            s.Wait = New
+            Local:LogLM("Set wait for '%s' to %s seconds", Name, New)
         end,
-
         Kill = function(s) 
             Local:ForceStop(Name)
             Local:LogLM("Killed HeavyLoop '%s'", Name)
@@ -7995,92 +7469,24 @@ function API:HeavyLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
     return Data
 end
 
-function API:SetWait(Name, New)
-    if not self.Stacks or not self.Stacks.While then
-        return false
-    end
-
-    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
-    if Entry and Entry.SetWait then
-        if typeof(New) ~= "number" or New < 0 then
-            self:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
-            return false
-        end
-        Entry.Wait = New
-        self:LogLM("Updated wait for '%s' to %s seconds", Name, New)
-        return true
-    end
-
-    for Wait, Stack_Data in pairs(self.Stacks.While) do
-        if Stack_Data.Coroutines and Stack_Data.Coroutines[Name] then
-            if typeof(New) ~= "number" or New < 0 then
-                self:LogLM("Invalid wait time for '%s': %s", Name, tostring(New))
-                return false
-            end
-            Stack_Data.Wait = New
-            Stack_Data.Coroutines[Name].Wait = New
-            self:LogLM("Updated wait for '%s' to %s seconds", Name, New)
-            return true
-        end
-    end
-
-    self:LogLM("SetWait failed: Could not find loop named '%s'", Name)
-    return false
-end
-
-function API:RenderStep(Callback, Name)
-    self:CreateStacks()
-
-    if typeof(Callback) ~= "function" then
-        self:LogLM("RenderStep requires a callback function")
-        return nil
-    end
-
-    local Name = Name or self:RandomString(15)
-	local Local = self
-    AddService(self, "RenderStep", RenderStepped)
-
-    local Data = {
-        Running = true,
-        Paused = false,
-        Callback = Callback,
-
-        Pause = function(s) 
-            s.Paused = true 
-            Local:LogLM("Paused RenderStep '%s'", Name)
-        end,
-        Unpause = function(s) 
-            s.Paused = false 
-            Local:LogLM("Unpaused RenderStep '%s'", Name)
-        end,
-
-        Kill = function(s) 
-            Local:ForceStop(Name)
-            Local:LogLM("Killed RenderStep '%s'", Name)
-        end
-    }
-
-    Local.Stacks.RenderStep.Functions[Name] = Data
-    return Data
-end
-
 function API:Heartbeat(Callback, Name)
-    self:CreateStacks()
+    local Local = self
+    Local:CreateLM()
 
     if typeof(Callback) ~= "function" then
-        self:LogLM("Heartbeat requires a callback function")
+        Local:LogLM("Heartbeat requires a callback function")
         return nil
     end
 
-    local Name = Name or self:RandomString(15)
-	local Local = self
-    AddService(self, "Heartbeat", Heartbeat)
-    
+    local Name = Name or Local:RandomString(15)
+    Local.AddService(Local, "Heartbeat", Heartbeat)
+
     local Data = {
+        Type = "Heartbeat",
         Running = true,
         Paused = false,
+        Name = Name,
         Callback = Callback,
-
         Pause = function(s) 
             s.Paused = true 
             Local:LogLM("Paused Heartbeat '%s'", Name)
@@ -8089,34 +7495,70 @@ function API:Heartbeat(Callback, Name)
             s.Paused = false 
             Local:LogLM("Unpaused Heartbeat '%s'", Name)
         end,
-
         Kill = function(s) 
             Local:ForceStop(Name)
             Local:LogLM("Killed Heartbeat '%s'", Name)
         end
     }
-    
-    Local.Stacks.Heartbeat.Functions[Name] = Data
+
+    Local.LM.Stacks.Heartbeat.Loops[Name] = Data
+    return Data
+end
+
+function API:RenderStep(Callback, Name)
+    local Local = self
+    Local:CreateLM()
+
+    if typeof(Callback) ~= "function" then
+        Local:LogLM("RenderStep requires a callback function")
+        return nil
+    end
+
+    local Name = Name or Local:RandomString(15)
+    Local.AddService(Local, "RenderStep", RenderStepped)
+
+    local Data = {
+        Type = "RenderStep",
+        Running = true,
+        Paused = false,
+        Name = Name,
+        Callback = Callback,
+        Pause = function(s) 
+            s.Paused = true 
+            Local:LogLM("Paused RenderStep '%s'", Name)
+        end,
+        Unpause = function(s) 
+            s.Paused = false 
+            Local:LogLM("Unpaused RenderStep '%s'", Name)
+        end,
+        Kill = function(s) 
+            Local:ForceStop(Name)
+            Local:LogLM("Killed RenderStep '%s'", Name)
+        end
+    }
+
+    Local.LM.Stacks.RenderStep.Loops[Name] = Data
     return Data
 end
 
 function API:Stepped(Callback, Name)
-    self:CreateStacks()
+    local Local = self
+    Local:CreateLM()
 
     if typeof(Callback) ~= "function" then
-        self:LogLM("Stepped requires a callback function")
+        Local:LogLM("Stepped requires a callback function")
         return nil
     end
 
-    local Name = Name or self:RandomString(15)
-	local Local = self
-    AddService(self, "Stepped", Stepped)
-    
+    local Name = Name or Local:RandomString(15)
+    Local.AddService(Local, "Stepped", Stepped)
+
     local Data = {
+        Type = "Stepped",
         Running = true,
         Paused = false,
+        Name = Name,
         Callback = Callback,
-
         Pause = function(s) 
             s.Paused = true 
             Local:LogLM("Paused Stepped '%s'", Name)
@@ -8125,34 +7567,34 @@ function API:Stepped(Callback, Name)
             s.Paused = false 
             Local:LogLM("Unpaused Stepped '%s'", Name)
         end,
-
         Kill = function(s) 
             Local:ForceStop(Name)
             Local:LogLM("Killed Stepped '%s'", Name)
         end
     }
 
-    Local.Stacks.Stepped.Functions[Name] = Data
+    Local.LM.Stacks.Stepped.Loops[Name] = Data
     return Data
 end
 
 function API:BindRender(Callback, Name, Priority)
-    self:CreateStacks()
+    local Local = self
+    Local:CreateLM()
 
     if typeof(Callback) ~= "function" then
-        self:LogLM("BindRender requires a callback function")
+        Local:LogLM("BindRender requires a callback function")
         return nil
     end
 
     local Name = Name or self:RandomString(15)
-    local Local = self
 
     local Data = {
         Type = "BindToRenderStep",
-        Name = Name,
         Running = true,
         Paused = false,
-
+        Name = Name,
+        Callback = Callback,
+        Priority = Priority or Enum.RenderPriority.Last.Value,
         Pause = function(s) 
             s.Paused = true 
             Local:LogLM("Paused BindToRenderStep '%s'", Name)
@@ -8161,52 +7603,50 @@ function API:BindRender(Callback, Name, Priority)
             s.Paused = false 
             Local:LogLM("Unpaused BindToRenderStep '%s'", Name)
         end,
-
         Kill = function(s) 
             Local:ForceStop(Name)
             Local:LogLM("Killed BindToRenderStep '%s'", Name)
         end
     }
 
-    local Func = function(dt)
-        if Local.UnloadedLM or not Data.Running or Data.Paused then 
+    local Func = function(Dt)
+        if Local.LM.Unloaded or not Data.Running or Data.Paused then 
             return 
         end
-        Callback(self, dt)
+        Data.Callback(Local, Dt)
     end
 
     BindToRenderStep(Name, Priority or Enum.RenderPriority.Last.Value, Func)
     Data.Func = Func
 
-    Local.ActiveConnections = Local.ActiveConnections or {}
-    Local.ActiveConnections[Name] = Data
-
+    Local.LM.Stacks.BindToRenderStep.Loops[Name] = Data
     return Data
 end
 
 function API:BindKeybind(Key, Callback, BindName)
-    self:CreateStacks()
+    local Local = self
+    Local:CreateLM()
 
     if not Key then
-        self:LogLM("BindKeybind requires a Key parameter")
+        Local:LogLM("BindKeybind requires a Key parameter")
         return nil
     end
 
     if typeof(Callback) ~= "function" then
-        self:LogLM("BindKeybind requires a callback function")
+        Local:LogLM("BindKeybind requires a callback function")
         return nil
     end
 
-    local Name = BindName or self:RandomString(15)
-    local Local = self
+    local Name = BindName or Local:RandomString(15)
 
     local Data = {
         Type = "Keybind",
-        Name = Name,
-        Key = Key,
         Running = true,
         Paused = false,
-        
+        Name = Name,
+        Key = Key,
+        Callback = Callback,
+        Connection = nil,
         Pause = function(s) 
             s.Paused = true 
             Local:LogLM("Paused Keybind '%s'", Name)
@@ -8215,7 +7655,6 @@ function API:BindKeybind(Key, Callback, BindName)
             s.Paused = false 
             Local:LogLM("Unpaused Keybind '%s'", Name)
         end,
-        
         Kill = function(s) 
             Local:ForceStop(Name)
             Local:LogLM("Killed Keybind '%s'", Name)
@@ -8223,331 +7662,236 @@ function API:BindKeybind(Key, Callback, BindName)
     }
 
     local Func = function(Input, Processed)
-        if Processed or Local.UnloadedLM or not Data.Running or Data.Paused then 
+        if Processed or Local.LM.Unloaded or not Data.Running or Data.Paused then 
             return 
         end
-        
         if Input.KeyCode == Key or Input.UserInputType == Key then
-            Callback(self, Input)
+            Data.Callback(Local, Input)
         end
     end
 
     Data.Connection = InputBegan:Connect(Func)
-    Data.Callback = Callback
-    Data.InternalFunc = Func
-    
-    Local.ActiveConnections = Local.ActiveConnections or {}
-    Local.ActiveConnections[Name] = Data
-   
+    Local.LM.Stacks.Keybind.Loops[Name] = Data
     return Data
 end
 
 function API:SetKeybind(Name, NewKey)
-    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
-    if not Entry or Entry.Type ~= "Keybind" then
-        self:LogLM("SetKeybind failed: '%s' not found or not a keybind", Name)
-        return false, "Invalid keybind"
+    local Local = self
+
+    local Data = Local.LM and Local.LM.Stacks.Keybind.Loops[Name]
+    if not Data or Data.Type ~= "Keybind" then
+        Local:LogLM("SetKeybind Could not find '%s' or its not a keybind", Name)
+        return false
     end
 
     if not NewKey then
-        self:LogLM("SetKeybind requires a NewKey parameter")
-        return false, "Invalid key"
+        Local:LogLM("SetKeybind requires a 'NewKey' parameter")
+        return false
     end
 
-    self:LogLM("Updating keybind '%s' from %s to %s", Name, tostring(Entry.Key), tostring(NewKey))
+    Local:LogLM("Updating keybind '%s' from %s to %s", Name, tostring(Data.Key), tostring(NewKey))
 
-    if Entry.Connection then
-        Entry.Connection:Disconnect()
+    if Data.Connection then
+        Data.Connection:Disconnect()
     end
 
-    Entry.Key = NewKey
+    Data.Key = NewKey
 
     local Func = function(Input, Processed)
-        if Processed or self.UnloadedLM or not Entry.Running or Entry.Paused then 
+        if Processed or Local.LM.Unloaded or not Data.Running or Data.Paused then 
             return 
         end
         if Input.KeyCode == NewKey or Input.UserInputType == NewKey then
-            Entry.Callback(self, Input)
+            Data.Callback(Local, Input)
         end
     end
 
-    Entry.Connection = InputBegan:Connect(Func)
-    Entry.InternalFunc = Func
-
+    Data.Connection = InputBegan:Connect(Func)
     return true
 end
 
-function API:ForceStop(Name)
-    local Entry = self.ActiveConnections and self.ActiveConnections[Name]
-    if Entry then
-        local _DestroyCallback = Entry.Destroyed
+function API:AddTask(Signal, Callback, Name)
+    local Local = self
+    Local:CreateLM()
 
-        Entry.Running = false
-
-        if Entry.Type == "BindToRenderStep" then
-            pcall(function() 
-                UnbindFromRenderStep(Entry.Name or Name)
-            end)
-        elseif Entry.Connection then
-            Entry.Connection:Disconnect()
-        end
-        
-        if Entry.Thread then
-            pcall(task_cancel, Entry.Thread)
-            Entry.Thread = nil
-        end
-
-        self.ActiveConnections[Name] = nil
-
-        if _DestroyCallback then
-            pcall(_DestroyCallback, self)
-        end
-        
-        return true
+    if Local.LM.Stacks.Task.Loops[Name] then
+        return Local.LM.Stacks.Task.Loops[Name]
     end
-    
-    if self.Stacks then
-        for Wait, Stack in pairs(self.Stacks.While) do
-            if typeof(Wait) == "number" and typeof(Stack) == "table" and Stack.Coroutines and Stack.Coroutines[Name] then
-                local Data = Stack.Coroutines[Name]
-				if Data.Destroyed then
-                    pcall(Data.Destroyed, self)
-                end
 
+    local Name = Name or self:RandomString(15)
+
+    local Data = {
+        Type = "Task",
+        Running = true,
+        Paused = false,
+        Name = Name,
+        Signal = Signal,
+        Callback = Callback,
+        Connection = nil,
+        Pause = function(s) 
+            s.Paused = true 
+            Local:LogLM("Task '%s' paused", Name)
+        end,
+        Unpause = function(s) 
+            s.Paused = false 
+            Local:LogLM("Task '%s' unpaused", Name)
+        end,
+        Kill = function(s) 
+            Local:ForceStop(Name)
+            Local:LogLM("Task '%s' killed", Name)
+        end
+    }
+
+    Data.Connection = Signal:Connect(function(...)
+        if Data.Running and not Data.Paused and not Local.LM.Unloaded then
+            Data.Callback(Local, ...)
+        end
+    end)
+
+    Local.LM.Stacks.Task.Loops[Name] = Data
+    return Data
+end
+
+function API:ForceStop(Name)
+    local Found, Local = false, self
+
+    if Local.LM and Local.LM.Stacks and Local.LM.Stacks.HeavyLoop and Local.LM.Stacks.HeavyLoop.Connections then
+        for Wait, Stack_Data in pairs(Local.LM.Stacks.HeavyLoop.Connections) do
+            if Stack_Data.Coroutines and Stack_Data.Coroutines[Name] then
+                local Data = Stack_Data.Coroutines[Name]
+                
+                if Data.Coroutine then
+                    pcall(task_cancel, Data.Coroutine)
+                end
+                
+                if Data.Destroyed then
+                    pcall(Data.Destroyed, Local)
+                end
+                
                 Data.Running = false
-                Stack.Coroutines[Name] = nil
+                Stack_Data.Coroutines[Name] = nil
 
-                if not next(Stack.Coroutines) then
-                    Stack.Running = false
-                    if Stack.Connection then
-                        Stack.Connection:Disconnect()
-                    end
-                    self.Stacks.While[Wait] = nil
+                if Local.LM.Stacks.HeavyLoop.Loops then
+                    Local.LM.Stacks.HeavyLoop.Loops[Name] = nil
                 end
-                return true
+
+                if not next(Stack_Data.Coroutines) then
+                    if Stack_Data.Connection then
+                        pcall(Stack_Data.Connection.Disconnect, Stack_Data.Connection)
+                    end
+                    Local.LM.Stacks.HeavyLoop.Connections[Wait] = nil
+                end
+                
+                Found = true
+                Local:LogLM("Disconnected '%s' (HeavyLoop)", Name)
+                break
             end
         end
-        
-        if self.Stacks.Heartbeat and self.Stacks.Heartbeat.Functions and self.Stacks.Heartbeat.Functions[Name] then
-            self.Stacks.Heartbeat.Functions[Name] = nil
-            return true
-        end
-        
-        if self.Stacks.RenderStep and self.Stacks.RenderStep.Functions and self.Stacks.RenderStep.Functions[Name] then
-            self.Stacks.RenderStep.Functions[Name] = nil
-            return true
-        end
-        
-        if self.Stacks.Stepped and self.Stacks.Stepped.Functions and self.Stacks.Stepped.Functions[Name] then
-            self.Stacks.Stepped.Functions[Name] = nil
-            return true
+    end
+
+    if not Found then
+        for StackName, Stack in pairs(Local.LM.Stacks) do
+            if Stack.Loops and Stack.Loops[Name] then
+                local Data = Stack.Loops[Name]
+
+                if Data.Type == "WhileLoop" and Data.Thread then
+                    pcall(task_cancel, Data.Thread)
+                elseif Data.Type == "BindToRenderStep" and Data.Func then
+                    pcall(UnbindFromRenderStep, Name)
+                elseif Data.Type == "Keybind" and Data.Connection then
+                    pcall(Data.Connection.Disconnect, Data.Connection)
+                elseif Data.Type == "Task" and Data.Connection then
+                    pcall(Data.Connection.Disconnect, Data.Connection)
+                end
+
+                if Data.Destroyed then
+                    pcall(Data.Destroyed, Local)
+                end
+
+                Data.Running, Stack.Loops[Name], Found = false, nil, true
+                Local:LogLM("Disconnected '%s' (%s)", Name, Data.Type)
+                break
+            end
         end
     end
 
-    self:LogLM("ForceStop: Could not find '%s'", Name)
+    if not Found then
+        Local:LogLM("Could not find '%s'", Name)
+    end
+
+    return Found
+end
+
+function API:SetWait(Name, New)
+    local Local = self
+    Local:CreateLM()
+
+    for StackName, Stack in pairs(Local.LM.Stacks) do
+        if Stack.Loops and Stack.Loops[Name] then
+            local Data = Stack.Loops[Name]
+            if Data.SetWait then
+                return Data:SetWait(New)
+            end
+        end
+    end
+
+    Local:LogLM("Could not find '%s'", Name)
     return false
 end
 
 function API:GetState(Name)
-    local Entry = (self.ActiveConnections and self.ActiveConnections[Name]) or (self.ActiveTasks and self.ActiveTasks[Name])
-    if Entry then
-        if not Entry.Running then return false end
-        if Entry.Paused then return "Paused" end
-        return true
-    end
-
-    if self.Stacks then
-        for Wait, Stack in pairs(self.Stacks.While) do
-            local Data = Stack.Functions and Stack.Functions[Name]
-            if Data then
-                if not Data.Running then return false end
-                if Data.Paused then return "Paused" end
-                return true
-            end
-        end
-
-        local Data = self.Stacks.Heartbeat.Functions and self.Stacks.Heartbeat.Functions[Name]
-        if Data then
-            if not Data.Running then return false end
-            if Data.Paused then return "Paused" end
-            return true
-        end
-        
-        Data = self.Stacks.RenderStep.Functions and self.Stacks.RenderStep.Functions[Name]
-        if Data then
-            if not Data.Running then return false end
-            if Data.Paused then return "Paused" end
-            return true
-        end
-        
-        Data = self.Stacks.Stepped.Functions and self.Stacks.Stepped.Functions[Name]
-        if Data then
-            if not Data.Running then return false end
-            if Data.Paused then return "Paused" end
-            return true
-        end
-    end
-    
-    return nil
-end
-
-function API:AddTask(Signal, Callback, Name)
-    self.ActiveTasks = self.ActiveTasks or {}
-
-    if self.ActiveTasks[Name] then
-        return self.ActiveTasks[Name]
-    end
-
-    local Name = Name or self:RandomString(15)
     local Local = self
 
-    local Data = {
-        Signal = Signal, 
-        Callback = Callback, 
-        Connection = nil, 
-        Running = true,
-        Paused = false,
-        Type = "Task"
-    }
-
-    Data.Pause = function(S) 
-        S.Paused = true 
-        self:LogLM("Task '%s' paused", Name)
-    end
-    Data.Unpause = function(S) 
-        S.Paused = false 
-        self:LogLM("Task '%s' unpaused", Name)
-    end
-    Data.Kill = function(S) 
-        Local:StopTask(Name)
-        self:LogLM("Task '%s' killed", Name)
-    end
-
-    local function wrapper()
-        Data.Connection = Signal:Connect(function(...)
-            if Data.Running and not Data.Paused and not Local.UnloadedLM then
-                Callback(Local, ...)
-            end
-        end)
-    end
-
-    wrapper()
-    Data.Reconnect = wrapper
-    self.ActiveTasks[Name] = Data
-
-    return Data
-end
-
-function API:StopTask(Name)
-    local Data = self.ActiveTasks and self.ActiveTasks[Name]
-    if Data then
-        Data.Running = false
-        if Data.Connection then
-            Data.Connection:Disconnect()
-            Data.Connection = nil
-        end
-        self.ActiveTasks[Name] = nil
-        self:LogLM("Task '%s' stopped", Name)
-    else
-        self:LogLM("StopTask: Task '%s' not found", Name)
-    end
-end
-
-function API:RestartTask(Name)
-    local Data = self.ActiveTasks and self.ActiveTasks[Name]
-    if Data then
-        if Data.Running then 
-            Data.Connection:Disconnect() 
-        end
-        
-        Data.Running = true
-        Data.Paused = false
-        Data.Reconnect()
-        self:LogLM("Task '%s' restarted", Name)
-    else
-        self:LogLM("RestartTask: Task '%s' not found", Name)
-    end
-end
-
-function API:Unload_LM()
-    self.UnloadedLM = true
-	local Count = 0 
-
-    Count = 0
-    if self.ActiveConnections then
-        for Instance, _ in pairs(self.ActiveConnections) do
-            self:ForceStop(Instance)
-            Count = Count + 1
-        end
-        if Count > 0 then
-            self:LogLM("Unloaded %d Active Connections", Count)
+    for StackName, Stack in pairs(Local.LM.Stacks) do
+        if Stack.Loops and Stack.Loops[Name] then
+            local Data = Stack.Loops[Name]
+            if not Data.Running then return false end
+            if Data.Paused then return false end
+            return true
         end
     end
-
-    Count = 0
-    if self.ActiveTasks then
-        for Instance, _ in pairs(self.ActiveTasks) do
-            self:StopTask(Instance)
-            Count = Count + 1
-        end
-        if Count > 0 then
-            self:LogLM("Unloaded %d Active Tasks", Count)
-        end
-    end
-
-    if self.Stacks then
-        Count = 0
-        for Wait, Stack in pairs(self.Stacks.While) do
-            if typeof(Wait) == "number" and Stack and Stack.Coroutines then
-                for Name, _ in pairs(Stack.Coroutines) do
-                    self:ForceStop(Name)
-                    Count = Count + 1
-                end
-            end
-        end
-        if Count > 0 then
-            self:LogLM("Unloaded %d Heavy Loops", Count)
-        end
-
-        Count = 0
-        if self.Stacks.Heartbeat and self.Stacks.Heartbeat.Functions then
-            for Instance, _ in pairs(self.Stacks.Heartbeat.Functions) do
-                self:ForceStop(Instance)
-                Count = Count + 1
-            end
-            if Count > 0 then
-                self:LogLM("Unloaded %d Heartbeats", Count)
-            end
-        end
-
-        Count = 0
-        if self.Stacks.RenderStep and self.Stacks.RenderStep.Functions then
-            for Instance, _ in pairs(self.Stacks.RenderStep.Functions) do
-                self:ForceStop(Instance)
-                Count = Count + 1
-            end
-            if Count > 0 then
-                self:LogLM("Unloaded %d RenderSteps", Count)
-            end
-        end
-
-        Count = 0
-        if self.Stacks.Stepped and self.Stacks.Stepped.Functions then
-            for Instance, _ in pairs(self.Stacks.Stepped.Functions) do
-                self:ForceStop(Instance)
-                Count = Count + 1
-            end
-            if Count > 0 then
-                self:LogLM("Unloaded %d Steppeds", Count)
-            end
-        end
-    end
+    return false
 end
 
 function API:ToggleLM(State)
     if typeof(State) == "boolean" then
-        self.UnloadedLM = State
+        self.LM.Unloaded = State
     end
+end
+
+function API:Unload_LM()
+    if not self.LM then return end
+
+    self.LM.Unloaded = true
+
+    for StackName, Stack in pairs(self.LM.Stacks) do
+        if Stack.Loops then
+            local Count = 0
+            for Name, _ in pairs(Stack.Loops) do
+                self:ForceStop(Name)
+                Count = Count + 1
+            end
+            if Count > 0 then
+                self:LogLM("Unloaded %d %ss", Count, StackName)
+            end
+        end
+    end
+
+    for StackName, Stack in pairs(self.LM.Stacks) do
+        if Stack.Connection then
+            Stack.Connection:Disconnect()
+            Stack.Connection = nil
+        end
+        if Stack.Connections then
+            for _, Connection in pairs(Stack.Connections) do
+                Connection:Disconnect()
+            end
+            table_clear(Stack.Connections)
+        end
+    end
+
+    table_clear(self.LM)
+    self.LM = nil
 end
 
 function API:OverrideFunction(Name, Func)
@@ -8557,16 +7901,13 @@ function API:OverrideFunction(Name, Func)
 
     self[self:RandomString(15)] = self[Name]
 
-    if self.Overwriteable then
-        local _Meta = getmetatable(self)
-        if typeof(_Meta) == "table" and typeof(_Meta.__newindex) == "function" then
-            local Previous_Index = _Meta.__newindex
-            _Meta.__newindex = nil
-            self[Name] = Func
-            _Meta.__newindex = Previous_Index
-        else
-            self[Name] = Func
-        end
+    if self.Overwriteable and typeof(getrawmetatable) == "function" then
+        local Meta = getrawmetatable(self)
+
+        local _PreviousIndex = Meta.__newindex
+        Meta.__newindex = nil
+        self[Name] = Func
+        Meta.__newindex = _PreviousIndex
     else
         self[Name] = Func
     end
@@ -8574,8 +7915,18 @@ function API:OverrideFunction(Name, Func)
     return true
 end
 
+function API:OnUnload(Callback)
+    self._UnloadedFM = Callback
+end
+
 function API:Unload()
     warn("[@Functions.luau]: Unloaded")
+
+    if self._UnloadedFM then
+        pcall(self._UnloadedFM)
+    end
+
+    -- // @Unload Functions
     Build_Engine, Window_Focused, Class = nil, nil, nil
     LocalPlayer, Character, Roots, Humanoid, CurrentCamera = nil, nil, nil, nil, nil
 
@@ -8588,7 +7939,6 @@ function API:Unload()
     self:Flight(false, nil)
     self:BypassWS(false, nil)
     self:Strengthen(false, nil)
-    -- self:VehicleFlight(false, nil)
     self:TouchFling(false)
     self:BypassJP(false, nil)
     self:AntiCFrameTeleport(false)
@@ -8603,20 +7953,20 @@ function API:Unload()
     self:StopFling()
     self:StopFps()
     self:StopSeating()
+    self:StopSpectate()
     self:StopBringTools()
+
     self:ClearHighlights()
     self:ClearBaseplates()
     self:ClearWebSockets()
     self:ClearGamepasses()
-    self:ClearConflicts()
     self:ClearDrawingsV()
     self:ClearDrawings()
-    self:StopSpectate()
     self:ClearSounds()
     self:ClearRaknet()
     self:ClearSpoofs()
-    self:_Exit()
 
+    self:_ExitFM()
     globalEnv._IsLoadedFM = nil
 
     task_wait(0.25)
@@ -8688,7 +8038,7 @@ function API:Launch(Class, Options)
 	
     global.FunctionManager_Engine = Class
 
-    if not Options.Overwriteable or false then
+    if not (Options.Overwriteable or false) then
         for Instance, Service in pairs(Services) do
             Class[Instance] = (Service)
         end
