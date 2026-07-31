@@ -1046,19 +1046,19 @@ function API:DeleteDirectory(Path, Recursive)
     if not is_folder(Path) then
         return false
     end
-    
+
     if Recursive then
-        local contents = self:GetDirectoryContents(Path, true)
-        
-        for i = #contents, 1, -1 do
-            local item = contents[i]
-            if item.Type == "Folder" then
-                if is_folder(item.Path) then
-                    del_folder(item.Path)
+        local Contents = self:GetDirectoryContents(Path, true)
+
+        for i = #Contents, 1, -1 do
+            local Item = Contents[i]
+            if Item.Type == "Folder" then
+                if is_folder(Item.Path) then
+                    del_folder(Item.Path)
                 end
             else
                 if del_file then
-                    del_file(item.Path)
+                    del_file(Item.Path)
                 end
             end
         end
@@ -1385,7 +1385,6 @@ function API:SetQueue(Flag, State)
 
     if Flag == false and State == nil then
         self:_Disconnect("@Teleport_Queue")
-        table_clear(self.Teleport_Queues)
         return
     end
 
