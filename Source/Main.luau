@@ -5694,7 +5694,7 @@ function API:Spectate(Input)
         self:StopSpectate()
     end
 
-    if not CurrentCamera or not Humanoid then
+    if not CurrentCamera then
         return false
     end
 
@@ -5806,7 +5806,7 @@ function API:StopSpectate()
         self.Spectate_AddedConnection = nil
     end
 
-	if (Humanoid) then
+	if Humanoid then
 		CurrentCamera.CameraSubject = Humanoid
 		CurrentCamera.CameraType = Enum.CameraType.Custom
 	end
@@ -8042,9 +8042,6 @@ function API:Unload()
     end
 
     -- // @Unload Functions
-    Build_Engine, Window_Focused, Class = nil, nil, nil
-    LocalPlayer, Character, Roots, Humanoid, CurrentCamera = nil, nil, nil, nil, nil
-
     self:_Disconnect("@Engine.luau")
 
     self:Unload_LM()
@@ -8089,6 +8086,9 @@ function API:Unload()
 
     debug.setmetatable(global.FunctionManager_Engine, nil)
     global.FunctionManager_Engine = nil
+
+    Build_Engine, Window_Focused, Class = nil, nil, nil
+    LocalPlayer, Character, Roots, Humanoid, CurrentCamera = nil, nil, nil, nil, nil
 
     table_clear(API) 
 	debug.setmetatable(API, nil)
