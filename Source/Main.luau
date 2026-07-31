@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.07", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.08", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -229,13 +229,9 @@ end
 
 function API:CreateDrawingManager()
     if typeof(self.DrawingManager) ~= "table" then
-        self.DrawingManager = {
-            Drawings = {}, 
-            AutoCleanup = true,  
-            AutoUpdate = true,
-            Connections = {},
+        self.DrawingManager = {Drawings = {}, Connections = {},
             System = {
-                Player = {
+                ["Player"] = {
                     type = "Player",
                     getPosition = function(Target) 
                         return self:ResolvePosition(Target) or nil
@@ -256,7 +252,7 @@ function API:CreateDrawingManager()
                         return Connection
                     end
                 },
-                Character = {
+                ["Character"] = {
                     type = "Model",
                     getPosition = function(Target)
                         return self:ResolvePosition(Target) or nil
@@ -273,7 +269,7 @@ function API:CreateDrawingManager()
                         return Connection
                     end
                 },
-                Part = {
+                ["Part"] = {
                     type = "BasePart",
                     getPosition = function(Target) 
                         return self:ResolvePosition(Target) or nil
@@ -290,7 +286,7 @@ function API:CreateDrawingManager()
                         return Connection
                     end
                 },
-                Vector3 = {
+                ["Vector3"] = {
                     type = "Vector3",
                     getPosition = function(Target) 
                         return self:ResolvePosition(Target) or nil
@@ -301,7 +297,7 @@ function API:CreateDrawingManager()
                     onRespawn = nil,
                     onRemove = nil
                 },
-                Instance = {
+                ["Instance"] = {
                     type = "Instance",
                     getPosition = function(Target)
                         return self:ResolvePosition(Target) or nil
@@ -332,7 +328,7 @@ end
 
 function API:GetDrawingSystem(Target)
     self:CreateDrawingManager()
-    
+
     local Type = typeof(Target)
     
     if Type == "Player" then
@@ -385,7 +381,6 @@ function API:CreateDrawingV(DrawType, Properties, Target, OnUpdate, SpecifiedSys
     }
 
     local Data = self.DrawingManager.Drawings[DrawingID]
-
     local Connections = {Remove = "@Draw_Remove: " .. DrawingID, Render = "@Draw_Render: " .. DrawingID, Respawn = "@Draw_Respawn: " .. DrawingID}
 
     if System.onRemove then
@@ -617,7 +612,7 @@ function API:ResumeSound(Id)
     if typeof(SoundId) == "number" or (typeof(SoundId) == "string" and SoundId:match("^%d+$")) then
         SoundId = "rbxassetid://" .. tostring(SoundId)
     end
-    
+
     local Data = self.Sounds[SoundId]
     if Data and Data.Instance then
         Data.Instance:Resume()
@@ -1324,8 +1319,11 @@ function API:GetFps(Format)
 end
 
 function API:StopFps()
-    self:_Disconnect("@Statistics_Fps")
-    self.Fps_Counter, self.Current_Fps = nil,0
+    if self.Fps_Counter then
+        self:_Disconnect("@Statistics_Fps")
+
+        self.Fps_Counter, self.Current_Fps = nil,0
+    end
 end
 
 function API:QueueOnTeleport(Flag, State, Script, Callbacks)
@@ -4293,12 +4291,12 @@ function API:TouchFling(State)
     return true
 end
 
-function API:Fling(Input)
+function API:FlingPlayer(Input)
     if not Input then return false end
     if self.Is_Flinging then return false end
 
-    local Target = nil
     self.Is_Flinging = true
+    local Target = nil
 
     local Success, Resolver1, Resolver2 = pcall(function()
         if typeof(Input) == "string" then
@@ -4318,10 +4316,7 @@ function API:Fling(Input)
 		    return false
 		end
 
-        local Character = self:GetCharacter()
-        local Humanoid = self:GetHumanoid()
-        local RootPart = self:GetRoot()
-
+        local Character, Humanoid, RootPart = self:GetCharacter(), self:GetHumanoid(), self:GetRoot()
         local Fling_Manager = { FlingOldPos = nil, lFlingOldPos = nil, cFlingOldPos = nil }
 
         local TChar = Target.Character
@@ -4332,7 +4327,7 @@ function API:Fling(Input)
         local THead = TChar:FindFirstChild("Head")
         local Acc = TChar:FindFirstChildOfClass("Accessory")
         local Handle = Acc and Acc:FindFirstChild("Handle")
-        
+
         if not THumanoid then return false end
         
         local TargetPart = (TRootPart and THead and (TRootPart.Position - THead.Position).Magnitude > 5) and THead or TRootPart or THead or Handle
@@ -4478,6 +4473,125 @@ function API:Fling(Input)
         return Resolver1, Resolver2
     else
         return false, Resolver1
+    end
+end
+
+function API:FlingNPC(Input)
+    if not Input then return false end
+    if self.Is_Flinging then return false end
+
+    self.Is_Flinging = true
+    local Target = nil
+
+    local Success, Resolver1, Resolver2 = pcall(function()
+        if typeof(Input) == "string" then
+            if Input == "closestnpc" then
+                local NPC, Model, Distance, Name = self:Search("closestnpc")
+                if not NPC then
+                    return false
+                end
+                Target = Model or NPC
+            else
+                Target = self:Search(Input)
+            end
+        elseif typeof(Input) == "Instance" then
+            Target = Input
+        elseif typeof(Input) == "table" and (Input.Character or Input.Model) then
+            Target = Input.Character or Input.Model or Input
+        end
+
+        if not Target then 
+            return false
+        end
+
+        local LPlayer = LocalPlayer
+        if Target == LPlayer or (typeof(Target) == "Instance" and Target == LPlayer.Character) then
+            return false
+        end
+
+        local NPC = self:GetNPC(Target)
+        if not NPC then
+            return false
+        end
+
+        local TChar, THumanoid, TRootPart = NPC.Model, NPC.Humanoid, NPC.Root or NPC.Any
+        if not TRootPart then
+            return false
+        end
+
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+
+        for _, Part in ipairs(TChar:GetDescendants()) do
+            if Part:IsA("BasePart") then
+                Part.Velocity = Vector3_new(9e7, 9e7*10, 9e7)
+                Part.RotVelocity = Vector3_new(9e8, 9e8, 9e8)
+                Part.AssemblyLinearVelocity = Vector3_new(9e7, 9e7*10, 9e7)
+                Part.AssemblyAngularVelocity = Vector3_new(9e8, 9e8, 9e8)
+            end
+        end
+
+        local Fling_Velocity = self:CreateInstance("BodyVelocity", {
+            Name = self:RandomString(15),
+            Parent = TRootPart,
+            Velocity = Vector3_new(9e8, 9e8, 9e8),
+            MaxForce = Vector3_new(9e9, 9e9, 9e9)
+        })
+
+        task_wait(1)
+
+        Fling_Velocity:Destroy()
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+        THumanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true)
+
+        return true, Target.Name
+    end)
+
+    self.Is_Flinging = false
+
+    if Success then
+        return Resolver1, Resolver2
+    else
+        return false, Resolver1
+    end
+end
+
+function API:Fling(Input)
+    if not Input then return false end
+    if self.Is_Flinging then return false end
+
+    local Target, Targetted = Input, nil
+
+    if typeof(Input) == "string" then
+        if Input == "closestnpc" then
+            local NPC, Model, Distance, Name = self:Search("closestnpc")
+            if not NPC then
+                return false
+            end
+            Target = Model or NPC
+            Targetted = Name
+        else
+            Target = self:Search(Input)
+            if not Target then
+                return false
+            end
+        end
+    end
+
+    local IsNPC, _ = self:IsNPC(Target)
+    
+    if IsNPC then
+        return self:FlingNPC(Target)
+    else
+        return self:FlingPlayer(Target)
     end
 end
 
@@ -4965,11 +5079,35 @@ function API:IsNPC(Model)
         return false
     end
 
-    if Players:GetPlayerFromCharacter(Model) then
+    local Support_1, Singular = pcall(function()
+        return Players:GetPlayerFromCharacter(Model)
+    end)
+
+    if Support_1 and Singular then
         return false
     end
 
-    return #self:GetClasses(Model, "Humanoid", false) > 0
+    local Support_2, Everyone = pcall(function()
+        return Players:GetPlayers()
+    end)
+
+    if Support_2 and Everyone then
+        for _, Every in ipairs(Everyone) do
+            local Character = Every.Character
+            if Character then
+                if (Model == Character or Model:IsDescendantOf(Character) or Character:IsDescendantOf(Model)) then
+                    return false
+                end
+            end
+        end
+    end
+
+    local Humanoids = self:GetClasses(Model, "Humanoid", false)
+    if #Humanoids == 0 then
+        return false, nil
+    end
+
+    return true, Humanoids[1]
 end
 
 function API:IsAliveTarget(Character)
@@ -5107,23 +5245,21 @@ end
 
 function API:GetClosestNPC(Radius)
     Radius = Radius or math_huge
-    local Closest, ClosestModel = nil, nil
-    local ClosestDistSquared = Radius * Radius
 
+    local Closest, ClosestModel, ClosestDistSquared = nil, nil, Radius * Radius
     local Models = self:GetClasses(Workspace, "Model", false)
 
     for i = 1, #Models do
         local Model = Models[i]
-        if self:IsNPC(Model) then
-            local NPCRoot = Model:FindFirstChild("HumanoidRootPart") or Model:FindFirstChild("Torso") 
-			or Model:FindFirstChild("RootPart") or Model:FindFirstChild("Root") or Model:FindFirstChild("Head") or Model.PrimaryPart or Model:FindFirstChildWhichIsA("BasePart") 
-
-            if NPCRoot then
-                local DistanceSquared = self:GetDistance(NPCRoot, true)
+        local NPC_Data = self:GetNPC(Model)
+        if NPC_Data then
+            local NPC_Part = NPC_Data.Root or NPC_Data.Any
+            if NPC_Part then
+                local DistanceSquared = self:GetDistance(NPC_Part, true)
                 if DistanceSquared < ClosestDistSquared then
                     ClosestDistSquared = DistanceSquared
                     ClosestModel = Model
-                    Closest = self:GetNPC(Model)
+                    Closest = NPC_Data
                 end
             end
         end
@@ -5313,21 +5449,22 @@ function API:GetNPC(Model)
         return nil
     end
 
-    local Hum = Model:FindFirstChildOfClass("Humanoid")
-    local Roots = Model:FindFirstChild("HumanoidRootPart") or Model:FindFirstChild("Torso") or Model:FindFirstChild("RootPart") or Model:FindFirstChild("Root")
-        or Model:FindFirstChild("Head") or Model.PrimaryPart
-		or Model:FindFirstChildWhichIsA("BasePart")
-	
-    if not Hum or not Roots then return nil end
+    local IsNPC, Humanoid = self:IsNPC(Model)
+    if not IsNPC or not Humanoid then
+        return nil
+    end
 
-    local Status = {
-        Model = Model,
-        Humanoid = Hum,
-        Root = Roots,
-        TeleportRules = nil,
+    local Root = Model:FindFirstChild("HumanoidRootPart") or Model:FindFirstChild("Torso")
 
-        Attributes = Model:GetAttributes()
-    }
+    local Any = Root or Model:FindFirstChild("RootPart") or Model:FindFirstChild("Root") or 
+                Model:FindFirstChild("Head") or Model.PrimaryPart or 
+                Model:FindFirstChildWhichIsA("BasePart")
+    
+    if not Any then
+        return nil
+    end
+
+    local Status = {Model = Model, Humanoid = Humanoid, Root = Root, Any = Any, TeleportRules = nil}
 
     function Status:Override(Name, Func)
         local Original = self[Name]
@@ -5389,7 +5526,7 @@ function API:GetNPC(Model)
 	end
 
     function Status:GetPosition()
-        return self.Root.Position
+        return (self.Root or self.Any).Position 
     end
 
     function Status:GetPivot()
@@ -5405,7 +5542,7 @@ function API:GetNPC(Model)
     end
 
     function Status:GetDistance()
-        return API:GetDistance(self.Model, true)
+        return API:GetDistance((self.Root or self.Any), true)
     end
 
     function Status:IsMoving()
@@ -5475,21 +5612,22 @@ function API:GetNPC(Model)
 
         local Data = {}
 
-        for _, track in ipairs(Anim:GetPlayingAnimationTracks()) do
-            local AnimObj = track.Animation
-            local AssetId = AnimObj and AnimObj.AnimationId and tonumber(AnimObj.AnimationId:match("%d+"))
-            local AssetInfo = AssetId and self:GetAssetInfo(AssetId)
+        for _, Track in ipairs(Anim:GetPlayingAnimationTracks()) do
+            local Object = Track.Animation
+
+            local Asset_Id = Object and Object.AnimationId and tonumber(Object.AnimationId:match("%d+"))
+            local Asset_Info = Asset_Id and self:GetAssetInfo(Asset_Id)
 
             Data[#Data + 1] = {
-                Name = track.Name,
-                Speed = track.Speed,
-                TimePosition = track.TimePosition,
-                AnimationId = AnimObj and AnimObj.AnimationId,
+                Name = Track.Name,
+                Speed = Track.Speed,
+                TimePosition = Track.TimePosition,
+                AnimationId = Object and Object.AnimationId,
                 
-                AssetName = AssetInfo and AssetInfo.Name,
-                Creator = AssetInfo and AssetInfo.Creator,
-                Type = AssetInfo and AssetInfo.Type,
-                Description = AssetInfo and AssetInfo.Description,
+                AssetName = Asset_Info and Asset_Info.Name,
+                Creator = Asset_Info and Asset_Info.Creator,
+                Type = Asset_Info and Asset_Info.Type,
+                Description = Asset_Info and Asset_Info.Description,
             }
         end
 
@@ -5507,9 +5645,9 @@ function API:GetNPC(Model)
         end
 
         if self.TeleportRules then
-            for _, rule in ipairs(self.TeleportRules) do
-                if rule.Condition(self) then
-                    return rule.Action(self, Roots)
+            for _, Rule in ipairs(self.TeleportRules) do
+                if Rule.Condition(self) then
+                    return Rule.Action(self, Roots)
                 end
             end
         end
@@ -5551,75 +5689,27 @@ function API:Travel(Speed, ...)
     self:GetCharacter():PivotTo(cf);
 end
 
-function API:DetectType(Object)
-    if not Object then return nil end
-
-    if typeof(Object) == "Instance" and Object:IsA("Player") then
-        return Object.Character
-    end
-
-    if typeof(Object) == "Instance" and Object:IsA("Model") then
-        if Object:FindFirstChildWhichIsA("Humanoid") or Object:FindFirstChildWhichIsA("Humanoid", true) then
-            return Object
-        end
-    end
-
-    if typeof(Object) == "table" then
-        local Resolvers = {
-            "Model", "model",
-            "Character", "character",
-            "Instance", "instance",
-            "PrimaryPart", "primaryPart",
-            "RootPart", "rootPart", "HumanoidRootPart",
-            "Root", "root"
-        }
-
-        for _, Resolver in ipairs(Resolvers) do
-            if Object[Resolver] then
-                return self:DetectType(Object[Resolver])
-            end
-        end
-
-        if Object.Humanoid or Object.humanoid then
-            local hum = Object.Humanoid or Object.humanoid
-            if typeof(hum) == "Instance" and hum.Parent then
-                return hum.Parent
-            end
-        end
-
-        for _, v in pairs(Object) do
-            if typeof(v) == "Instance" then
-                if v:IsA("Model") or v:IsA("BasePart") then
-                    return self:DetectType(v)
-                end
-            end
-        end
-    end
-
-    if typeof(Object) == "Instance" then
-        local Current = Object
-        while Current do
-            if Current:IsA("Model") then
-                if Current:FindFirstChildWhichIsA("Humanoid") or Current:FindFirstChildWhichIsA("Humanoid", true) then
-                    return Current
-                end
-            end
-            Current = Current.Parent
-        end
-    end
-
-    return nil
-end
-
 function API:Spectate(Input)
     if self.Spectate_Active then
         self:StopSpectate()
     end
 
+    if not CurrentCamera or not Humanoid then
+        return false
+    end
+
     local Target = nil
 
     if typeof(Input) == "string" then
-        Target = self:Search(Input)
+        if Input == "closestnpc" then
+            local NPC, Model, Distance, Name = self:Search("closestnpc")
+            if not NPC then
+                return false
+            end
+            Target = Model or NPC
+        else
+            Target = self:Search(Input)
+        end
     elseif typeof(Input) == "Instance" then
         Target = Input
     elseif typeof(Input) == "table" and Input.Character then
@@ -5630,30 +5720,46 @@ function API:Spectate(Input)
         return false
     end
 
-	local LocalPlayer = self:GetPlayer()
+    local LocalPlayer = self:GetPlayer()
     if Target == LocalPlayer or (typeof(Target) == "Instance" and Target == LocalPlayer.Character) then
-		return false
-    end
-
-    local Model = self:DetectType(Target)
-    if not Model then
         return false
     end
 
-    self.Spectate_Target = Model
-    self.Spectate_Active = true
+    local Model = nil
+    
+    if typeof(Target) == "Instance" then
+        if Target:IsA("Player") then
+            Model = Target.Character
+        elseif Target:IsA("Model") then
+            Model = Target
+        elseif Target:IsA("BasePart") then
+            Model = Target.Parent
+            while Model and not Model:IsA("Model") do
+                Model = Model.Parent
+            end
+        end
+    end
+
+    if not Model or not Model:IsA("Model") then
+        return false
+    end
+
+    self.Spectate_Target, self.Spectate_Active = Model, true
 
     local function Lookat_Camera(Model)
         if not Model or not Model.Parent then return false end
+        if not CurrentCamera then return false end
 
-        local Humanoid = Model:FindFirstChildWhichIsA("Humanoid") or Model:FindFirstChildWhichIsA("Humanoid", true)
-        local Roots = Model:FindFirstChild("HumanoidRootPart") or Model.PrimaryPart
+        local Humanoid = Model:FindFirstChildOfClass("Humanoid")
+        local Roots = Model:FindFirstChild("HumanoidRootPart") or Model.PrimaryPart or Model:FindFirstChildWhichIsA("BasePart")
 
         if Humanoid then
             CurrentCamera.CameraSubject = Humanoid
+            CurrentCamera.CameraType = Enum.CameraType.Custom
             return true
         elseif Roots then
             CurrentCamera.CameraSubject = Roots
+            CurrentCamera.CameraType = Enum.CameraType.Custom
             return true
         end
         return false
@@ -5665,39 +5771,48 @@ function API:Spectate(Input)
         if not Model.Parent then
             self:StopSpectate()
         else
-            task_delay(0.15, Lookat_Camera, Model)
+            task_spawn(function()
+                task_wait(0.15)
+                Lookat_Camera(Model)
+            end)
         end
     end)
 
     self.Spectate_AddedConnection = Model.ChildAdded:Connect(function(v)
         if v:IsA("Humanoid") then
-            task_delay(0.15, Lookat_Camera, Model)
+            task_spawn(function()
+                task_wait(0.15)
+                Lookat_Camera(Model)
+            end)
         end
     end)
 
-    self:_Connect("@Spectate_Added", self.Spectate_AddedConnection)
-    self:_Connect("@Spectate_Ancestry", self.Spectate_AncestryConnection)
-
+	self:_Connect("@Spectate_Added", self.Spectate_AddedConnection, "@Spectate_Ancestry", self.Spectate_AncestryConnection)
     return true
 end
 
 function API:StopSpectate()
     if not self.Spectate_Active then return end
+	
+	self:_Disconnect("@Spectate_Added", "@Spectate_Ancestry")
 
-    self:_Disconnect("@Spectate_Added")
-    self:_Disconnect("@Spectate_Ancestry")
-
-    self.Spectate_AncestryConnection = nil
-    self.Spectate_AddedConnection = nil
-
-    local Humanoid = self:GetHumanoid()
-    if Humanoid then
-        CurrentCamera.CameraSubject = Humanoid
-        CurrentCamera.CameraType = Enum.CameraType.Custom
+    if self.Spectate_AncestryConnection then
+        self.Spectate_AncestryConnection:Disconnect()
+        self.Spectate_AncestryConnection = nil
     end
 
-    self.Spectate_Target = nil
-    self.Spectate_Active = false
+    if self.Spectate_AddedConnection then
+        self.Spectate_AddedConnection:Disconnect()
+        self.Spectate_AddedConnection = nil
+    end
+
+	if (Humanoid) then
+		CurrentCamera.CameraSubject = Humanoid
+		CurrentCamera.CameraType = Enum.CameraType.Custom
+	end
+
+    self.Spectate_Target, self.Spectate_Active = nil, false    
+    return true
 end
 
 function API:IsSpectating()
