@@ -70,7 +70,7 @@ local function Load_File(luau, State)
                 end
             end
 
-            task.spawn(function()
+            task_spawn(function()
                 local Client_Check = Game:HttpGet(Source .. "?nocache=" .. tostring(os_clock()))
 
                 if Client_Check ~= Content then
