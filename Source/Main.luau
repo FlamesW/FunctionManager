@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.08", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.09", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -1397,6 +1397,64 @@ function API:SetQueue(Flag, State)
     else
         return self:QueueOnTeleport(Flag, false)
     end
+end
+
+function API:DetectAnim(Target)
+    local Model, Humanoid = nil, nil
+
+    if Target:IsA("Model") then
+        Model = Target
+        Humanoid = Target:FindFirstChildOfClass("Humanoid")
+    elseif Target:IsA("Humanoid") then
+        Humanoid = Target
+        Model = Target.Parent
+    elseif Target:IsA("Player") then
+        if Target.Character then
+            Model = Target.Character
+            Humanoid = Model:FindFirstChildOfClass("Humanoid")
+        end
+    elseif Target:IsA("Part") or Target:IsA("BasePart") then
+        Model = Target.Parent
+        if Model and Model:IsA("Model") then
+            Humanoid = Model:FindFirstChildOfClass("Humanoid")
+        end
+    end
+
+    if not Humanoid then
+        return
+    end
+
+    local Animator = Humanoid:FindFirstChildOfClass("Animator")
+    if not Animator then 
+        return
+    end
+
+    local Tracks = Animator:GetPlayingAnimationTracks()
+    if #Tracks == 0 then
+        return {}
+    end
+
+    local Data = {}
+    for _, Track in ipairs(Tracks) do
+        local Object = Track.Animation
+
+        local Asset_Id = Object and Object.AnimationId and tonumber(Object.AnimationId:match("%d+"))
+        local Asset_Info = Asset_Id and self:GetAssetInfo(Asset_Id)
+
+        Data[#Data + 1] = {
+            Name = Track.Name,
+            Speed = Track.Speed,
+            TimePosition = Track.TimePosition,
+            AnimationId = Object and Object.AnimationId,
+
+            AssetName = Asset_Info and Asset_Info.Name,
+            Creator = Asset_Info and Asset_Info.Creator,
+            Type = Asset_Info and Asset_Info.Type,
+            Description = Asset_Info and Asset_Info.Description,
+        }
+    end
+
+    return Data
 end
 
 function API:LoadFile(Url)
