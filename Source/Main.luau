@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.09", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.10", Author = "FlamesW", File = "Module.luau"}
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local LocalPlayer: Player? = nil
 local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
@@ -1400,13 +1400,17 @@ function API:SetQueue(Flag, State)
 end
 
 function API:DetectAnim(Target)
-    local Model, Humanoid = nil, nil
+    local Model, Humanoid, Controller = nil, nil, nil
 
     if Target:IsA("Model") then
         Model = Target
         Humanoid = Target:FindFirstChildOfClass("Humanoid")
+        Controller = Target:FindFirstChildOfClass("AnimationController")
     elseif Target:IsA("Humanoid") then
         Humanoid = Target
+        Model = Target.Parent
+    elseif Target:IsA("AnimationController") then
+        Controller = Target
         Model = Target.Parent
     elseif Target:IsA("Player") then
         if Target.Character then
@@ -1420,13 +1424,19 @@ function API:DetectAnim(Target)
         end
     end
 
-    if not Humanoid then
-        return
+    if not Humanoid and not Controller then
+        return {}
     end
 
-    local Animator = Humanoid:FindFirstChildOfClass("Animator")
-    if not Animator then 
-        return
+    local Animator = nil
+    if Humanoid then
+        Animator = Humanoid:FindFirstChildOfClass("Animator")
+    end
+    if not Animator and Controller then
+        Animator = Controller:FindFirstChildOfClass("Animator")
+    end
+    if not Animator then
+        return {}
     end
 
     local Tracks = Animator:GetPlayingAnimationTracks()
