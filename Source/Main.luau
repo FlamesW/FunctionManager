@@ -13,8 +13,8 @@ end)
 local typeof, pcall, tick, tonumber, warn, print,unpack, next, loadstring, setmetatable =
     typeof, pcall, tick, tonumber, warn, print, unpack, next, loadstring, setmetatable
 
-local math_floor, math_random, math_clamp, math_max, math_min, math_sqrt, math_rad, math_huge =
-    math.floor, math.random, math.clamp, math.max, math.min, math.sqrt, math.rad, math.huge
+local math_floor, math_random, math_clamp, math_max, math_min, math_sqrt, math_abs, math_rad, math_ceil, math_huge =
+    math.floor, math.random, math.clamp, math.max, math.min, math.sqrt, math.abs, math.rad, math.ceil, math.huge
 
 local string_format, string_sub, string_match, string_gsub, string_gmatch, string_lower =
     string.format, string.sub, string.match, string.gsub, string.gmatch, string.lower
@@ -44,52 +44,72 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.10", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.11", Author = "FlamesW", File = "Module.luau"}
+
 local Players: Players? = cloneref(GetService(Game, "Players"));
-local LocalPlayer: Player? = nil
-local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
-local RunService: RunService? = GetService(Game, "RunService");
-local TweenService: TweenService? = cloneref(GetService(Game, "TweenService"));
-local MarketplaceService: MarketplaceService? = GetService(Game, "MarketplaceService");
-local HttpService: HttpService? = cloneref(GetService(Game, "HttpService"));
-local TeleportService: TeleportService? = GetService(Game, "TeleportService");
-local RbxAnalyticsService: RbxAnalyticsService? = cloneref(GetService(Game, "RbxAnalyticsService"));
-local VirtualInputManager: VirtualInputManager? = Instance_new("VirtualInputManager");
-local QueueOnTeleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport);
-local GetConnections: GetConnections? = getconnections or get_signal_cons;
-local LocalizationService: LocalizationService? = cloneref(GetService(Game, "LocalizationService"));
-local ReplicatedStorage: ReplicatedStorage? = cloneref(GetService(Game, "ReplicatedStorage"));
-local TextChatService: TextChatService? = cloneref(GetService(Game, "TextChatService"));
+local RunService: RunService? = cloneref(GetService(Game, "RunService"));
 local UserInputService: UserInputService? = cloneref(GetService(Game, "UserInputService"));
+local ReplicatedStorage: ReplicatedStorage? = cloneref(GetService(Game, "ReplicatedStorage"));
+local HttpService: HttpService? = cloneref(GetService(Game, "HttpService"));
+local TweenService: TweenService? = cloneref(GetService(Game, "TweenService"));
 local SoundService: SoundService? = cloneref(GetService(Game, "SoundService"));
-local StarterGuiService: StarterGuiService? = cloneref(GetService(Game, "StarterGui"));
-local GuiService: GuiService? = cloneref(GetService(Game, "GuiService"));
 local CoreGui: CoreGui? = cloneref(GetService(Game, "CoreGui"));
+
+local MarketplaceService: MarketplaceService? = GetService(Game, "MarketplaceService");
+local TeleportService: TeleportService? = GetService(Game, "TeleportService");
+local RbxAnalyticsService: RbxAnalyticsService? = GetService(Game, "RbxAnalyticsService");
+local LocalizationService: LocalizationService? = GetService(Game, "LocalizationService");
+local TextChatService: TextChatService? = GetService(Game, "TextChatService");
+local StarterGuiService: StarterGuiService? = GetService(Game, "StarterGui");
+local GuiService: GuiService? = GetService(Game, "GuiService");
 local Performance: Performance? = GetService(Game, "Stats");
 local LightingService: LightingService? = GetService(Game, "Lighting");
+
+local VirtualInputManager: VirtualInputManager? = Instance_new("VirtualInputManager");
+local LocalPlayer: Player? = nil
+local Character: Model?, Roots: BasePart?, Humanoid: Humanoid? = nil, nil, nil;
 local CurrentCamera: Camera? = Workspace.CurrentCamera;
+
+local QueueOnTeleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport);
+local GetConnections: GetConnections? = getconnections or get_signal_cons;
+local Get_Asset = getcustomasset or getsynasset;
+
 repeat task_wait() LocalPlayer = Players.LocalPlayer until LocalPlayer ~= nil
 global.FunctionManager_Engine = API -- // @Enviroment exposure
 
--- // @Caches.vars
 local Runtime = os_clock()
 
+-- // @RunService
 local RenderStepped = RunService.RenderStepped;
 local Heartbeat = RunService.Heartbeat;
 local Stepped = RunService.Stepped;
-local InputBegan = UserInputService.InputBegan;
 local BindToRenderStep = RunService.BindToRenderStep;
 local UnbindFromRenderStep = RunService.UnbindFromRenderStep;
 
+-- // @UserInputService
+local InputBegan = UserInputService.InputBegan;
 local IsKeyDown = UserInputService.IsKeyDown;
 local GetMouseLocation = UserInputService.GetMouseLocation;
 local GetPlatform = UserInputService.GetPlatform;
 
-local WorkspaceRaycast = Workspace.Raycast;
-local RaycastParamsNew = RaycastParams.new;
+-- // @Workspace / @Game
+local WorkspaceRaycast, RaycastParamsNew = Workspace.Raycast, RaycastParams.new;
+local PlaceId, JobId, GameId = Game.PlaceId, Game.JobId, Game.GameId;
 
-local PlaceId, JobId, GameId  = Game.PlaceId, Game.JobId, Game.GameId;
-local Get_Asset = getcustomasset or getsynasset;
+--[[
+-- // @KeyCode Enums
+local Enum_KeyCode_W, Enum_KeyCode_A, Enum_KeyCode_S, Enum_KeyCode_D = 
+    Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D;
+
+local Enum_KeyCode_Space, Enum_KeyCode_LeftControl = 
+    Enum.KeyCode.Space, Enum.KeyCode.LeftControl;
+    
+local Enum_KeyCode_Equals, Enum_KeyCode_Minus = 
+    Enum.KeyCode.Equals, Enum.KeyCode.Minus;
+
+local Enum_KeyCode_KeypadPlus, Enum_KeyCode_KeypadMinus = 
+    Enum.KeyCode.KeypadPlus, Enum.KeyCode.KeypadMinus;
+--]]
 
 -- // @Signal.luau
 function API:_Connect(...): () 
@@ -110,6 +130,24 @@ end
 
 function globalEnv._IsLoadedFM() --> typeof(_IsLoadedFM) == "function" and _IsLoadedFM();
     return global.FunctionManager_Engine ~= nil
+end
+
+function globalEnv._Clean(Object, ...)
+    if not Object then return end
+
+    if type(table.clear) == "function" then
+        pcall(table.clear, Object)
+    end
+
+    if type(setmetatable) == "function" then
+        pcall(setmetatable, Object, nil)
+    end
+
+    pcall(function()
+        for Key in pairs(Object) do
+            rawset(Object, Key, nil)
+        end
+    end)
 end
 
 -- // @Engine.luau
@@ -1888,17 +1926,38 @@ function API:UpdateTrack(FilePath, RemoteUrl, OnDownloaded, OnChanged, Options)
     end)
 end
 
-function API:AbbreviateNumber(Number)
-    local Abbrev = { "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "De" }
+function API:AbbreviateNumber(Number, ShownDigits)
+    local Suffixes = {"", "K", "M", "B", "T", "Qd", "Qn", "Sx", "Sp", "O", "N", "De",
+    "Ud", "Dd", "TdD", "QdD", "QnD", "SxD", "SpD", "OcD", "NvD"}
 
-    for i = #Abbrev, 1, -1 do
-        local Value = 10 ^ (i * 3)
-        if Number >= Value then
-            return string_format("%.1f%s", Number / Value, Abbrev[i])
-        end
+    local Prefix = ""
+    ShownDigits = ShownDigits or 3
+
+    if Number < 0 then
+        Number = math_abs(Number)
+        Prefix = "-"
     end
 
-    return tostring(Number)
+    local Intial = ("%.0f"):format(Number)
+    local Digits = #Intial
+
+    if Digits <= 3 then
+        return Prefix .. Intial
+    end
+
+    local Suffix: string? = Suffixes[math_ceil(Digits / 3)]
+    local Decimal_Position = (Digits - 1) % 3 + 1
+
+    if not Suffix then
+        Suffix = "e" .. math_ceil((Digits - 3) / 3) * 3
+    end
+
+    local Abbreviated_Number = string_sub(Intial, 1, Decimal_Position)
+    if Decimal_Position < ShownDigits then
+        Abbreviated_Number ..= "." .. string_sub(Intial, Decimal_Position + 1, ShownDigits)
+    end
+
+    return Prefix .. Abbreviated_Number .. Suffix
 end
 
 function API:GetAveragePosition(Targets)
@@ -8076,32 +8135,14 @@ function API:Unload_LM()
     self.LM = nil
 end
 
-function API:OverrideFunction(Name, Func)
-    if typeof(self[Name]) ~= "function" then
-        return false
-    end
-
-    self[self:RandomString(15)] = self[Name]
-
-    if self.Overwriteable and typeof(getrawmetatable) == "function" then
-        local Meta = getrawmetatable(self)
-
-        local _PreviousIndex = Meta.__newindex
-        Meta.__newindex = nil
-        self[Name] = Func
-        Meta.__newindex = _PreviousIndex
-    else
-        self[Name] = Func
-    end
-
-    return true
-end
-
 function API:OnUnload(Callback)
     self._UnloadedFM = Callback
 end
 
 function API:Unload()
+    if self._UnloadingFM then return end
+
+    self._UnloadingFM = true
     warn("[@Functions.luau]: Unloaded")
 
     if self._UnloadedFM then
@@ -8149,22 +8190,16 @@ function API:Unload()
     globalEnv._IsLoadedFM = nil
 
     task_wait(0.25)
-    table_clear(global.FunctionManager_Engine)
+    globalEnv._Clean(global.FunctionManager_Engine, nil)
 
-    debug.setmetatable(global.FunctionManager_Engine, nil)
     global.FunctionManager_Engine = nil
-
     Build_Engine, Window_Focused, Class = nil, nil, nil
     LocalPlayer, Character, Roots, Humanoid, CurrentCamera = nil, nil, nil, nil, nil
 
-    table_clear(API) 
-	debug.setmetatable(API, nil)
-
-    table_clear(self) 
-	debug.setmetatable(self, nil)
+    globalEnv._Clean(API, nil); globalEnv._Clean(self, nil); globalEnv._Clean = nil
 end
 
-function API:Merge(...) -- // Merges with one another module 😉👍
+function API:Merge(...)
     for _, Modules in ipairs({...}) do
         for Method, Func in pairs(Modules) do
             if typeof(Func) == "function" then
@@ -8184,11 +8219,12 @@ function API:Merge(...) -- // Merges with one another module 😉👍
 end
 
 function API:Launch(Class, Options)
+    if self._Unloading then return nil end
+
     Options = Options or {}
 
     Class = Class or {}
     Class.Functionable = {}
-    Class.Overwriteable = not Options.Overwriteable or false
 
     -- // @Services
     local Services = {
@@ -8217,30 +8253,21 @@ function API:Launch(Class, Options)
         GuiService = GuiService,
         CoreGui = CoreGui
     }
-	
+
     global.FunctionManager_Engine = Class
 
-    if not (Options.Overwriteable or false) then
-        for Instance, Service in pairs(Services) do
-            Class[Instance] = (Service)
-        end
+    for Instance, Service in pairs(Services) do
+        Class[Instance] = (Service)
+    end
 
-        local Protected_Metatables = { __index = API, __newindex = function(Guardian, Key, Value)
-            if (API[Key] ~= nil and Key ~= "_Signal") or Services[Key] ~= nil then
-                return
-            end
-            rawset(Guardian, Key, Value)
-        end}
-
-        setmetatable(Class, Protected_Metatables)
-    else
-        for Instance, Service in pairs(Services) do
-            if (Class[Instance] == nil) then
-                Class[Instance] = (Service)
-            end
-        end
-
+    if type(setmetatable) == "function" then
         setmetatable(Class, { __index = API })
+    else
+        for Instance, Service in pairs(API) do
+            if type(Service) == "function" then
+                Class[Instance] = function(_, ...) return Service(Class, ...) end
+            end
+        end
     end
 
     return Class
