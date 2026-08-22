@@ -38,7 +38,6 @@ local write_file, read_file, is_file, make_folder, is_folder, del_folder, del_fi
 
 local globalEnv = (getgenv and getgenv() or _G) :: any;
 
--- // @API.module
 local API = {}
 API.__index = API
 
