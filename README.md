@@ -7,6 +7,11 @@ is a powerful developer tool packed with a wide range of ready-to-use functions,
 
 * Loop Manager:
 ```lua
+if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
+    warn("@Function Manager.luau is already running")
+    return
+end
+
 local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))()
 
 local API = Class.Launch({
