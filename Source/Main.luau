@@ -8218,18 +8218,12 @@ function API:Merge(...)
     return self
 end
 
-function API:Launch(Class, Options)
+function API:Launch(Class)
     if self._Unloading then return nil end
-
-    Options = Options or {}
 
     Class = Class or {}
     Class.Functionable = {}
-
-    for Option, Function in pairs(Options) do
-        Class[Option] = Function
-    end
-
+    
     -- // @Services
     local Services = {
         Workspace = Workspace,
@@ -8257,19 +8251,23 @@ function API:Launch(Class, Options)
         GuiService = GuiService,
         CoreGui = CoreGui
     }
-
+    
+    for Instance, Service in pairs(Services) do
+        Class[Instance] = Service
+    end
+    
     global.FunctionManager_Engine = Class
 
-    for Instance, Service in pairs(Services) do
-        Class[Instance] = (Service)
-    end
-
+    -- // @Metatable Support
     if type(setmetatable) == "function" then
         setmetatable(Class, { __index = API })
     else
+        -- // Fallback for shitty environments without setmetatable
         for Instance, Service in pairs(API) do
             if type(Service) == "function" then
-                Class[Instance] = function(_, ...) return Service(Class, ...) end
+                Class[Instance] = function(_, ...) 
+                    return Service(Class, ...) 
+                end
             end
         end
     end
