@@ -8226,6 +8226,10 @@ function API:Launch(Class, Options)
     Class = Class or {}
     Class.Functionable = {}
 
+    for Option, Function in pairs(Options) do
+        Class[Option] = Function
+    end
+
     -- // @Services
     local Services = {
         Workspace = Workspace,
