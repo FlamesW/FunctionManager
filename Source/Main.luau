@@ -8218,9 +8218,7 @@ function API:Merge(...)
     return self
 end
 
-function API:Launch(Class)
-    if self._Unloading then return nil end
-
+function API.Launch(Class)
     Class = Class or {}
     Class.Functionable = {}
     
@@ -8253,7 +8251,7 @@ function API:Launch(Class)
     }
     
     for Instance, Service in pairs(Services) do
-        Class[Instance] = Service
+        Class[Instance] = (Service)
     end
     
     global.FunctionManager_Engine = Class
@@ -8266,7 +8264,7 @@ function API:Launch(Class)
         for Instance, Service in pairs(API) do
             if type(Service) == "function" then
                 Class[Instance] = function(_, ...) 
-                    return Service(Class, ...) 
+                    return Service(API, ...)
                 end
             end
         end
