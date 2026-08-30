@@ -8213,7 +8213,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
     end
     
     function Object:GetState()
-        return self[Name]
+        return API[Name]
     end
 
     if Options.ColorPickers then
