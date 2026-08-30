@@ -8104,34 +8104,41 @@ function API:Unload_LM()
     if not self.LM then return end
 
     self.LM.Unloaded = true
+    task_wait()
 
     for StackName, Stack in pairs(self.LM.Stacks or {}) do
         if Stack.Loops then
             local Count = 0
             for Name, _ in pairs(Stack.Loops) do
-                self:ForceStop(Name)
+                pcall(function() self:ForceStop(Name) end)
                 Count = Count + 1
             end
             if Count > 0 then
-                self:LogLM("Unloaded %d %ss", Count, StackName)
+                pcall(function() self:LogLM("Unloaded %d %ss", Count, StackName) end)
             end
         end
     end
 
     for StackName, Stack in pairs(self.LM.Stacks or {}) do
         if Stack.Connection then
-            pcall(function()
-                Stack.Connection:Disconnect()
+            pcall(function() 
+                if Stack.Connection.Disconnect then
+                    Stack.Connection:Disconnect() 
+                end
             end)
             Stack.Connection = nil
         end
+        
         if Stack.Connections then
-            for i, Connection in pairs(Stack.Connections) do
-                pcall(function()
-                    if Connection and Connection.Disconnect then
-                        Connection:Disconnect()
-                    end
-                end)
+            for _, Data in pairs(Stack.Connections) do
+                if Data and Data.Connection then
+                    pcall(function()
+                        if Data.Connection.Disconnect then
+                            Data.Connection:Disconnect()
+                        end
+                    end)
+                    Data.Connection = nil
+                end
             end
             table_clear(Stack.Connections)
         end
