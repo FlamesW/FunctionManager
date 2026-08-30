@@ -8105,7 +8105,7 @@ function API:Unload_LM()
 
     self.LM.Unloaded = true
 
-    for StackName, Stack in pairs(self.LM.Stacks) do
+    for StackName, Stack in pairs(self.LM.Stacks or {}) do
         if Stack.Loops then
             local Count = 0
             for Name, _ in pairs(Stack.Loops) do
@@ -8118,14 +8118,20 @@ function API:Unload_LM()
         end
     end
 
-    for StackName, Stack in pairs(self.LM.Stacks) do
+    for StackName, Stack in pairs(self.LM.Stacks or {}) do
         if Stack.Connection then
-            Stack.Connection:Disconnect()
+            pcall(function()
+                Stack.Connection:Disconnect()
+            end)
             Stack.Connection = nil
         end
         if Stack.Connections then
-            for _, Connection in pairs(Stack.Connections) do
-                Connection:Disconnect()
+            for i, Connection in pairs(Stack.Connections) do
+                pcall(function()
+                    if Connection and Connection.Disconnect then
+                        Connection:Disconnect()
+                    end
+                end)
             end
             table_clear(Stack.Connections)
         end
