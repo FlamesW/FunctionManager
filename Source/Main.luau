@@ -8148,6 +8148,321 @@ function API:Unload_LM()
     self.LM = nil
 end
 
+function API:AddFeature(Group, Name, Options) -- // @Obsidian only
+    self[Name] = Options.Default or false
+
+    local Disabled, Recrusive, Toggle, LoopData, Object = false, false, nil, nil, {}
+
+    Toggle = Group:AddToggle(Name, {
+        Text = Options.Text or "Toggle",
+        Tooltip = Options.Tooltip or nil,
+        DisabledTooltip = Options.DisabledTooltip or nil,
+        Default = Options.Default or false,
+        Disabled = Options.Disabled or false,
+        Visible = Options.Visible or true,
+        Risky = Options.Risky or false,
+        Callback = function(Value)
+            if Recrusive then return end
+
+            Recrusive = true
+            self[Name] = Value
+            
+            if Value then
+                if Options.OnEnable then 
+                    Options.OnEnable(Object) 
+                end
+                if LoopData and LoopData.Unpause and LoopData.Paused then
+                    LoopData:Unpause()
+                end
+            else
+                if Options.OnDisable then 
+                    Options.OnDisable(Object) 
+                end
+                if LoopData and LoopData.Pause then
+                    LoopData:Pause()
+                end
+            end
+            
+            if Options.Callback and not Options.Engine then
+                Options.Callback(Object)
+            end
+            
+            Recrusive = false
+        end
+    })
+
+    function Object:SetText(Text)
+        if Toggle and Toggle.SetText then
+            Toggle:SetText(Text)
+        end
+        return self
+    end
+
+    function Object:SetVisible(Visible)
+        if Toggle and Toggle.SetVisible then
+            Toggle:SetVisible(Visible)
+        end
+        return self
+    end
+    
+    function Object:OnChanged(Func)
+        if Toggle and Toggle.OnChanged then
+            Toggle:OnChanged(Func)
+        end
+        return self
+    end
+    
+    function Object:GetState()
+        return self[Name]
+    end
+
+    if Options.ColorPickers then
+        for _, ColorPickerOptions in ipairs(Options.ColorPickers) do            
+            Toggle:AddColorPicker(ColorPickerOptions.Idx or "ColorPicker", {
+                Default = ColorPickerOptions.Default or Color3.new(1, 1, 1),
+                Title = ColorPickerOptions.Title or "Color Picker",
+                Transparency = ColorPickerOptions.Transparency,
+                Resizable = ColorPickerOptions.Resizable or false,
+                Callback = function(Value)
+                    if ColorPickerOptions.OnColor then
+                        ColorPickerOptions.OnColor(Value, Object)
+                    end
+                end,
+                Changed = ColorPickerOptions.OnChanged or function() end
+            })
+        end
+    end
+
+    if Options.KeyPickers then
+        for _, KeyPickerOptions in ipairs(Options.KeyPickers) do
+            Toggle:AddKeyPicker(KeyPickerOptions.Idx or "KeyPicker", {
+                Text = KeyPickerOptions.Text or "Keybind",
+                Default = KeyPickerOptions.Default or Enum.KeyCode.None,
+                DefaultModifiers = KeyPickerOptions.DefaultModifiers or {},
+                Mode = KeyPickerOptions.Mode or "Toggle",
+                SyncToggleState = KeyPickerOptions.SyncToggleState or false,
+                WaitForCallback = KeyPickerOptions.WaitForCallback or false,
+                Modes = KeyPickerOptions.Modes or { "Always", "Toggle", "Hold" },
+                NoUI = KeyPickerOptions.NoUI or false,
+                Blacklisted = KeyPickerOptions.Blacklisted or {},
+                Whitelisted = KeyPickerOptions.Whitelisted or {},
+                BlacklistedModifiers = KeyPickerOptions.BlacklistedModifiers or {},
+                WhitelistedModifiers = KeyPickerOptions.WhitelistedModifiers or {},
+                Callback = function(Value)
+                    if KeyPickerOptions.OnKey then
+                        KeyPickerOptions.OnKey(Value, Object)
+                    end
+                    if KeyPickerOptions.Callback then
+                        KeyPickerOptions.Callback(Value)
+                    end
+                    if KeyPickerOptions.Mode == "Toggle" and Toggle then
+                        local NewValue = not self[Name]
+                        if Recrusive then return end
+                        Recrusive = true
+                        self[Name] = NewValue
+                        if Toggle.SetValue then
+                            Toggle:SetValue(NewValue)
+                        end
+                        if NewValue then
+                            if Options.OnEnable then Options.OnEnable(Object) end
+                            if LoopData and LoopData.Unpause and LoopData.Paused then
+                                LoopData:Unpause()
+                            end
+                        else
+                            if Options.OnDisable then Options.OnDisable(Object) end
+                            if LoopData and LoopData.Pause then
+                                LoopData:Pause()
+                            end
+                        end
+                        Recrusive = false
+                    end
+                end,
+                ChangedCallback = KeyPickerOptions.ChangedCallback or KeyPickerOptions.OnChanged or function() end,
+                Changed = KeyPickerOptions.OnChanged or KeyPickerOptions.Changed or function() end,
+                Clicked = KeyPickerOptions.OnClick or KeyPickerOptions.Clicked or function() end,
+            })
+        end
+    end
+
+    local Engine = Options.Engine or "WhileLoop"
+    
+    local function Create_Callback(Self, DeltaTime, Cooldown)
+        if Options.SyncFlag == true then
+            if self[Name] then
+                if Options.Callback then
+                    Options.Callback(Object, DeltaTime, Cooldown)
+                end
+            end
+        else
+            if Options.Callback then
+                Options.Callback(Object, DeltaTime, Cooldown)
+            end
+        end
+    end
+
+    if Engine == "HeavyLoop" then
+        LoopData = self:HeavyLoop(
+            Options.Interval or 0.15,
+            Create_Callback,
+            Name,
+            Options.WaitBefore or false,
+            function()
+                if Options.OnDestroy then Options.OnDestroy(Object) end
+                if Toggle and Toggle.Destroy then
+                    Toggle:Destroy()
+                end
+            end
+        )
+    elseif Engine == "SmartLoop" then
+        LoopData = self:SmartLoop(
+            Options.Interval or 0.15,
+            Create_Callback,
+            Name,
+            Options.WaitBefore or false,
+            function()
+                if Options.OnDestroy then Options.OnDestroy(Object) end
+                if Toggle and Toggle.Destroy then
+                    Toggle:Destroy()
+                end
+            end
+        )
+    else
+        LoopData = self:WhileLoop(
+            Options.Interval or 0.35,
+            Create_Callback,
+            Name,
+            Options.WaitBefore or false,
+            function()
+                if Options.OnDestroy then Options.OnDestroy(Object) end
+                if Toggle and Toggle.Destroy then
+                    Toggle:Destroy()
+                end
+            end
+        )
+    end
+    
+    if Options.Default then
+        if LoopData and LoopData.Unpause and LoopData.Paused then
+            LoopData:Unpause()
+        end
+        if Toggle and Toggle.SetValue then
+            Toggle:SetValue(true)
+        end
+    else
+        if LoopData and LoopData.Pause then
+            LoopData:Pause()
+        end
+        if Toggle and Toggle.SetValue then
+            Toggle:SetValue(false)
+        end
+    end
+    
+    Object.Toggle = Toggle
+    Object.Loop = LoopData
+    
+    function Object:SetValue(Value)
+        if Disabled then 
+            return self 
+        end
+        if Recrusive then return self end
+
+        Recrusive = true
+        self[Name] = Value
+        if Toggle and Toggle.SetValue then
+            Toggle:SetValue(Value)
+        end
+        if Value then
+            if Options.OnEnable then Options.OnEnable(self) end
+            if LoopData and LoopData.Unpause and LoopData.Paused then
+                LoopData:Unpause()
+            end
+        else
+            if Options.OnDisable then Options.OnDisable(self) end
+            if LoopData and LoopData.Pause then
+                LoopData:Pause()
+            end
+        end
+        Recrusive = false
+        return self
+    end
+    
+    function Object:Lock()
+        Disabled = true
+        if Toggle and Toggle.SetDisabled then
+            Toggle:SetDisabled(true)
+        end
+        if Options.OnLock then Options.OnLock(self) end
+        return self
+    end
+    
+    function Object:Unlock()
+        Disabled = false
+        if Toggle and Toggle.SetDisabled then
+            Toggle:SetDisabled(false)
+        end
+        if Options.OnUnlock then Options.OnUnlock(self) end
+        return self
+    end
+    
+    function Object:IsLocked()
+        return Disabled
+    end
+    
+    function Object:SetInterval(Interval)
+        if Disabled then return self end
+        if LoopData and LoopData.SetWait then
+            LoopData:SetWait(Interval)
+        end
+        if Options.OnIntervalChange then Options.OnIntervalChange(Interval) end
+        return self
+    end
+    
+    function Object:Pause()
+        if Disabled then return self end
+        if LoopData and LoopData.Pause then
+            LoopData:Pause()
+        end
+        if Options.OnPause then Options.OnPause(self) end
+        return self
+    end
+    
+    function Object:Unpause()
+        if Disabled then return self end
+        if LoopData and LoopData.Unpause then
+            LoopData:Unpause()
+        end
+        if Options.OnUnpause then Options.OnUnpause(self) end
+        return self
+    end
+    
+    function Object:Kill()
+        if LoopData and LoopData.Kill then
+            LoopData:Kill()
+        end
+        if Toggle and Toggle.Destroy then
+            Toggle:Destroy()
+        end
+        return self
+    end
+    
+    function Object:Destroy()
+        self:Kill()
+        return self
+    end
+    
+    function Object:Reset()
+        self:Unlock()
+        self:SetEnabled(Options.Default)
+        self:SetInterval(Options.Interval or 0.15)
+        if LoopData and LoopData.Unpause then
+            LoopData:Unpause()
+        end
+        return self
+    end
+    
+    return Object
+end
+
 function API:OnUnload(Callback)
     self._UnloadedFM = Callback
 end
