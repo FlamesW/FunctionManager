@@ -1,36 +1,36 @@
+-- // @Obsidian Example
 if typeof(_IsLoadedFM) == "function" and _IsLoadedFM() then
     warn("@Function Manager.luau is already running")
     return
 end
 
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
 local Class = loadstring(game:HttpGet("https://github.com/FlamesW/FunctionManager/releases/latest/download/Module.luau"))()
 
 local API = Class.Launch({
     Loop_Example = true
 })
 
-API:WhileLoop(0.35, function(self)
-    if self.Loop_Example then
-        print("wowwee")
-    end
-end, "Loop")
-
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
-
 local Window = Library:CreateWindow()
 local Main = Window:AddTab("Main", "user")
 
 local GroupBox = Main:AddLeftGroupbox("Groupbox", "boxes")
 
-GroupBox:AddToggle("Loop_Example_CFG", {
+API:AddFeature(GroupBox, "Loop_Example", {
+    Default = false,
     Text = "Loop Toggle",
-    Default = API.Loop_Example,
-    Callback = function(Value)
-        API.Loop_Example = Value
+    Interval = 0.35,
+    Callback = function(self, Object, Value)
+        print("State:", Value)
+    end,
+    LoopCallback = function(self, State, Delta, Cooldown)
+        if State:GET() then
+            warn("Loop running!")
+            -- // Your loop logic here
+        end
     end
 })
 
 GroupBox:AddButton("Unload", function()
-    Library:Unload()
     API:Unload()
 end)
