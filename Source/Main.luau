@@ -5949,6 +5949,125 @@ function API:GetSpectateTarget()
     return self.Spectate_Target
 end
 
+function API:Load_Obsidian(Options)
+    Options = Options or {}
+
+    if self.Obsidian_Injected then
+        return self.Obsidian_Injected
+    end
+
+    -- // Load Obsidian Library, Credits to deivid, mstudio45 and all its contributors for making this ui library 💕
+    local Repo = Options.Repo or "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+    local CacheFolder = "@Obsidian_Cache/"
+
+    local Files = {}
+
+    table_insert(Files, {
+        Name = "Library",
+        Url = Repo .. "Library.lua",
+        File = CacheFolder .. "Library.luau",
+        Required = true,
+    })
+
+    if Options.ThemeManager ~= false then
+        table_insert(Files, {
+            Name = "ThemeManager",
+            Url = Repo .. "addons/ThemeManager.lua",
+            File = CacheFolder .. "ThemeManager.luau",
+            Required = false,
+        })
+    end
+
+    if Options.SaveManager ~= false then
+        table_insert(Files, {
+            Name = "SaveManager",
+            Url = Repo .. "addons/SaveManager.lua",
+            File = CacheFolder .. "SaveManager.luau",
+            Required = false,
+        })
+    end
+
+    local function GetContent(FileData)
+        local Content = self:LoadData(FileData.File)
+        if Content then
+            task_spawn(function()
+                local Update = game:HttpGet(FileData.Url .. "?nocache=" .. tostring(os_clock()))
+                if Update and Update ~= Content then
+                    self:SaveData(FileData.File, Update)
+
+                    warn("[Obsidian]: Updated " .. FileData.Name)
+                end
+            end)
+            return Content
+        end
+        local Content = game:HttpGet(FileData.Url .. "?nocache=" .. tostring(os_clock()))
+        self:SaveData(FileData.File, Content)
+        return Content
+    end
+    
+    local Library_Content = GetContent(Files[1])
+    if not Library_Content then
+        warn("[Obsidian]: Failed to load Library")
+        return nil
+    end
+    
+    local Success, Library = pcall(function()
+        return loadstring(Library_Content)()
+    end)
+
+    if not Success then
+        warn("[Obsidian]: Failed to execute Library:", Library)
+        return nil
+    end
+
+    local Result = { Library = Library, ThemeManager = nil, SaveManager = nil }
+
+    if Options.ThemeManager ~= false then
+        local ThemeManager_Content = GetContent(Files[2])
+        if ThemeManager_Content then
+            local Success, ThemeManager = pcall(function()
+                return loadstring(ThemeManager_Content)()
+            end)
+            if Success then
+                Result.ThemeManager = ThemeManager
+            else
+                warn("[Obsidian]: Failed to execute ThemeManager:", ThemeManager)
+            end
+        end
+    end
+
+    if Options.SaveManager ~= false then
+        local SaveManager_Content = GetContent(Files[3])
+        if SaveManager_Content then
+            local Success, SaveManager = pcall(function()
+                return loadstring(SaveManager_Content)()
+            end)
+            if Success then
+                Result.SaveManager = SaveManager
+            else
+                warn("[Obsidian]: Failed to execute SaveManager:", SaveManager)
+            end
+        end
+    end
+
+    self.ObsidianUI = Result
+    self.Obsidian_Injected = true
+
+    return Result
+end
+
+function API:Unload_OBS()
+    -- if self.ObsidianUI then
+        -- if self.ObsidianUI.Library and self.ObsidianUI.Library.Unload then
+            -- pcall(self.ObsidianUI.Library.Unload, self.ObsidianUI.Library)
+        -- end
+    -- end
+    
+    self.ObsidianUI = nil
+    self.Obsidian_Injected = nil
+    return true
+end
+
 function API:Notify(Title, Description, Duration, Image)
     -- // Load Notification Library, All credits to lxte 🫶, I've forked it to add gethui suppport and boost runtime performance.
     local Framework = self:LoadData("@Notification.UI")
@@ -8470,6 +8589,7 @@ function API:Unload()
 
     self:Unload_LM()
     self:Unload_ESP()
+    self:Unload_OBS()
 
     self:XRay(false)
     self:Flight(false, nil)
