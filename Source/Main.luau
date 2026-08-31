@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.14", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.15", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -8298,7 +8298,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
             end
         )
     elseif Engine == "SmartLoop" then
-        LoopData = self:SmartLoop(
+        LoopData = API:SmartLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
@@ -8311,7 +8311,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
             end
         )
     elseif Engine == "WhileLoop" then
-        LoopData = self:WhileLoop(
+        LoopData = API:WhileLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
