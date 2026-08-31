@@ -8148,7 +8148,7 @@ function API:Unload_LM()
     self.LM = nil
 end
 
-function API:AddFeature(Group, Name, Options)
+function API:AddFeature(Group, Name, Options) -- // @Obsidian only
     API[Name] = Options.Default or false
 
     local Disabled, Recrusive, Toggle, LoopData, Object = false, false, nil, nil, {}
@@ -8285,7 +8285,7 @@ function API:AddFeature(Group, Name, Options)
     end
 
     if Engine == "HeavyLoop" then
-        LoopData = API:HeavyLoop(
+        LoopData = self:HeavyLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
@@ -8298,7 +8298,7 @@ function API:AddFeature(Group, Name, Options)
             end
         )
     elseif Engine == "SmartLoop" then
-        LoopData = API:SmartLoop(
+        LoopData = self:SmartLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
@@ -8311,7 +8311,7 @@ function API:AddFeature(Group, Name, Options)
             end
         )
     elseif Engine == "WhileLoop" then
-        LoopData = API:WhileLoop(
+        LoopData = self:WhileLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
