@@ -8148,8 +8148,8 @@ function API:Unload_LM()
     self.LM = nil
 end
 
-function API:AddFeature(Group, Name, Options) -- // @Obsidian only
-    self[Name] = Options.Default or false
+function API:AddFeature(Group, Name, Options)
+    API[Name] = Options.Default or false
 
     local Disabled, Recrusive, Toggle, LoopData, Object = false, false, nil, nil, {}
     local IsLoading = true
@@ -8166,21 +8166,21 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
             if Recrusive then return end
 
             Recrusive = true
-            self[Name] = Value
+            API[Name] = Value
             
             if Value then
                 if Options.OnEnable then 
-                    Options.OnEnable(self, Object)
+                    Options.OnEnable(API, Object)
                 end
             else
                 if Options.OnDisable then 
-                    Options.OnDisable(self, Object)
+                    Options.OnDisable(API, Object)
                 end
             end
     
             if Options.Callback then
                 if not IsLoading or Options.CallOnLaunch or (IsLoading and Options.Default and Options.CallOnLaunch ~= false) then
-                    Options.Callback(self, Object, Value)
+                    Options.Callback(API, Object, Value)
                 end
             end
             
@@ -8211,7 +8211,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
     end
 
     function Object:GET()
-        return self[Name]
+        return API[Name]
     end
 
     if Options.ColorPickers then
@@ -8223,7 +8223,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
                 Resizable = ColorPickerOptions.Resizable or false,
                 Callback = function(Value)
                     if ColorPickerOptions.OnColor then
-                        ColorPickerOptions.OnColor(Value, self, Object)
+                        ColorPickerOptions.OnColor(Value, API, Object)
                     end
                 end,
                 Changed = ColorPickerOptions.OnChanged or function() end
@@ -8248,23 +8248,23 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
                 WhitelistedModifiers = KeyPickerOptions.WhitelistedModifiers or {},
                 Callback = function(Value)
                     if KeyPickerOptions.OnKey then
-                        KeyPickerOptions.OnKey(Value, self, Object)
+                        KeyPickerOptions.OnKey(Value, API, Object)
                     end
                     if KeyPickerOptions.Callback then
                         KeyPickerOptions.Callback(Value)
                     end
                     if KeyPickerOptions.Mode == "Toggle" and Toggle then
-                        local NewValue = not self[Name]
+                        local NewValue = not API[Name]
                         if Recrusive then return end
                         Recrusive = true
-                        self[Name] = NewValue
+                        API[Name] = NewValue
                         if Toggle.SetValue then
                             Toggle:SetValue(NewValue)
                         end
                         if NewValue then
-                            if Options.OnEnable then Options.OnEnable(self, Object) end
+                            if Options.OnEnable then Options.OnEnable(API, Object) end
                         else
-                            if Options.OnDisable then Options.OnDisable(self, Object) end
+                            if Options.OnDisable then Options.OnDisable(API, Object) end
                         end
                         Recrusive = false
                     end
@@ -8280,44 +8280,44 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
 
     local function Create_Callback(Self, DeltaTime, Cooldown)
         if Options.LoopCallback then
-            Options.LoopCallback(self, Object, DeltaTime, Cooldown)
+            Options.LoopCallback(API, Object, DeltaTime, Cooldown)
         end
     end
 
     if Engine == "HeavyLoop" then
-        LoopData = self:HeavyLoop(
+        LoopData = API:HeavyLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
             Options.WaitBefore or false,
             function()
-                if Options.OnDestroy then Options.OnDestroy(self, Object) end
+                if Options.OnDestroy then Options.OnDestroy(API, Object) end
                 if Toggle and Toggle.Destroy then
                     Toggle:Destroy()
                 end
             end
         )
     elseif Engine == "SmartLoop" then
-        LoopData = self:SmartLoop(
+        LoopData = API:SmartLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
             Options.WaitBefore or false,
             function()
-                if Options.OnDestroy then Options.OnDestroy(self, Object) end
+                if Options.OnDestroy then Options.OnDestroy(API, Object) end
                 if Toggle and Toggle.Destroy then
                     Toggle:Destroy()
                 end
             end
         )
     elseif Engine == "WhileLoop" then
-        LoopData = self:WhileLoop(
+        LoopData = API:WhileLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
             Options.WaitBefore or false,
             function()
-                if Options.OnDestroy then Options.OnDestroy(self, Object) end
+                if Options.OnDestroy then Options.OnDestroy(API, Object) end
                 if Toggle and Toggle.Destroy then
                     Toggle:Destroy()
                 end
@@ -8351,14 +8351,14 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
         if Recrusive then return self end
 
         Recrusive = true
-        self[Name] = Value
+        API[Name] = Value
         if Toggle and Toggle.SetValue then
             Toggle:SetValue(Value)
         end
         if Value then
-            if Options.OnEnable then Options.OnEnable(self, Object) end
+            if Options.OnEnable then Options.OnEnable(API, Object) end
         else
-            if Options.OnDisable then Options.OnDisable(self, Object) end
+            if Options.OnDisable then Options.OnDisable(API, Object) end
         end
         Recrusive = false
         return self
@@ -8369,7 +8369,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
         if Toggle and Toggle.SetDisabled then
             Toggle:SetDisabled(true)
         end
-        if Options.OnLock then Options.OnLock(self, Object) end
+        if Options.OnLock then Options.OnLock(API, Object) end
         return self
     end
 
@@ -8378,7 +8378,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
         if Toggle and Toggle.SetDisabled then
             Toggle:SetDisabled(false)
         end
-        if Options.OnUnlock then Options.OnUnlock(self, Object) end
+        if Options.OnUnlock then Options.OnUnlock(API, Object) end
         return self
     end
 
@@ -8400,7 +8400,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
         if LoopData and LoopData.Pause then
             LoopData:Pause()
         end
-        if Options.OnPause then Options.OnPause(self, Object) end
+        if Options.OnPause then Options.OnPause(API, Object) end
         return self
     end
 
@@ -8409,7 +8409,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
         if LoopData and LoopData.Unpause then
             LoopData:Unpause()
         end
-        if Options.OnUnpause then Options.OnUnpause(self, Object) end
+        if Options.OnUnpause then Options.OnUnpause(API, Object) end
         return self
     end
 
