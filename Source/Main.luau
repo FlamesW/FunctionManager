@@ -8430,7 +8430,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
 
     function Object:Reset()
         self:Unlock()
-        self:SetEnabled(Options.Default)
+        self:SetValue(Options.Default)
         self:SetInterval(Options.Interval or 0.15)
         if LoopData and LoopData.Unpause then
             LoopData:Unpause()
