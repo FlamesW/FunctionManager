@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.15", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.16", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -7561,6 +7561,8 @@ function API:WhileLoop(WaitBoy, Callback, Name, WaitBefore, Destroyed)
 
             if not Data.Paused then
                 Data.Callback(Local)
+
+                local Wait = Data.Wait
                 if Wait > 0 then
                     task_wait(Wait)
                 end
