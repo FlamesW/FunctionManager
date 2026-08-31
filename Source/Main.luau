@@ -8481,6 +8481,11 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
         else
             if Options.OnDisable then Options.OnDisable(API, Object) end
         end
+
+        if Options.Callback then
+            Options.Callback(API, Object, Value)
+        end
+
         Recrusive = false
         return self
     end
