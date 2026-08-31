@@ -8298,7 +8298,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
             end
         )
     elseif Engine == "SmartLoop" then
-        LoopData = API:SmartLoop(
+        LoopData = self:SmartLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
@@ -8311,7 +8311,7 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
             end
         )
     elseif Engine == "WhileLoop" then
-        LoopData = API:WhileLoop(
+        LoopData = self:WhileLoop(
             Options.Interval or 0.15,
             Create_Callback,
             Name,
