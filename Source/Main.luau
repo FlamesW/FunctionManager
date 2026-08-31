@@ -8455,6 +8455,13 @@ function API:Unload()
         pcall(self._UnloadedFM)
     end
 
+    -- // @Obsidian Unload
+    local Obsidian = globalEnv.Library
+
+    if Obsidian then
+        pcall(Obsidian.Unload, Obsidian)
+    end
+
     -- // @Unload Functions
     self:_Disconnect("@Engine.luau")
 
