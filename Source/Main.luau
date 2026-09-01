@@ -1332,6 +1332,16 @@ function API:Date(Format, Offset)
     return os_date(Format, Current_Time)
 end
 
+function API:OnMouseMove(Callback)
+    local Connection = RunService.RenderStepped:Connect(function()
+        local Position = self:GetMousePosition()
+        Callback(Position.X, Position.Y)
+    end)
+    
+    self:_Connect("@MouseMove", Connection)
+    return Connection
+end
+
 function API:GetPing(Format)
     local Ping = Performance.Network.ServerStatsItem["Data Ping"]:GetValue()
     Format = Format or "%.2f"
@@ -2875,19 +2885,30 @@ function API:SmartTimer(Name, Delay)
     return false;
 end
 
-function API:WaitUntil(Condition, Out)
-    local Time = 0
+function API:WaitUntil(Condition, Timeout, Wait)
+    Wait = Wait or 0.1
+    Timeout = Timeout or math_huge
+    local Start = os_clock()
 
     while not Condition() do
-        task_wait(0.1)
-        Time += 0.1
-
-        if Out and Time >= Out then
+        if os_clock() - Start > Timeout then
             return false
         end
+        task_wait(Wait)
     end
-
     return true
+end
+
+function API:GenerateUUID()
+    local Template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
+
+    return Template:gsub("[xy]", function(Item)
+        if Item == "x" then
+            return string_format("%x", math_random(0, 15))
+        else
+            return string_format("%x", math_random(8, 11))
+        end
+    end)
 end
 
 function API:Resolve(Mode, Input, Key)
