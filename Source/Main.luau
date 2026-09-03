@@ -1632,6 +1632,11 @@ function API:ClearWebSockets()
     return Success
 end
 
+function API:GetTeamColor(Team)
+    if not Team then return end
+    return Team.TeamColor
+end
+
 function API:ToColor3(Color)
     if not Color then return Color3_fromRGB(255, 255, 255) end
     
@@ -8665,11 +8670,9 @@ function API:Merge(...)
     for _, Modules in ipairs({...}) do
         for Method, Func in pairs(Modules) do
             if typeof(Func) == "function" then
-                if self.Functionable and self.Functionable[Method] then
-                    continue;
-                end
+                if self[Method] ~= nil then
 
-                if self[Method] == nil then
+                else
                     self[Method] = function(_, ...)
                         return Func(self, ...)
                     end
@@ -8682,7 +8685,6 @@ end
 
 function API.Launch(Class)
     Class = Class or {}
-    Class.Functionable = {}
 
     -- // @Services
     local Services = {
