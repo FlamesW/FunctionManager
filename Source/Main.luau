@@ -5358,17 +5358,41 @@ function API:Fakeout(Position, Duration)
     return true
 end
 
-function API:CalculateSpeed(Unit, DecimalPlaces)
+function API:CalculateSpeed(Unit, DecimalPlaces, Target)
     Unit = Unit or "KPH"
     DecimalPlaces = DecimalPlaces or 1
-    local Velocity = self:GetVelocity()
+
+    local Velocity
+    if Target then
+        local Part = Target
+        if typeof(Target) == "Instance" then
+            if Target:IsA("Player") then
+                Part = Target.Character and Target.Character:FindFirstChild("HumanoidRootPart")
+            elseif Target:IsA("Model") then
+                Part = Target:FindFirstChild("HumanoidRootPart")
+                    or Target.PrimaryPart
+                    or Target:FindFirstChildWhichIsA("BasePart")
+            elseif Target:IsA("Humanoid") then
+                Part = Target.Parent and Target.Parent:FindFirstChild("HumanoidRootPart")
+            end
+        end
+
+        if Part and typeof(Part) == "Instance" and Part:IsA("BasePart") then
+            Velocity = Part.AssemblyLinearVelocity or Part.Velocity
+        else
+            Velocity = Vector3.zero
+        end
+    else
+        Velocity = self:GetVelocity()
+    end
+
     local StudsPS = Velocity.Magnitude
 
     local Result
     if Unit == "KPH" then
         Result = StudsPS * 1.008
     elseif Unit == "MPH" then
-        Result = StudsPS * 0.626 
+        Result = StudsPS * 0.626
     elseif Unit == "MPS" then
         Result = StudsPS * 0.28
     elseif Unit == "Studs" then
@@ -5380,7 +5404,7 @@ function API:CalculateSpeed(Unit, DecimalPlaces)
     else
         Result = StudsPS
     end
-    
+
     local Multiplier = 10 ^ DecimalPlaces
     return math_floor(Result * Multiplier + 0.5) / Multiplier
 end
