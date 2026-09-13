@@ -120,10 +120,6 @@ function API:_Disconnect(...): ()
     local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; for _, Name in ipairs(Signal) do if type(Name) ~= "string" then continue end; local Objects = self._Signal and self._Signal[Name]; if not Objects then continue end; local function Disconnect(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do Disconnect(Objects[i]) end; self._Signal[Name] = nil end 
 end
 
-function API:_Inject(Url, t, Cache) 
-   local Source; if Cache and type(Cache) == "string" and #Cache > 0 then local Cache_Path = self:Hotpath(Cache); local Cached = self:LoadData(Cache_Path); if Cached and type(Cached) == "string" and #Cached > 0 then Source = Cached; task_spawn(function() local Success, Remote = pcall(function() return Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())) end); if Success and Remote and Remote ~= Cached then self:SaveData(Cache_Path, Remote) end end) else Source = Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())); self:SaveData(Cache_Path, Source) end else Source = Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())) end; local Names, Values = {}, {}; for k, v in pairs(t or {}) do table_insert(Names, k); table_insert(Values, v) end; local Prologue = ""; if #Names > 0 then Prologue = "local " .. table_concat(Names, ", ") .. " = ...\n" end; local fn, Err = loadstring(Prologue .. Source); if not fn then warn("[Inject] compile error: " .. tostring(Err)); return nil end; local ok, Response = pcall(fn, table_unpack(Values)); if not ok then warn("[Inject] runtime error: " .. tostring(Response)) end; return Response 
-end
-
 function API:_ExitFM(): ()
     for Name, _ in pairs(self._Signal or {}) do self:_Disconnect(Name) end; self._Signal = nil
 end
@@ -1513,6 +1509,59 @@ function API:DetectAnim(Target)
     end
 
     return Data
+end
+
+function API:Inject(Url, t, Cache)
+    local Source
+
+    if Cache and type(Cache) == "string" and #Cache > 0 then
+        local Cache_Path = self:Hotpath(Cache)
+        local Cached = self:LoadData(Cache_Path)
+
+        if Cached and type(Cached) == "string" and #Cached > 0 then
+            Source = Cached
+
+            task_spawn(function()
+                local Success, Remote = pcall(function()
+                    return Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock()))
+                end)
+
+                if Success and Remote and Remote ~= Cached then
+                    self:SaveData(Cache_Path, Remote)
+                end
+            end)
+        else
+            Source = Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock()))
+            self:SaveData(Cache_Path, Source)
+        end
+    else
+        Source = Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock()))
+    end
+
+    local Names, Values = {}, {}
+
+    for k, v in pairs(t or {}) do
+        table_insert(Names, k)
+        table_insert(Values, v)
+    end
+
+    local Prologue = ""
+    if #Names > 0 then
+        Prologue = "local " .. table_concat(Names, ", ") .. " = ...\n"
+    end
+
+    local fn, Err = loadstring(Prologue .. Source)
+    if not fn then
+        warn("[Inject] compile error: " .. tostring(Err))
+        return nil
+    end
+
+    local Okay, Response = pcall(fn, table_unpack(Values))
+    if not Okay then
+        warn("[Inject] runtime error: " .. tostring(Response))
+    end
+
+    return Response
 end
 
 function API:LoadFile(Url)
