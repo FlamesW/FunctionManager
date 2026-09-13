@@ -136,7 +136,7 @@ function globalEnv._Clean(Object, ...)
     if not Object then return end
 
     if type(table.clear) == "function" then
-        pcall(table.clear, Object)
+        table.clear(Object)
     end
 
     if type(setmetatable) == "function" then
