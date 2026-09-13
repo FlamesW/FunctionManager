@@ -6054,7 +6054,7 @@ function API:Load_NeverLose()
     end
 
     -- // Load Neverlose Library, Credits to 4lpaca for making this ui library 💕
-    local Repo, Cache = ("https://raw.githubusercontent.com/FlamesW/Neverlose/refs/heads/home/Library.luau"), ("NeverLose/Assets/Library.luau")
+    local Repo, Cache = ("https://raw.githubusercontent.com/FlamesW/Neverlose/refs/heads/home/Library/Source.luau"), ("NeverLose/Assets/Library.luau")
     local Content = self:LoadData(Cache)
 
     if Content and type(Content) == "string" and #Content > 0 then
