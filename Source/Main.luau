@@ -19,8 +19,8 @@ local math_floor, math_random, math_clamp, math_max, math_min, math_sqrt, math_a
 local string_format, string_sub, string_match, string_gsub, string_gmatch, string_lower =
     string.format, string.sub, string.match, string.gsub, string.gmatch, string.lower
 
-local table_insert, table_clear, table_sort, table_remove, table_create, table_concat =
-    table.insert, table.clear, table.sort, table.remove, table.create, table.concat
+local table_insert, table_clear, table_sort, table_remove, table_create, table_concat, table_unpack =
+    table.insert, table.clear, table.sort, table.remove, table.create, table.concat, table.unpack
 
 local task_wait, task_spawn, task_cancel, task_delay = task.wait, task.spawn, task.cancel, task.delay
 
@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.17", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.18", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -120,12 +120,12 @@ function API:_Disconnect(...): ()
     local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; for _, Name in ipairs(Signal) do if type(Name) ~= "string" then continue end; local Objects = self._Signal and self._Signal[Name]; if not Objects then continue end; local function Disconnect(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do Disconnect(Objects[i]) end; self._Signal[Name] = nil end 
 end
 
-function API:_ExitFM(): ()
-    for Name, _ in pairs(self._Signal or {}) do self:_Disconnect(Name) end; self._Signal = nil
+function API:_Inject(Url, t, Cache) 
+   local Source; if Cache and type(Cache) == "string" and #Cache > 0 then local Cache_Path = self:Hotpath(Cache); local Cached = self:LoadData(Cache_Path); if Cached and type(Cached) == "string" and #Cached > 0 then Source = Cached; task_spawn(function() local Success, Remote = pcall(function() return Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())) end); if Success and Remote and Remote ~= Cached then self:SaveData(Cache_Path, Remote) end end) else Source = Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())); self:SaveData(Cache_Path, Source) end else Source = Game:HttpGet(Url .. "?nocache=" .. tostring(os_clock())) end; local Names, Values = {}, {}; for k, v in pairs(t or {}) do table_insert(Names, k); table_insert(Values, v) end; local Prologue = ""; if #Names > 0 then Prologue = "local " .. table_concat(Names, ", ") .. " = ...\n" end; local fn, Err = loadstring(Prologue .. Source); if not fn then warn("[Inject] compile error: " .. tostring(Err)); return nil end; local ok, Response = pcall(fn, table_unpack(Values)); if not Ok then warn("[Inject] runtime error: " .. tostring(Response)) end; return Response 
 end
 
-function API:_Inject(Url, t)
-    local fn = self:LoadFile(Url); local env = getfenv(fn); for k,v in pairs(t or {}) do env[k]=v end; setfenv(fn, env); return fn()
+function API:_ExitFM(): ()
+    for Name, _ in pairs(self._Signal or {}) do self:_Disconnect(Name) end; self._Signal = nil
 end
 
 function globalEnv._IsLoadedFM() --> typeof(_IsLoadedFM) == "function" and _IsLoadedFM();
@@ -5997,6 +5997,43 @@ end
 
 function API:GetSpectateTarget()
     return self.Spectate_Target
+end
+
+function API:Load_NeverLose()
+    if self.NeverLose_Injected then
+        return self.NeverLose_Injected
+    end
+
+    -- // Load Neverlose Library, Credits to 4lpaca for making this ui library 💕
+    local Repo, Cache = ("https://raw.githubusercontent.com/FlamesW/Neverlose/refs/heads/home/Library.luau"), ("NeverLose/Assets/Library.luau")
+    local Content = self:LoadData(Cache)
+
+    if Content and type(Content) == "string" and #Content > 0 then
+        task_spawn(function()
+            local Success, Remote = pcall(function()
+                return Game:HttpGet(Repo .. "?nocache=" .. tostring(os_clock()))
+            end)
+
+            if Success and Remote and Remote ~= Content then
+                self:SaveData(Cache, Remote)
+            end
+        end)
+    else
+        Content = Game:HttpGet(Repo .. "?nocache=" .. tostring(os_clock()))
+        self:SaveData(Cache, Content)
+    end
+
+    local Success, Library = pcall(function()
+        return loadstring(Content)()
+    end)
+
+    if not Success then
+        warn("[NeverLose]: Failed to load: " .. tostring(Library))
+        return nil
+    end
+
+    self.NeverLose_Injected = Library
+    return Library
 end
 
 function API:Load_Obsidian(Options)
