@@ -3755,7 +3755,7 @@ function API:IsState(StateName)
     return Hum:GetState() == StateName
 end
 
-function Script:PlatformStand(State)
+function API:PlatformStand(State)
     local Hum = self:GetHumanoid()
     if Hum then
         Hum.PlatformStand = State
