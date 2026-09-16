@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.18", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.19", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -3753,6 +3753,13 @@ function API:IsState(StateName)
     local Hum = self:GetHumanoid()
     if not Hum then return false end
     return Hum:GetState() == StateName
+end
+
+function Script:PlatformStand(State)
+    local Hum = self:GetHumanoid()
+    if Hum then
+        Hum.PlatformStand = State
+    end
 end
 
 function API:SetSpeed(Amount)
