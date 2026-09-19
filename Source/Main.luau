@@ -1519,7 +1519,6 @@ function API:OnDisconnected(Options)
     return true
 end
 
-
 function API:QueueOnTeleport(Flag, State, Script, Callbacks)
     if not self.Queues_Loaded then
         local Data = self:LoadData("@QueueSystem.json")
