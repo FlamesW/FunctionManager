@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.20", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.21", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -1369,6 +1369,156 @@ function API:StopFps()
         self.Fps_Counter, self.Current_Fps = nil,0
     end
 end
+
+function API:OnDisconnected(Options)
+    Options = Options or {}
+
+    self._Disconnections = self._Disconnections or {
+        Enabled = false,
+        Ignore = {},
+        Source = nil,
+        Callback = nil,
+        Action = "Nothing",
+        Serverhop = { Mode = "high" },
+        Time = 1,
+    }
+
+    local Config = self._Disconnections
+
+    if Options.Ignore then
+        Config.Ignore = { Exact = {}, Substring = {} }
+
+        for Key, Value in pairs(Options.Ignore) do
+            if typeof(Key) == "number" and typeof(Value) == "string" then
+                table_insert(Config.Ignore.Substring, string_lower(Value))
+            elseif typeof(Key) == "string" and Value == true then
+                table_insert(Config.Ignore.Exact, string_lower(Key))
+            end
+        end
+    end
+
+    if Options.Callback ~= nil then Config.Callback = Options.Callback end
+    if Options.Action ~= nil then Config.Action = Options.Action end
+    if Options.Serverhop ~= nil then Config.Serverhop = Options.Serverhop end
+    if Options.Time ~= nil then Config.Time = Options.Time end
+
+    local function ShouldIgnore(Message)
+        if not Message or Message == "" then return true end
+
+        local Has_Exact = Config.Ignore.Exact and #Config.Ignore.Exact > 0
+        local Has_Substring = Config.Ignore.Substring and #Config.Ignore.Substring > 0
+
+        if not Has_Exact and not Has_Substring then return false end
+
+        local Lower = string_lower(Message)
+
+        if Has_Exact then
+            for _, Entry in ipairs(Config.Ignore.Exact) do
+                if Lower == Entry then return true end
+            end
+        end
+
+        if Has_Substring then
+            for _, Entry in ipairs(Config.Ignore.Substring) do
+                if Lower:find(Entry, 1, true) then return true end
+            end
+        end
+
+        return false
+    end
+
+    local function Retry_Rejoin()
+        task_spawn(function()
+            for i = 1, 50 do
+                if not Config.Enabled then return end
+
+                self:Rejoin()
+                task_wait(2)
+            end
+        end)
+    end
+
+    local function Retry_Serverhop()
+        task_spawn(function()
+            for i = 1, 50 do
+                if not Config.Enabled then return end
+
+                local SH = Config.Serverhop or {}
+                self:ServerHop({
+                    Mode = SH.Mode or "high",
+                    MinPlayers = SH.MinPlayers,
+                    MaxPlayers = SH.MaxPlayers,
+                    MaxPing = SH.MaxPing,
+                    MaxRetries = SH.MaxRetries,
+                    RetryDelay = SH.RetryDelay,
+                    Timeout = SH.Timeout,
+                })
+
+                task_wait(10)
+            end
+        end)
+    end
+
+    local function OnMessage(Message)
+        if not Config.Enabled then return end
+        if ShouldIgnore(Message) then return end
+
+        task_wait(Config.Time)
+
+        if Config.Callback then
+            pcall(Config.Callback, Message)
+        end
+
+        local Action = string_lower(Config.Action or "Nothing")
+
+        if Action == "serverhop" then
+            Retry_Serverhop()
+        elseif Action == "rejoin" then
+            Retry_Rejoin()
+        elseif Action == "nothing" then
+            -- // Absolute nothing.
+        end
+    end
+
+    if Options.Enabled == false then
+        Config.Enabled = false
+        self:_Disconnect(Options.Name or "@Disconnect")
+        return true
+    end
+
+    if Config.Enabled and Options.Enabled == nil then
+        return true
+    end
+
+    self:_Disconnect(Options.Name or "@Disconnect")
+
+    local Source = Options.Source or Config.Source or GuiService.ErrorMessageChanged
+    Config.Source = Source
+    Config.Enabled = true
+
+    local SignalName = Options.Name or "@Disconnect"
+
+    if Source == GuiService.ErrorMessageChanged then
+        self:_Connect(SignalName, Source:Connect(OnMessage))
+    else
+        self:_Connect(SignalName, Source:Connect(function(...)
+            local args = { ... }
+            local Message = nil
+
+            for _, v in ipairs(args) do
+                if typeof(v) == "string" then
+                    Message = v
+                    break
+                end
+            end
+
+            OnMessage(Message)
+        end))
+    end
+
+    return true
+end
+
 
 function API:QueueOnTeleport(Flag, State, Script, Callbacks)
     if not self.Queues_Loaded then
