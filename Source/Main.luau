@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.19", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.20", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -6055,13 +6055,13 @@ function API:GetSpectateTarget()
     return self.Spectate_Target
 end
 
-function API:Load_NeverLose()
-    if self.NeverLose_Injected then
-        return self.NeverLose_Injected
+function API:Load_Mother()
+    if self.Mother_Injected then
+        return self.Mother_Injected
     end
 
-    -- // Load Neverlose Library, Credits to 4lpaca for making this ui library 💕
-    local Repo, Cache = ("https://raw.githubusercontent.com/FlamesW/Neverlose/refs/heads/home/Library/Source.luau"), ("NeverLose/Assets/Library.luau")
+    -- // Load Mother Library, Credits to 4lpaca for making this ui library 💕
+    local Repo, Cache = ("https://raw.githubusercontent.com/FlamesW/Mommy/refs/heads/home/Library/Source.luau"), ("Mother/Assets/Library.luau")
     local Content = self:LoadData(Cache)
 
     if Content and type(Content) == "string" and #Content > 0 then
@@ -6084,11 +6084,11 @@ function API:Load_NeverLose()
     end)
 
     if not Success then
-        warn("[NeverLose]: Failed to load: " .. tostring(Library))
+        warn("[Mommy]: Failed to load: " .. tostring(Library))
         return nil
     end
 
-    self.NeverLose_Injected = Library
+    self.Mother_Injected = Library
     return Library
 end
 
