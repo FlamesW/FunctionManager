@@ -3809,9 +3809,9 @@ function API:AntiAFK()
         end
     else
         LocalPlayer.Idled:Connect(function()
-            self:Press(Enum.KeyCode.F5)
+            self:Press(Enum.KeyCode.Unknown)
             task_wait(0.05)
-            self:Unpress(Enum.KeyCode.F5)
+            self:Unpress(Enum.KeyCode.Unknown)
         end)
     end
 
