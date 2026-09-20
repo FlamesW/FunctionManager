@@ -8932,6 +8932,25 @@ function API:Unload()
     globalEnv._Clean(API, nil); globalEnv._Clean(self, nil); globalEnv._Clean = nil
 end
 
+function API:Build(Path, Value)
+    local Segments = {}
+    for Part in Path:gmatch("[^/]+") do
+        table_insert(Segments, Part)
+    end
+
+    local Root = globalEnv
+    for i = 1, #Segments - 1 do
+        local Key = Segments[i]
+        Root[Key] = Root[Key] or {}
+        Root = Root[Key]
+    end
+
+    local Last = Segments[#Segments]
+    Root[Last] = Root[Last] or Value
+
+    return self
+end
+
 function API:Merge(...)
     for _, Modules in ipairs({...}) do
         for Method, Func in pairs(Modules) do
