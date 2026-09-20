@@ -3796,7 +3796,9 @@ function API:SetFpsCap(Fps)
 end
 
 function API:AntiAFK()
-    if global.AFK_Service then return end
+    local Service = "AFK_Service|" .. tostring(LocalPlayer and LocalPlayer.Name)
+
+    if global[Service] then return end
 
     if (GetConnections) then
         for _, Con in pairs(GetConnections(LocalPlayer.Idled)) do
@@ -3813,7 +3815,7 @@ function API:AntiAFK()
         end)
     end
 
-    global.AFK_Service = true
+    global[Service] = true
 end
 
 function API:Sit(State)
