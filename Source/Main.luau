@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.21", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.22", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -1403,7 +1403,7 @@ function API:OnDisconnected(Options)
     if Options.Time ~= nil then Config.Time = Options.Time end
 
     local function ShouldIgnore(Message)
-        if not Message or Message == "" then return true end
+        if Message == nil then return true end
 
         local Has_Exact = Config.Ignore.Exact and #Config.Ignore.Exact > 0
         local Has_Substring = Config.Ignore.Substring and #Config.Ignore.Substring > 0
@@ -1503,7 +1503,7 @@ function API:OnDisconnected(Options)
     else
         self:_Connect(SignalName, Source:Connect(function(...)
             local args = { ... }
-            local Message = nil
+            local Message = ""
 
             for _, v in ipairs(args) do
                 if typeof(v) == "string" then
