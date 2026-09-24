@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.24", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.23", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -90,6 +90,7 @@ local UnbindFromRenderStep = RunService.UnbindFromRenderStep;
 local InputBegan = UserInputService.InputBegan;
 local IsKeyDown = UserInputService.IsKeyDown;
 local GetMouseLocation = UserInputService.GetMouseLocation;
+local GetPlatform = UserInputService.GetPlatform;
 
 -- // @Workspace / @Game
 local WorkspaceRaycast, RaycastParamsNew = Workspace.Raycast, RaycastParams.new;
@@ -1279,7 +1280,7 @@ function API:CreateConfig(Defaults)
 end
 
 function API:GetDevice()
-    return UserInputService:GetPlatform()
+    return GetPlatform(UserInputService)
 end
 
 function API:IsMobile()
