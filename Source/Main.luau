@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.23", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.24", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -1295,7 +1295,7 @@ end
 
 function API:IsPC()
     local Plat = self:GetDevice()
-    return Plat == Enum.Platform.Windows or Plat == Enum.Platform.MacOS or Plat == Enum.Platform.Linux
+    return Plat == Enum.Platform.Windows or Plat == Enum.Platform.OSX or Plat == Enum.Platform.Linux
 end
 
 function API:ToPlace(Place)
