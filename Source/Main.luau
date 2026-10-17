@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.24", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.25", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -6204,6 +6204,45 @@ end
 
 function API:GetSpectateTarget()
     return self.Spectate_Target
+end
+
+function API:Load_DirectorCut(Options)
+    Options = Options or {}
+
+    local Repo, Cache = "https://raw.githubusercontent.com/FlamesW/Interface/refs/heads/home/Library.luau", (Options.Cache or "DirectorCut/Assets/Library.luau")
+
+    if self.DirectorCut_Injected and self.DirectorCut_Cache == Cache then
+        return self.DirectorCut_Injected
+    end
+
+    local Content = self:LoadData(Cache)
+
+    if Content and type(Content) == "string" and #Content > 0 then
+        task_spawn(function()
+            local Success, Remote = pcall(function()
+                return Game:HttpGet(Repo .. "?nocache=" .. tostring(os_clock()))
+            end)
+
+            if Success and Remote and Remote ~= Content then
+                self:SaveData(Cache, Remote)
+            end
+        end)
+    else
+        Content = Game:HttpGet(Repo .. "?nocache=" .. tostring(os_clock()))
+        self:SaveData(Cache, Content)
+    end
+
+    local Success, Library = pcall(function()
+        return loadstring(Content)()
+    end)
+
+    if not Success then
+        warn("[DirectorCut]: Failed to load: " .. tostring(Library))
+        return nil
+    end
+
+    self.DirectorCut_Injected, self.DirectorCut_Cache = Library, Cache
+    return Library
 end
 
 function API:Load_Mother()
