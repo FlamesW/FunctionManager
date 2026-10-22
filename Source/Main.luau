@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.25", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.26", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -64,6 +64,7 @@ local StarterGuiService: StarterGuiService? = GetService(Game, "StarterGui");
 local GuiService: GuiService? = GetService(Game, "GuiService");
 local Performance: Performance? = GetService(Game, "Stats");
 local LightingService: LightingService? = GetService(Game, "Lighting");
+local PathfindingService: PathfindingService? = GetService(Game, "PathfindingService");
 
 local VirtualInputManager: VirtualInputManager? = Instance_new("VirtualInputManager");
 local LocalPlayer: Player? = nil
@@ -1452,6 +1453,7 @@ function API:OnDisconnected(Options)
                     MaxRetries = SH.MaxRetries,
                     RetryDelay = SH.RetryDelay,
                     Timeout = SH.Timeout,
+                    Callback = SH.Callback,
                 })
 
                 task_wait(10)
@@ -1592,7 +1594,14 @@ function API:SetQueue(Flag, State)
     end
 end
 
-function API:DetectAnim(Target)
+function API:DetectAnim(Target, Options)
+    Options = Options or {}
+
+    local WithAssetInfo = Options.WithAssetInfo ~= false
+    local IncludeStopped = Options.IncludeStopped or false
+
+    if not Target or typeof(Target) ~= "Instance" then return {} end
+
     local Model, Humanoid, Controller = nil, nil, nil
 
     if Target:IsA("Model") then
@@ -1606,20 +1615,18 @@ function API:DetectAnim(Target)
         Controller = Target
         Model = Target.Parent
     elseif Target:IsA("Player") then
-        if Target.Character then
-            Model = Target.Character
+        Model = Target.Character
+        if Model then
             Humanoid = Model:FindFirstChildOfClass("Humanoid")
         end
-    elseif Target:IsA("Part") or Target:IsA("BasePart") then
+    elseif Target:IsA("BasePart") then
         Model = Target.Parent
         if Model and Model:IsA("Model") then
             Humanoid = Model:FindFirstChildOfClass("Humanoid")
         end
     end
 
-    if not Humanoid and not Controller then
-        return {}
-    end
+    if not Humanoid and not Controller then return {} end
 
     local Animator = nil
     if Humanoid then
@@ -1628,36 +1635,187 @@ function API:DetectAnim(Target)
     if not Animator and Controller then
         Animator = Controller:FindFirstChildOfClass("Animator")
     end
-    if not Animator then
-        return {}
+    if not Animator then return {} end
+
+    self._AnimRegistry = self._AnimRegistry or setmetatable({}, {__mode = "k"})
+
+    local Reg = self._AnimRegistry[Animator]
+
+    if not Reg then
+        Reg = {
+            Tracks = {},
+            Conn = nil,
+            Cleanup = nil,
+        }
+        self._AnimRegistry[Animator] = Reg
+
+        local Playing = Animator:GetPlayingAnimationTracks()
+        local Now = os_clock()
+        for i = 1, #Playing do
+            local Track = Playing[i]
+            if Track then
+                Reg.Tracks[Track] = {StartedAt = Now}
+            end
+        end
+
+        Reg.Conn = Animator.AnimationPlayed:Connect(function(Track)
+            if not Track then return end
+            Reg.Tracks[Track] = {StartedAt = os_clock()}
+        end)
+
+        Reg.Cleanup = Animator.Destroying:Connect(function()
+            if Reg.Conn then Reg.Conn:Disconnect() end
+            if Reg.Cleanup then Reg.Cleanup:Disconnect() end
+            self._AnimRegistry[Animator] = nil
+        end)
     end
 
-    local Tracks = Animator:GetPlayingAnimationTracks()
-    if #Tracks == 0 then
-        return {}
+    local Now = os_clock()
+    local Tracks = Reg.Tracks
+
+    for Track, Meta in pairs(Tracks) do
+        if not Track.IsPlaying then
+            if IncludeStopped then
+                Meta.StoppedAt = Meta.StoppedAt or Now
+            else
+                Tracks[Track] = nil
+            end
+        elseif Meta.StoppedAt then
+            Meta.StoppedAt = nil
+            Meta.StartedAt = Now
+        end
     end
 
     local Data = {}
-    for _, Track in ipairs(Tracks) do
-        local Object = Track.Animation
+    local Count = 0
 
-        local Asset_Id = Object and Object.AnimationId and tonumber(Object.AnimationId:match("%d+"))
-        local Asset_Info = Asset_Id and self:GetAssetInfo(Asset_Id)
+    self._AnimIdCache = self._AnimIdCache or setmetatable({}, {__mode = "k"})
 
-        Data[#Data + 1] = {
+    for Track, Meta in pairs(Tracks) do
+        local Animation = Track.Animation
+        local AnimationId = Animation and Animation.AnimationId or nil
+
+        local Asset_Id
+        if Animation then
+            Asset_Id = self._AnimIdCache[Animation]
+            if Asset_Id == nil then
+                Asset_Id = AnimationId and tonumber(AnimationId:match("%d+")) or false
+                self._AnimIdCache[Animation] = Asset_Id
+            end
+            if Asset_Id == false then Asset_Id = nil end
+        end
+
+        local Asset_Info = (WithAssetInfo and Asset_Id) and self:GetAssetInfo(Asset_Id) or nil
+
+        Count = Count + 1
+        Data[Count] = {
             Name = Track.Name,
             Speed = Track.Speed,
+            Weight = Track.WeightCurrent,
             TimePosition = Track.TimePosition,
-            AnimationId = Object and Object.AnimationId,
+            Length = Track.Length,
+            IsPlaying = Track.IsPlaying,
+            Looped = Track.Looped,
+            Priority = Track.Priority,
+            AnimationId = AnimationId,
+
+            StartedAt = Meta.StartedAt,
+            Elapsed = Meta.StartedAt and (Now - Meta.StartedAt) or nil,
+            StoppedAt = Meta.StoppedAt,
 
             AssetName = Asset_Info and Asset_Info.Name,
             Creator = Asset_Info and Asset_Info.Creator,
             Type = Asset_Info and Asset_Info.Type,
-            Description = Asset_Info and Asset_Info.Description,
+            Description  = Asset_Info and Asset_Info.Description,
         }
     end
 
-    return Data
+    return Data, Count
+end
+
+function API:PlayAnimation(AnimationInput, Options)
+    Options = Options or {}
+
+    if not AnimationInput then return nil end
+
+    local Char = self:GetCharacter()
+    local Hum = self:GetHumanoid()
+    if not Char or not Hum then return nil end
+
+    local Animator = Hum:FindFirstChildOfClass("Animator")
+    if not Animator then
+        Animator = Instance_new("Animator")
+        Animator.Parent = Hum
+    end
+
+    local AnimObj
+
+    if typeof(AnimationInput) == "Instance" and AnimationInput:IsA("Animation") then
+        AnimObj = AnimationInput
+    elseif typeof(AnimationInput) == "string" or typeof(AnimationInput) == "number" then
+        local Id = tostring(AnimationInput):match("%d+")
+        if not Id then return nil end
+
+        AnimObj = Instance_new("Animation")
+        AnimObj.AnimationId = "rbxassetid://" .. Id
+        AnimObj.Name = Options.Name or ("Anim_" .. Id)
+    elseif typeof(AnimationInput) == "table" then
+        AnimObj = Instance_new("Animation")
+        if AnimationInput.Id then
+            AnimObj.AnimationId = "rbxassetid://" .. tostring(AnimationInput.Id):match("%d+")
+        elseif AnimationInput.AnimationId then
+            AnimObj.AnimationId = AnimationInput.AnimationId
+        else
+            return nil
+        end
+        AnimObj.Name = AnimationInput.Name or "Anim"
+    else
+        return nil
+    end
+
+    local Track
+    if not Options.NoReuse then
+        self._AnimTrackCache = self._AnimTrackCache or setmetatable({}, {__mode = "k"})
+        self._AnimTrackCache[AnimObj] = self._AnimTrackCache[AnimObj] or nil
+        Track = self._AnimTrackCache[AnimObj]
+    end
+
+    if not Track then
+        local Ok, Loaded = pcall(function()
+            return Animator:LoadAnimation(AnimObj)
+        end)
+        if not Ok or not Loaded then return nil end
+        Track = Loaded
+        if not Options.NoReuse then
+            self._AnimTrackCache[AnimObj] = Track
+        end
+    end
+
+    Track.Priority = Options.Priority or Track.Priority or Enum.AnimationPriority.Action
+    Track.Looped = Options.Looped ~= nil and Options.Looped or Track.Looped
+    Track.Speed = Options.Speed or Track.Speed or 1
+
+    Track:Play(Options.Fade or 0.1, Options.Weight or 1, Track.Speed)
+
+    if Options.TimePosition then
+        Track.TimePosition = Options.TimePosition
+    end
+
+    if Options.OnEnded and not Track.Looped then
+        local Conn
+        Conn = Track.Stopped:Connect(function()
+            if Conn then Conn:Disconnect() end
+            pcall(Options.OnEnded, Track)
+        end)
+    end
+
+    return Track
+end
+
+function API:StopAnimation(Track, Fade)
+    if not Track then return false end
+    pcall(function() Track:Stop(Fade or 0.1) end)
+    return true
 end
 
 function API:Inject(Url, t, Cache)
@@ -3021,7 +3179,27 @@ end
 
 function API:IsAFriend(Player)
     if not Player then return false end
-    return Player:IsFriendsWith(LocalPlayer.UserId)
+
+    local LPlayer = self:GetPlayer()
+    if not LPlayer then return false end
+
+    local TargetId
+    if typeof(Player) == "Instance" and Player:IsA("Player") then
+        TargetId = Player.UserId
+    else
+        TargetId = tonumber(Player)
+    end
+    if not TargetId then return false end
+    if TargetId == LPlayer.UserId then return true end
+
+    local Friends = self:GetFriends(LPlayer.UserId)
+    for _, F in ipairs(Friends) do
+        if F.UserId == TargetId then
+            return true
+        end
+    end
+
+    return false
 end
 
 function API:GetPlaceId()
@@ -3879,17 +4057,20 @@ function API:GetControlModule()
     if self.ControlModule then
         return self.ControlModule
     end
-    
-    local Scripts = LocalPlayer:FindFirstChild("PlayerScripts")
-    if not Scripts then return nil end
-    
-    local Module = PlayerScripts:FindFirstChild("PlayerModule")
-    if not Module then return nil end
-    
-    local ControlModule = Module:FindFirstChild("ControlModule")
-    if not ControlModule then return nil end
 
-    self.ControlModule = require(ControlModule)
+    local PlayerScripts = LocalPlayer:FindFirstChild("PlayerScripts")
+    if not PlayerScripts then return nil end
+
+    local PlayerModule = PlayerScripts:FindFirstChild("PlayerModule")
+    if not PlayerModule then return nil end
+
+    local Ok, Module = pcall(require, PlayerModule)
+    if not Ok or typeof(Module) ~= "table" then return nil end
+
+    local Controls = Module:GetControls()
+    if not Controls then return nil end
+
+    self.ControlModule = Controls
     return self.ControlModule
 end
 
@@ -4130,6 +4311,828 @@ function API:StopBringTools()
     end
 end
 
+function API:Pathfind(Destination, Options)
+    Options = Options or {}
+
+    local Hum = self:GetHumanoid()
+    local Root = self:GetRoot()
+    local Char = self:GetCharacter()
+    if not Hum or not Root or not Char then return false end
+
+    local Target = self:ResolvePosition(Destination)
+    if not Target then return false end
+
+    local SingleInstance = Options.SingleInstance ~= false
+    local CancelPrevious = Options.CancelPrevious ~= false
+
+    if SingleInstance then
+        if not CancelPrevious and self._Pathfinding and next(self._Pathfinding) then
+            if Options.OnContextFail then pcall(Options.OnContextFail, "Already Running") end
+            return false, "Already Running"
+        end
+
+        for OldKey, OldThread in pairs(self._Pathfinding or {}) do
+            if typeof(OldThread) == "thread" then
+                pcall(task_cancel, OldThread)
+            end
+            self._Pathfinding[OldKey] = nil
+        end
+    end
+
+    local ArriveDist = Options.ArriveDistance or 4
+    local Timeout = Options.Timeout or 60
+    local Recompute = Options.Recompute or 1.0
+    local AgentRadius = Options.AgentRadius or 2
+    local AgentHeight = Options.AgentHeight or 5
+    local CanJump = Options.AgentCanJump ~= false
+    local UseFallback = Options.FallbackDirect ~= false
+    local StopOnDeath = Options.StopOnDeath ~= false
+    local MaxRecompute = Options.MaxRecompute or 60
+    local WaypointReach = Options.WaypointDistance or 4
+    local WaypointTimeout = Options.WaypointTimeout or 2.0
+    local StuckThreshold = Options.StuckThreshold or 0.4
+
+    local UseRaycast = Options.UseRaycast ~= false
+    local DirectWalk = Options.DirectWalk ~= false
+    local MaxDirectDist = Options.MaxDirectDistance or 45
+    local EdgeCheck = Options.EdgeCheck ~= false
+    local GroundCheck = Options.GroundCheck ~= false
+
+    local NoMicropause = Options.NoMicropause ~= false
+    local AnticipateNext = Options.AnticipateNext ~= false
+    local SmoothHandoff = Options.SmoothHandoff ~= false
+    local KeepMovingOnFail = Options.KeepMovingOnFail ~= false
+    local AimLookahead = Options.AimLookahead or 2
+
+    local EdgeJumpEnabled = Options.EdgeJump ~= false
+    local EdgeJumpBoost = Options.EdgeJumpBoost or nil
+    local EdgeJumpMult = Options.EdgeJumpMultiplier or 1.0
+    local EdgeJumpRewind = Options.EdgeJumpRewind ~= false
+    local EdgeJumpMaxAge = Options.EdgeJumpRewindMaxAge or 0.15
+    local EdgeJumpVerify = Options.EdgeJumpVerify ~= false
+    local OnEdgeJump = Options.OnEdgeJump
+
+    local SmartJump = Options.SmartJump ~= false
+    local JumpClearHeight = Options.JumpClearHeight or (AgentHeight + 1)
+    local JumpObstacleRange = Options.JumpObstacleRange or (AgentRadius + 3)
+    local JumpCooldown = Options.JumpCooldown or 0.4
+    local JumpMaxHeight = Options.JumpMaxHeight or 6
+    local JumpMinHeight = Options.JumpMinHeight or 0.5
+
+    local WallTouch = Options.WallTouch ~= false
+    local WallTouchMinHeight = Options.WallTouchMinHeight or 0.45
+    local WallTouchMaxHeight = Options.WallTouchMaxHeight or 500
+    local WallTouchCooldown = Options.WallTouchCooldown or 1.0
+    local WallTouchVerifyTop = Options.WallTouchVerifyTop ~= false
+    local OnWallTouch = Options.OnWallTouch
+
+    local RetryBacksteps = Options.RetryBacksteps or 3
+    local RetryBackstepsMin = Options.RetryBackstepsMin or 2
+    local MaxBacktrackTries = Options.MaxBacktrackTries or 2
+    local MaxStayTries = Options.MaxStayTries or 2
+    local MaxFreshTries = Options.MaxFreshTries or 2
+    local MaxSkipTries = Options.MaxSkipTries or 3
+    local BtMaxDistance = Options.BacktrackMaxDistance or 40
+    local BtRequireLOS = Options.BacktrackRequireLOS ~= false
+    local BtRequireGround = Options.BacktrackRequireGround ~= false
+    local BtRequirePath = Options.BacktrackRequirePath ~= false
+
+    local OnWaypoint = Options.OnWaypoint
+    local OnDone = Options.OnDone
+    local OnStuck = Options.OnStuck
+    local OnContextFail = Options.OnContextFail
+    local OnRetry = Options.OnRetry
+    local OnStrategy = Options.OnStrategy
+    local OnJump = Options.OnJump
+
+    if Target.Y < (Workspace.FallenPartsDestroyHeight or -500) then
+        if OnContextFail then pcall(OnContextFail, "TargetOutOfBounds") end
+        return false, "TargetOutOfBounds"
+    end
+    if (Root.Position - Target).Magnitude > (Options.MaxDistance or 2000) then
+        if OnContextFail then pcall(OnContextFail, "TooFar") end
+        return false, "TooFar"
+    end
+
+    local Path = PathfindingService:CreatePath({
+        AgentRadius = AgentRadius, AgentHeight = AgentHeight, AgentCanJump = CanJump,
+    })
+
+    self._Pathfinding = self._Pathfinding or {}
+    local Key = "@Pathfind_" .. self:RandomString(10)
+
+    local LastJumpTime = 0
+    local LastWallTouchTime = 0
+
+    local function Stopped()
+        return not self._Pathfinding or not self._Pathfinding[Key]
+    end
+
+    local function CastRay(From, To)
+        local Params = RaycastParamsNew()
+        Params.FilterType = Enum.RaycastFilterType.Exclude
+        Params.FilterDescendantsInstances = {Char}
+        Params.IgnoreWater = true
+        return WorkspaceRaycast(Workspace, From, To - From, Params)
+    end
+
+    local function HasLOS(From, To)
+        if not UseRaycast then return true end
+        return CastRay(From, To) == nil
+    end
+
+    local function IsGroundAt(Pos)
+        if not UseRaycast then return true end
+        local Hit = CastRay(Pos + Vector3_new(0, 2, 0), Pos - Vector3_new(0, 8, 0))
+        return Hit ~= nil and Hit.Instance.CanCollide
+    end
+
+    local function IsObstacleAhead()
+        if not UseRaycast then return false, nil end
+        local LR = self:GetRoot()
+        if not LR then return false, nil end
+        local origin = LR.Position
+        local forward = LR.CFrame.LookVector
+        local endPos = origin + forward * JumpObstacleRange
+        local heights = {0.1, 0.5, 1.0, AgentHeight / 2}
+        for _, Y in ipairs(heights) do
+            local from = origin + Vector3_new(0, Y, 0)
+            local to = endPos + Vector3_new(0, Y, 0)
+            local hit = CastRay(from, to)
+            if hit and hit.Instance.CanCollide then return true, hit end
+        end
+        return false, nil
+    end
+
+    local function IsGroundAhead(Distance)
+        if not UseRaycast then return true end
+        local LR = self:GetRoot()
+        if not LR then return true end
+        return IsGroundAt(LR.Position + LR.CFrame.LookVector * (Distance or 4))
+    end
+
+    local function HasGroundBelow()
+        if not GroundCheck then return true end
+        local LR = self:GetRoot()
+        if not LR then return true end
+        return CastRay(LR.Position, LR.Position - Vector3_new(0, 8, 0)) ~= nil
+    end
+
+    local function CanJumpClearance()
+        if not UseRaycast then return true end
+        local LR = self:GetRoot()
+        if not LR then return false end
+        local UpHit = CastRay(
+            LR.Position + Vector3_new(0, 2, 0),
+            LR.Position + Vector3_new(0, JumpClearHeight + 2, 0)
+        )
+        if UpHit and UpHit.Instance.CanCollide then return false end
+        return true
+    end
+
+    local function ObstacleHeight()
+        if not UseRaycast then return 0 end
+        local LR = self:GetRoot()
+        if not LR then return 0 end
+        local origin = LR.Position
+        local forward = LR.CFrame.LookVector
+        local startY = nil
+        for Y = 0.1, 3, 0.3 do
+            local from = origin + Vector3_new(0, Y, 0)
+            local to = from + forward * JumpObstacleRange
+            local hit = CastRay(from, to)
+            if hit and hit.Instance.CanCollide then startY = Y break end
+        end
+        if not startY then return 0 end
+        local lastHitY = startY
+        for Y = startY, JumpMaxHeight + 3, 0.3 do
+            local from = origin + Vector3_new(0, Y, 0)
+            local to = from + forward * JumpObstacleRange
+            local hit = CastRay(from, to)
+            if not hit or not hit.Instance.CanCollide then
+                return math_max(0, Y - startY)
+            end
+            lastHitY = Y
+        end
+        return math_max(0, lastHitY - startY)
+    end
+
+    local function ShouldJumpOver()
+        if not SmartJump or not CanJump then return false, nil end
+        if not IsObstacleAhead() then return false, nil end
+        if not HasGroundBelow() then return false, nil end
+        local H = ObstacleHeight()
+        if H < JumpMinHeight then return false, "TooShort" end
+        if H > JumpMaxHeight then return false, "TooTall" end
+        if not CanJumpClearance() then return false, "NoClearance" end
+        return true, "Clear"
+    end
+
+    local function TryWallTouchClimb()
+        if not WallTouch or not UseRaycast then return false end
+        local LR = self:GetRoot()
+        local LH = self:GetHumanoid()
+        if not LR or not LH then return false end
+
+        local HipHeight = LH.HipHeight or 2
+        local BaseY = LR.Position.Y
+
+        local Forward = LR.CFrame.LookVector
+        local Right = LR.CFrame.RightVector
+
+        local Dirs = {
+            {dir = Forward, label = "fwd"},
+            {dir = -Forward, label = "back"},
+            {dir = Right, label = "right"},
+            {dir = -Right, label = "left"},
+            {dir = (Forward + Right).Unit, label = "fwd-right"},
+            {dir = (Forward - Right).Unit, label = "fwd-left"},
+            {dir = (-Forward + Right).Unit, label = "back-right"},
+            {dir = (-Forward - Right).Unit, label = "back-left"},
+        }
+
+        local Heights = {0.1, 0.5, 1.0, AgentHeight / 2}
+
+        local BestHit = nil
+        local BestScore = math_huge
+
+        for _, D in ipairs(Dirs) do
+            for _, RayY in ipairs(Heights) do
+                local origin = Vector3_new(LR.Position.X, BaseY + RayY, LR.Position.Z)
+                local endPos = origin + D.dir * (AgentRadius + 1.5)
+                local hit = CastRay(origin, endPos)
+
+                if hit and hit.Instance and hit.Instance.CanCollide then
+                    local WallPos = hit.Position
+
+                    local HitParent = hit.Instance.Parent
+                    local HalfHeight
+                    if HitParent and HitParent:IsA("Model") and HitParent.PrimaryPart then
+                        HalfHeight = HitParent.PrimaryPart.Size.Z / 2
+                    else
+                        HalfHeight = hit.Instance.Size.Y / 2
+                    end
+
+                    local EstimatedTopY = WallPos.Y + HalfHeight
+                    local HeightAboveUs = EstimatedTopY - BaseY
+
+                    if HeightAboveUs >= WallTouchMinHeight and HeightAboveUs <= WallTouchMaxHeight then
+                        if WallTouchVerifyTop then
+                            local topProbe = Vector3_new(WallPos.X, EstimatedTopY + 1, WallPos.Z)
+                            local topHit = CastRay(topProbe, topProbe - Vector3_new(0, 3, 0))
+                            if topHit and topHit.Instance.CanCollide then
+                                local distToTargetY = math_abs(Target.Y - EstimatedTopY)
+                                local xzDist = (Vector3_new(WallPos.X, 0, WallPos.Z) - Vector3_new(LR.Position.X, 0, LR.Position.Z)).Magnitude
+                                local score = distToTargetY + xzDist * 0.5
+
+                                if score < BestScore then
+                                    BestScore = score
+                                    BestHit = {
+                                        Instance = hit.Instance, Position = WallPos,
+                                        HalfHeight = HalfHeight, Direction = D.dir,
+                                        EstimatedTopY = EstimatedTopY,
+                                    }
+                                end
+                            end
+                        else
+                            local distToTargetY = math_abs(Target.Y - EstimatedTopY)
+                            local xzDist = (Vector3_new(WallPos.X, 0, WallPos.Z) - Vector3_new(LR.Position.X, 0, LR.Position.Z)).Magnitude
+                            local score = distToTargetY + xzDist * 0.5
+                            if score < BestScore then
+                                BestScore = score
+                                BestHit = {
+                                    Instance = hit.Instance, Position = WallPos,
+                                    HalfHeight = HalfHeight, Direction = D.dir,
+                                    EstimatedTopY = EstimatedTopY,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if not BestHit then return false end
+
+        local Look = LR.CFrame.LookVector
+        local NewCFrame = BestHit.Instance.CFrame * CFrame_new(
+            Look.X, BestHit.HalfHeight + HipHeight, Look.Z
+        )
+
+        LR.CFrame = NewCFrame
+        task_wait(0.1)
+
+        local NewRoot = self:GetRoot()
+        if not NewRoot then return false end
+        local HeightGained = NewRoot.Position.Y - BaseY
+
+        if HeightGained >= WallTouchMinHeight * 0.3 then
+            if OnWallTouch then
+                pcall(OnWallTouch, {
+                    Position = NewRoot.Position,
+                    HeightGained = HeightGained,
+                    EstimatedTopY = BestHit.EstimatedTopY,
+                    Wall = BestHit.Instance,
+                })
+            end
+            return true
+        end
+        return false
+    end
+
+    local EdgeJumpState = {
+        LastState = nil, LastCF = nil, LastCFTime = 0, LastJumpAt = 0,
+    }
+
+    local function ApplyEdgeJump(Char2, Hum2, Root2)
+        if not EdgeJumpEnabled then return false end
+        if not Char2 or not Hum2 or not Root2 then return false end
+        local NewState = Hum2:GetState()
+        local Now = os_clock()
+
+        if NewState == Enum.HumanoidStateType.Running
+           or NewState == Enum.HumanoidStateType.RunningNoPhysics
+           or NewState == Enum.HumanoidStateType.Landed then
+            EdgeJumpState.LastCF = Root2.CFrame
+            EdgeJumpState.LastCFTime = Now
+        end
+
+        if EdgeJumpState.LastState ~= nil
+           and NewState == Enum.HumanoidStateType.Freefall
+           and EdgeJumpState.LastState ~= Enum.HumanoidStateType.Jumping
+           and EdgeJumpState.LastState ~= Enum.HumanoidStateType.Freefall
+           and EdgeJumpState.LastState ~= Enum.HumanoidStateType.PlatformStanding
+           and EdgeJumpState.LastState ~= Enum.HumanoidStateType.Climbing
+           and EdgeJumpState.LastState ~= Enum.HumanoidStateType.Swimming
+           and (os_clock() - EdgeJumpState.LastJumpAt) > JumpCooldown then
+
+            local ShouldTrigger = true
+            if EdgeJumpVerify and UseRaycast then
+                local Params = RaycastParamsNew()
+                Params.FilterType = Enum.RaycastFilterType.Exclude
+                Params.FilterDescendantsInstances = {Char2}
+                local DownHit = WorkspaceRaycast(Workspace, Root2.Position, Vector3_new(0, -6, 0), Params)
+                if DownHit and DownHit.Instance.CanCollide then ShouldTrigger = false end
+            end
+
+            if ShouldTrigger then
+                local Rewound = false
+                if EdgeJumpRewind and EdgeJumpState.LastCF
+                   and (Now - EdgeJumpState.LastCFTime) < EdgeJumpMaxAge then
+                    Root2.CFrame = EdgeJumpState.LastCF
+                    Rewound = true
+                end
+                local Vel = Root2.AssemblyLinearVelocity or Root2.Velocity
+                local UpVel
+                if EdgeJumpBoost then UpVel = EdgeJumpBoost
+                else
+                    local Power = Hum2.JumpPower
+                    if Power and Power > 0 then UpVel = Power * EdgeJumpMult
+                    else
+                        local Height = Hum2.JumpHeight or 7.2
+                        UpVel = math_sqrt(2 * Workspace.Gravity * Height) * EdgeJumpMult
+                    end
+                end
+                Root2.AssemblyLinearVelocity = Vector3_new(Vel.X, UpVel, Vel.Z)
+                pcall(function() Root2.Velocity = Vector3_new(Vel.X, UpVel, Vel.Z) end)
+                pcall(function() Hum2:ChangeState(Enum.HumanoidStateType.Jumping) end)
+                EdgeJumpState.LastJumpAt = os_clock()
+                if OnEdgeJump then pcall(OnEdgeJump, {
+                    State = EdgeJumpState.LastState, Position = Root2.Position,
+                    Rewound = Rewound, UpVel = UpVel,
+                }) end
+                if OnJump then pcall(OnJump, "Edge", UpVel) end
+                return true
+            end
+        end
+        EdgeJumpState.LastState = NewState
+        return false
+    end
+
+    local function TryDirectWalk()
+        if not DirectWalk or not UseRaycast then return false end
+        local LR = self:GetRoot()
+        if not LR then return false end
+        local Dist = (LR.Position - Target).Magnitude
+        if Dist > MaxDirectDist then return false end
+        local Steps = math_ceil(Dist / 5)
+        local Prev = LR.Position
+        for i = 1, Steps do
+            local P = LR.Position:Lerp(Target, i / Steps)
+            P = Vector3_new(P.X, LR.Position.Y, P.Z)
+            if CastRay(Prev, P) then return false end
+            if EdgeCheck and not IsGroundAt(P) then return false end
+            Prev = P
+        end
+        return true
+    end
+
+    local function IsValidBacktrackPos(Pos)
+        if not Pos then return false end
+        if BtRequireGround and not IsGroundAt(Pos) then return false end
+        if BtRequireLOS then
+            local CurRoot = self:GetRoot()
+            if CurRoot and not HasLOS(CurRoot.Position + Vector3_new(0, AgentHeight / 2, 0),
+                                       Pos + Vector3_new(0, AgentHeight / 2, 0)) then
+                return false
+            end
+        end
+        local CurRoot = self:GetRoot()
+        if CurRoot and (CurRoot.Position - Pos).Magnitude > BtMaxDistance then return false end
+        return true
+    end
+
+    local function CanPathToFrom(FromPos, ToPos)
+        if not BtRequirePath then return true end
+        local Probe = PathfindingService:CreatePath({
+            AgentRadius = AgentRadius, AgentHeight = AgentHeight, AgentCanJump = CanJump,
+        })
+        local Ok = pcall(function() Probe:ComputeAsync(FromPos, ToPos) end)
+        return Ok and Probe.Status == Enum.PathStatus.Success
+    end
+
+    local function AimAt(Pos)
+        local LH = self:GetHumanoid()
+        if not LH or not Pos then return end
+        LH:MoveTo(Pos)
+    end
+
+    local function WalkLeg(Waypoints, fromIdx)
+        local LH = self:GetHumanoid()
+        if not LH then return {Arrived = false, Failed = 1} end
+
+        local i = fromIdx
+        local lastMoveTime = os_clock()
+        local stuckStart = os_clock()
+        local lastPos = (self:GetRoot() and self:GetRoot().Position) or Vector3_zero
+
+        while i <= #Waypoints and not Stopped() do
+            local LR = self:GetRoot()
+            local LH2 = self:GetHumanoid()
+            local LC = self:GetCharacter()
+            if not LR or not LH2 or not LC then
+                return {Arrived = false, Failed = i}
+            end
+
+            if EdgeJumpEnabled and ApplyEdgeJump(LC, LH2, LR) then
+                task_wait(0.05)
+                lastMoveTime = os_clock()
+                stuckStart = os_clock()
+                lastPos = LR.Position
+                continue
+            end
+
+            local Wp = Waypoints[i]
+            local Reach = (i == #Waypoints) and (WaypointReach + 2) or WaypointReach
+
+            if (LR.Position - Wp.Position).Magnitude <= Reach then
+                i += 1
+                lastMoveTime = os_clock()
+                stuckStart = os_clock()
+                lastPos = LR.Position
+                if i > #Waypoints then
+                    return {Arrived = true}
+                end
+                AimAt(Waypoints[i].Position)
+                continue
+            end
+
+            local WpTimeout = WaypointTimeout + (i == #Waypoints and 1 or 0)
+            if (os_clock() - lastMoveTime) > WpTimeout then
+                if OnStuck then pcall(OnStuck, Wp, "Timeout") end
+                return {Arrived = false, Failed = i}
+            end
+
+            local Aim = Wp.Position
+
+            if AnticipateNext and i < #Waypoints then
+                local Next = Waypoints[i + 1]
+                local DistToCur = (LR.Position - Wp.Position).Magnitude
+                if DistToCur <= AimLookahead and HasLOS(LR.Position, Next.Position) then
+                    Aim = Next.Position
+                end
+            end
+
+            AimAt(Aim)
+            task_wait(0.05)
+
+            if (os_clock() - LastJumpTime) > JumpCooldown then
+                local Should, Reason = ShouldJumpOver()
+                if Should and Reason == "Clear" then
+                    LH2.Jump = true
+                    LastJumpTime = os_clock()
+                    if OnJump then pcall(OnJump, "ObstacleClear", ObstacleHeight()) end
+                elseif Reason == "TooTall" and WallTouch
+                   and (os_clock() - LastWallTouchTime) > WallTouchCooldown then
+                    LastWallTouchTime = os_clock()
+                    if TryWallTouchClimb() then
+                        lastMoveTime = os_clock()
+                        stuckStart = os_clock()
+                        lastPos = (self:GetRoot() and self:GetRoot().Position) or LR.Position
+                    end
+                end
+            end
+
+            if EdgeCheck and not IsGroundAhead(4) then
+                if CanJump and HasGroundBelow() and CanJumpClearance()
+                   and (os_clock() - LastJumpTime) > JumpCooldown then
+                    LH2.Jump = true
+                    LastJumpTime = os_clock()
+                    if OnJump then pcall(OnJump, "Edge", 0) end
+                elseif not CanJump then
+                    return {Arrived = false, Failed = i}
+                end
+            end
+
+            local NewPos = LR.Position
+            if (NewPos - lastPos).Magnitude < StuckThreshold then
+                if (os_clock() - stuckStart) > 0.8 then
+                    if WallTouch and (os_clock() - LastWallTouchTime) > WallTouchCooldown then
+                        LastWallTouchTime = os_clock()
+                        if TryWallTouchClimb() then
+                            lastMoveTime = os_clock()
+                            stuckStart = os_clock()
+                            lastPos = (self:GetRoot() and self:GetRoot().Position) or NewPos
+                        end
+                    end
+
+                    local ObstacleH = ObstacleHeight()
+                    local HasObstacle = IsObstacleAhead()
+                    local IsShort = ObstacleH > 0 and ObstacleH <= JumpMaxHeight
+                    local CanDoJump = CanJump and CanJumpClearance()
+                        and (os_clock() - LastJumpTime) > JumpCooldown
+
+                    if CanDoJump and HasObstacle and IsShort then
+                        LH2.Jump = true
+                        LastJumpTime = os_clock()
+                        if OnJump then pcall(OnJump, "ObstacleClear", ObstacleH) end
+                        stuckStart = os_clock()
+                    elseif CanDoJump and not HasObstacle then
+                        LH2.Jump = true
+                        LastJumpTime = os_clock()
+                        if OnJump then pcall(OnJump, "Unstick", 0) end
+                        stuckStart = os_clock()
+                    else
+                        if OnStuck then pcall(OnStuck, Wp, "Stuck") end
+                        return {Arrived = false, Failed = i}
+                    end
+                end
+            else
+                stuckStart = os_clock()
+                lastPos = NewPos
+                lastMoveTime = os_clock()
+            end
+
+        end
+
+        return {Arrived = true}
+    end
+
+    local Thread = task_create(function()
+        local Start = os_clock()
+        local LastCompute = 0
+        local Computes = 0
+        local DirectThisTick = false
+
+        local LastWaypoints = nil
+        local LastFailedIdx = nil
+        local BtCount = 0
+        local StayCount = 0
+        local FreshCount = 0
+        local SkipCount = 0
+        local BtTriedIndices = {}
+
+        local function KeepMovingFallback()
+            if not KeepMovingOnFail then return end
+            if LastWaypoints and LastFailedIdx then
+                local Wp = LastWaypoints[math_max(1, LastFailedIdx)]
+                if Wp then AimAt(Wp.Position) end
+            elseif Target then
+                AimAt(Target)
+            end
+        end
+
+        local function ComputeWithStrategy(FromPos, Strategy)
+            local ComputeFrom = FromPos
+            if Strategy == "backtrack" and LastWaypoints and LastFailedIdx then
+                local Found = nil
+                for Step = RetryBacksteps, RetryBackstepsMin, -1 do
+                    local BackIdx = math_max(1, LastFailedIdx - Step)
+                    if not BtTriedIndices[BackIdx] then
+                        local Candidate = LastWaypoints[BackIdx]
+                        if Candidate and IsValidBacktrackPos(Candidate.Position)
+                           and CanPathToFrom(Candidate.Position, Target) then
+                            Found = Candidate
+                            BtTriedIndices[BackIdx] = true
+                            break
+                        end
+                    end
+                end
+                if not Found and LastFailedIdx > 1 then
+                    local BackIdx = LastFailedIdx - 1
+                    if not BtTriedIndices[BackIdx] then
+                        local Candidate = LastWaypoints[BackIdx]
+                        if Candidate and IsValidBacktrackPos(Candidate.Position) then
+                            Found = Candidate
+                            BtTriedIndices[BackIdx] = true
+                        end
+                    end
+                end
+                if not Found then return nil end
+                ComputeFrom = Found.Position
+            elseif Strategy == "backtrack" then
+                return nil
+            end
+            local Ok = pcall(function() Path:ComputeAsync(ComputeFrom, Target) end)
+            if not Ok or Path.Status ~= Enum.PathStatus.Success then return nil end
+            return Path:GetWaypoints()
+        end
+
+        while not Stopped() do
+            local CurHum = self:GetHumanoid()
+            local CurRoot = self:GetRoot()
+            local CurChar = self:GetCharacter()
+
+            if not CurHum or not CurRoot or not CurChar then
+                if StopOnDeath then break end
+                task_wait(0.1)
+                continue
+            end
+
+            if EdgeJumpEnabled then ApplyEdgeJump(CurChar, CurHum, CurRoot) end
+            if CurHum.Health <= 0 and StopOnDeath then break end
+            if (os_clock() - Start) > Timeout then break end
+
+            local Dist = (CurRoot.Position - Target).Magnitude
+            if Dist <= ArriveDist then
+                CurHum:MoveTo(CurRoot.Position)
+                break
+            end
+
+            DirectThisTick = false
+            if TryDirectWalk() then
+                DirectThisTick = true
+                AimAt(Target)
+                local DS = os_clock()
+                while not Stopped() do
+                    local LR = self:GetRoot()
+                    local LH = self:GetHumanoid()
+                    local LC = self:GetCharacter()
+                    if not LR or not LH or not LC or LH.Health <= 0 then break end
+                    if EdgeJumpEnabled then ApplyEdgeJump(LC, LH, LR) end
+                    if (LR.Position - Target).Magnitude <= ArriveDist then break end
+                    if (os_clock() - Start) > Timeout then break end
+                    if (os_clock() - DS) > 4 then break end
+                    if IsObstacleAhead() then break end
+                    if EdgeCheck and not IsGroundAhead(4) then break end
+                    AimAt(Target)
+                    task_wait(0.05)
+                end
+            end
+
+            local Now = os_clock()
+            local DidCompute = false
+
+            if (Now - LastCompute) >= Recompute and Computes < MaxRecompute then
+                LastCompute = Now
+                Computes += 1
+                DidCompute = true
+
+                local Strategy
+                if LastFailedIdx then
+                    if BtCount < MaxBacktrackTries then Strategy = "backtrack"
+                    elseif StayCount < MaxStayTries then Strategy = "stay"
+                    elseif FreshCount < MaxFreshTries then Strategy = "fresh"
+                    elseif SkipCount < MaxSkipTries then Strategy = "skip"
+                    else Strategy = "fresh" end
+                else
+                    Strategy = "fresh"
+                end
+
+                if OnStrategy then pcall(OnStrategy, Strategy, BtCount, StayCount, FreshCount, SkipCount) end
+
+                local Waypoints = ComputeWithStrategy(CurRoot.Position, Strategy)
+                if not Waypoints and Strategy == "backtrack" then
+                    StayCount += 1
+                    Strategy = "stay"
+                    Waypoints = ComputeWithStrategy(CurRoot.Position, "stay")
+                end
+                if not Waypoints and Strategy == "stay" then
+                    FreshCount += 1
+                    Strategy = "fresh"
+                    Waypoints = ComputeWithStrategy(CurRoot.Position, "fresh")
+                end
+
+                if not Waypoints and WallTouch
+                   and (os_clock() - LastWallTouchTime) > WallTouchCooldown then
+                    LastWallTouchTime = os_clock()
+                    if TryWallTouchClimb() then
+                        local CR4 = self:GetRoot()
+                        if CR4 then Waypoints = ComputeWithStrategy(CR4.Position, "fresh") end
+                    end
+                end
+
+                if Waypoints then
+                    if Strategy == "backtrack" then BtCount += 1
+                    elseif Strategy == "stay" then StayCount += 1
+                    elseif Strategy == "fresh" then FreshCount += 1
+                    elseif Strategy == "skip" then SkipCount += 1 end
+
+                    LastWaypoints = Waypoints
+
+                    local BestDist, StartIndex = math_huge, 2
+                    for i = 1, #Waypoints do
+                        local d = (CurRoot.Position - Waypoints[i].Position).Magnitude
+                        if d < BestDist then BestDist, StartIndex = d, i end
+                    end
+                    StartIndex = math_max(2, StartIndex)
+                    if Strategy == "skip" and LastFailedIdx then
+                        StartIndex = math_min(#Waypoints, LastFailedIdx + 2)
+                    end
+
+                    local Result = WalkLeg(Waypoints, StartIndex)
+                    if not Result.Arrived then
+                        LastFailedIdx = Result.Failed or 1
+                        if OnRetry then
+                            pcall(OnRetry, LastFailedIdx, #Waypoints,
+                                BtCount + StayCount + FreshCount + SkipCount)
+                        end
+                        if BtCount >= MaxBacktrackTries
+                           and StayCount >= MaxStayTries
+                           and FreshCount >= MaxFreshTries
+                           and SkipCount >= MaxSkipTries then
+                            BtCount, StayCount, FreshCount, SkipCount = 0, 0, 0, 0
+                            BtTriedIndices = {}
+                        end
+                    else
+                        LastFailedIdx = nil
+                    end
+                elseif UseFallback then
+                    if WallTouch and (os_clock() - LastWallTouchTime) > WallTouchCooldown then
+                        LastWallTouchTime = os_clock()
+                        if TryWallTouchClimb() then
+                            local CR5 = self:GetRoot()
+                            if CR5 then AimAt(CR5.Position) end
+                        else
+                            AimAt(Target)
+                        end
+                    else
+                        AimAt(Target)
+                    end
+                end
+            else
+                KeepMovingFallback()
+            end
+
+            if not DidCompute and not DirectThisTick then
+                if LastWaypoints and LastFailedIdx then
+                    local ForwardIdx = math_min(#LastWaypoints, LastFailedIdx + 1)
+                    local Wp = LastWaypoints[ForwardIdx]
+                    if Wp then AimAt(Wp.Position) end
+                elseif LastWaypoints and #LastWaypoints >= 2 then
+                    AimAt(LastWaypoints[#LastWaypoints].Position)
+                elseif not NoMicropause then
+                    local LiveRoot = self:GetRoot()
+                    if LiveRoot then CurHum:MoveTo(LiveRoot.Position) end
+                end
+            end
+
+            task_wait(0.05)
+        end
+
+        local FH = self:GetHumanoid()
+        local FR = self:GetRoot()
+        if FH and FR then FH:MoveTo(FR.Position) end
+
+        if self._Pathfinding then self._Pathfinding[Key] = nil end
+
+        if OnDone then
+            local FinalRoot = self:GetRoot()
+            local Arrived = FinalRoot and (FinalRoot.Position - Target).Magnitude <= ArriveDist
+            pcall(OnDone, Arrived, Target)
+        end
+    end)
+
+    self._Pathfinding[Key] = Thread
+    task_resume(Thread)
+
+    return Key
+end
+
+function API:StopPathfind(Key)
+    if not Key or not self._Pathfinding then return false end
+    if self._Pathfinding[Key] then
+        self._Pathfinding[Key] = nil
+        local Hum  = self:GetHumanoid()
+        local Root = self:GetRoot()
+        if Hum and Root then
+            Hum:MoveTo(Root.Position)
+        end
+        return true
+    end
+    return false
+end
+
 function API:AntiCollider(State)   
     if State then
         if self.AntiCollide then return true end
@@ -4353,7 +5356,7 @@ end
 
 function API:Flight(State, Speed)
     State = State or false
-    
+
     self.FlightData = self.FlightData or {Active = false, Speed = 50, SpeedStep = 1.5, SpeedMin = 10, SpeedMax = 250}
 
     if not self.FlightData.SpeedControls then
@@ -4364,40 +5367,41 @@ function API:Flight(State, Speed)
         self.FlightData.Active = false
         self:_Disconnect("@Flight")
     end
-    
+
     if not State then
         CleanUP()
         return false
     end
-    
+
     if self.FlightData.Active then
         return true
     end
 
     local Roots = self:GetRoot()
-
     if not Roots then
         return false
     end
-    
+
     self.FlightData.Active = true
-    
+
     if Speed then
         self.FlightData.Speed = math_clamp(Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
     else
         self.FlightData.Speed = math_clamp(self.FlightData.Speed, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
     end
-    
+
     local Strength = 1e9
 
-    local BV = self:CreateInstance("BodyVelocity", { Name = self:RandomString(15),
+    local BV = self:CreateInstance("BodyVelocity", {
+        Name = self:RandomString(15),
         MaxForce = Vector3_new(Strength, Strength, Strength),
         Velocity = Vector3_zero,
         Parent = Roots
     })
     self:_Connect("@Flight", BV)
 
-    local BG = self:CreateInstance("BodyGyro", { Name = self:RandomString(15),
+    local BG = self:CreateInstance("BodyGyro", {
+        Name = self:RandomString(15),
         MaxTorque = Vector3_new(Strength, Strength, Strength),
         P = 3000,
         D = 500,
@@ -4411,23 +5415,27 @@ function API:Flight(State, Speed)
 
     local Connection = RenderStepped:Connect(function()
         local Roots = self:GetRoot()
-        if not self.FlightData.Active or not Roots or not Camera then 
-            return 
+        if not self.FlightData.Active or not Roots or not Camera then
+            return
         end
-        
-        if BV and BV.Parent ~= Roots then
-            BV.Parent = Roots
-        end
-        if BG and BG.Parent ~= Roots then
-            BG.Parent = Roots
-        end
-        
+
+        if BV and BV.Parent ~= Roots then BV.Parent = Roots end
+        if BG and BG.Parent ~= Roots then BG.Parent = Roots end
+
         local MoveDirection = Vector3_zero
-    
+
         if ControlModule then
             local Direction = ControlModule:GetMoveVector()
-            MoveDirection = (Camera.CFrame.RightVector * Direction.X) + (Camera.CFrame.LookVector * -Direction.Z)
-    
+            MoveDirection = (Camera.CFrame.RightVector * Direction.X)
+                          + (Camera.CFrame.LookVector * -Direction.Z)
+
+            if IsKeyDown(UserInputService, Enum.KeyCode.Space) then
+                MoveDirection += Camera.CFrame.UpVector
+            end
+            if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
+                MoveDirection -= Camera.CFrame.UpVector
+            end
+
             if MoveDirection.Magnitude > 0 then
                 MoveDirection = MoveDirection.Unit * self.FlightData.Speed
             end
@@ -4450,7 +5458,7 @@ function API:Flight(State, Speed)
             if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
                 MoveDirection -= Camera.CFrame.UpVector
             end
-            
+
             if MoveDirection.Magnitude > 0 then
                 MoveDirection = MoveDirection.Unit * self.FlightData.Speed
             end
@@ -4463,7 +5471,7 @@ function API:Flight(State, Speed)
                 self.FlightData.Speed = math_clamp(self.FlightData.Speed - self.FlightData.SpeedStep, self.FlightData.SpeedMin, self.FlightData.SpeedMax)
             end
         end
-        
+
         BV.Velocity = MoveDirection
         BG.CFrame = Camera.CFrame
     end)
@@ -5136,7 +6144,7 @@ function API:GetFriends()
         local Success, Response = pcall(function()
             return Game:HttpGet("https://users.roblox.com/v1/users/" .. Friend.id)
         end)
-        
+
         if Success then
             local UserData = HttpService:JSONDecode(Response)
             if UserData and UserData.name then
@@ -5147,6 +6155,122 @@ function API:GetFriends()
     end
 
     return Friends
+end
+
+function API:IsMutual(From, To, Options)
+    if To == nil and type(From) ~= "table" then
+        To, From = From, nil
+    elseif type(To) == "table" and Options == nil then
+        Options, To = To, nil
+    end
+    Options = Options or {}
+
+    local function ResolveId(P)
+        if P == nil then return nil end
+        if typeof(P) == "Instance" and P:IsA("Player") then return P.UserId end
+        return tonumber(P)
+    end
+
+    local FromId = ResolveId(From) or self:GetPlayer().UserId
+    local ToId = ResolveId(To)
+    if not ToId then return false, {} end
+    if FromId == ToId then return true, {Chain = {FromId}, Depth = 0, Visits = 0, Time = 0} end
+
+    local MaxVisits = Options.MaxVisits  or 5000
+    local MaxPerUser = Options.MaxPerUser or 100
+    local MaxTime = Options.MaxTime or 30
+    local MaxDepth = Options.MaxDepth or math_huge
+
+    self._MutualCache = self._MutualCache or {}
+
+    local function FetchFriends(UserId)
+        local Key = tostring(UserId)
+        local Cached = self._MutualCache[Key]
+        if Cached and (os_time() - Cached.Time) < 300 then
+            return Cached.List
+        end
+
+        local List = {}
+        local Url = "https://friends.roblox.com/v1/users/" .. tostring(UserId) .. "/friends?limit=100"
+
+        local Body = Game:HttpGet(Url)
+        if not Body or Body == "" then
+            self._MutualCache[Key] = {List = List, Time = os_time()}
+            return List
+        end
+
+        local Data = HttpService:JSONDecode(Body)
+        if typeof(Data) ~= "table" or typeof(Data.data) ~= "table" then
+            self._MutualCache[Key] = {List = List, Time = os_time()}
+            return List
+        end
+
+        for _, F in ipairs(Data.data) do
+            if F.id then table_insert(List, tonumber(F.id)) end
+            if #List >= MaxPerUser then break end
+        end
+
+        self._MutualCache[Key] = {List = List, Time = os_time()}
+        return List
+    end
+
+    local Start = os_clock()
+    local Visited = {[FromId] = true}
+    local Frontier = {FromId}
+    local Parent = {}
+    local Visits, CurrentDepth = 0, 0
+
+    while #Frontier > 0 do
+        CurrentDepth = CurrentDepth + 1
+        if CurrentDepth > MaxDepth then break end
+
+        local Next = {}
+
+        for _, UserId in ipairs(Frontier) do
+            if Visits >= MaxVisits then break end
+            if os_clock() - Start > MaxTime then break end
+            Visits = Visits + 1
+
+            for _, FriendId in ipairs(FetchFriends(UserId)) do
+                if not Visited[FriendId] then
+                    Visited[FriendId] = true
+                    Parent[FriendId] = UserId
+
+                    if FriendId == ToId then
+                        local Chain, Cur = {}, ToId
+                        while Cur do
+                            table_insert(Chain, 1, Cur)
+                            if Cur == FromId then break end
+                            Cur = Parent[Cur]
+                        end
+                        return true, {
+                            Chain = Chain,
+                            Depth = CurrentDepth,
+                            Visits = Visits,
+                            Time = os_clock() - Start,
+                            From = FromId,
+                            To = ToId,
+                        }
+                    end
+
+                    table_insert(Next, FriendId)
+                end
+            end
+        end
+
+        Frontier = Next
+        task_wait()
+    end
+
+    return false, {
+        Visits = Visits,
+        Time = os_clock() - Start,
+        From = FromId,
+        To = ToId,
+        Reason = Visits >= MaxVisits and "MaxVisits"
+              or (os_clock() - Start > MaxTime) and "Timeout"
+              or "Exhausted",
+    }
 end
 
 function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, IgnoreWater, Callback)
@@ -5219,6 +6343,29 @@ function API:IsBehindWall(Target, Character)
     end
     
     return false
+end
+
+function API:IsOnGround(Options)
+    Options = Options or {}
+
+    local Char = self:GetCharacter()
+    local Roots = self:GetRoot()
+    if not Char or not Roots then return false end
+
+    local Distance = Options.Distance or 4
+    local Filter = Options.Filter or {Char}
+
+    local Params = RaycastParamsNew()
+    Params.FilterType = Enum.RaycastFilterType.Exclude
+    Params.FilterDescendantsInstances = Filter
+    Params.IgnoreWater = true
+    if Options.CollisionGroup then Params.CollisionGroup = Options.CollisionGroup end
+
+    local Origin = Roots.Position
+    local Direction = Vector3_new(0, -Distance, 0)
+    local Result = WorkspaceRaycast(Workspace, Origin, Direction, Params)
+
+    return Result ~= nil and Result.Instance ~= nil and Result.Instance.CanCollide
 end
 
 function API:IsTeamMate(Target)
@@ -6824,6 +7971,7 @@ function API:ServerHop(Options)
     local Timeout = Options.Timeout or 676767
 
     local RetryDelay = Options.RetryDelay or 2
+    local Callback = Options.Callback
 
     if Mode == nil and MinPlayers == nil and MaxPlayers == nil and MaxPing == nil then
         Mode = "high"
@@ -7010,6 +8158,13 @@ function API:ServerHop(Options)
 			end
 
             if Best_Id then
+                if type(Callback) == "function" then
+                    local Success, Err = pcall(Callback, Best_Id, Best_Value, Best_Ping, Options)
+                    if not Success then
+                        warn("[Serverhop]: Callback error: " .. tostring(Err))
+                    end
+                end
+
                 TeleportService:TeleportToPlaceInstance(PlaceId, Best_Id, LocalPlayer)
 
                 task_wait(4)
@@ -7810,7 +8965,7 @@ function API:Infinite_Yield()
 end
 
 function API:Cobalt_Spy()
-    return self:Gitport("notpoiu", "cobalt", "latest", "Cobalt.luau")
+    return self:LoadFile("https://gitlab.com/upio/cobalt/-/releases/permalink/latest/downloads/Cobalt.luau")
 end
 
 function API:Katemine_Spy()
@@ -9035,11 +10190,12 @@ function API.Launch(Class)
         StarterGuiService = StarterGuiService,
         Performance = Performance,
         LightingService = LightingService,
+        PathfindingService = PathfindingService,
         CurrentCamera = CurrentCamera,
         GuiService = GuiService,
         CoreGui = CoreGui
     }
-    
+
     for Instance, Service in pairs(Services) do
         Class[Instance] = (Service)
     end
