@@ -27,8 +27,8 @@ local task_wait, task_spawn, task_cancel, task_delay = task.wait, task.spawn, ta
 local os_clock, os_time, os_date = os.clock, os.time, os.date
 local pairs, ipairs = pairs, ipairs
 
-local task_running, task_resume, task_yield, task_create, task_close = 
-    coroutine.running, coroutine.resume, coroutine.yield, coroutine.create, coroutine.close
+local task_running, task_resume, task_yield, task_create, task_close, task_status =
+    coroutine.running, coroutine.resume, coroutine.yield, coroutine.create, coroutine.close, coroutine.status
 
 local Vector3_new, Vector2_new, Vector3_zero, Color3_fromRGB, Color3_fromHSV, CFrame_lookAt, CFrame_new, CFrame_Angles, Instance_new =
     Vector3.new, Vector2.new, Vector3.zero, Color3.fromRGB, Color3.fromHSV, CFrame.lookAt, CFrame.new, CFrame.Angles, Instance.new
@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.26", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.27", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -112,17 +112,16 @@ local Enum_KeyCode_KeypadPlus, Enum_KeyCode_KeypadMinus =
     Enum.KeyCode.KeypadPlus, Enum.KeyCode.KeypadMinus;
 --]]
 
--- // @Signal.luau
-function API:_Connect(...): () 
-    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; local function Connect(Name, Object) if type(Name) ~= "string" then return end; self._Signal = self._Signal or {}; self._Signal[Name] = self._Signal[Name] or {}; local Service = self._Signal[Name]; if typeof(Object) == "table" then for _, v in ipairs(Object) do Service[#Service + 1] = v end else Service[#Service + 1] = Object end end; if #Signal >= 2 then for i = 1, #Signal, 2 do local Name = Signal[i]; local Object = Signal[i + 1]; Connect(Name, Object) end end 
+function API:_Connect(...) 
+    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; self._Signal = self._Signal or {}; for i = 1, #Signal, 2 do local Name, Object = Signal[i], Signal[i + 1]; if type(Name) ~= "string" or Object == nil then continue end; self._Signal[Name] = self._Signal[Name] or {}; local Service = self._Signal[Name]; Service[#Service + 1] = Object end 
 end
 
-function API:_Disconnect(...): () 
-    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; for _, Name in ipairs(Signal) do if type(Name) ~= "string" then continue end; local Objects = self._Signal and self._Signal[Name]; if not Objects then continue end; local function Disconnect(Object) if Object == nil then return end; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() Object:Disconnect() end) elseif ObjectType == "thread" then pcall(function() task_cancel(Object) end) elseif ObjectType == "Instance" then if Object.ClassName == "AnimationTrack" then pcall(function() Object:Stop() end) end; pcall(function() Object:Destroy() end) elseif ObjectType == "table" then for _, Sub in pairs(Object) do CleanUP(Sub) end; table_clear(Object) elseif ObjectType == "function" then pcall(Object) end end; for i = 1, #Objects do Disconnect(Objects[i]) end; self._Signal[Name] = nil end 
+function API:_Disconnect(...)
+    local Signal = {...}; if #Signal == 1 and typeof(Signal[1]) == "table" then Signal = Signal[1] end; local Registry = self._Signal; if not Registry then return end; local Visited = {}; local function Disconnect(Object) if Object == nil or Visited[Object] then return end; Visited[Object] = true; local ObjectType = typeof(Object); if ObjectType == "RBXScriptConnection" then pcall(function() if Object.Connected then Object:Disconnect() end end) elseif ObjectType == "thread" then if Object ~= task_running() and task_status(Object) ~= "dead" then pcall(task_cancel, Object) end elseif ObjectType == "Instance" then pcall(function() if Object:IsA("AnimationTrack") then Object:Stop(0) elseif Object:IsA("TweenBase") then Object:Cancel() end; Object:Destroy() end) elseif ObjectType == "function" then pcall(Object) elseif ObjectType == "table" then local Success, Method = pcall(function() return Object.Disconnect or Object.Destroy or Object.Cancel end); if Success and type(Method) == "function" then pcall(Method, Object); return end; for _, Value in pairs(Object) do Disconnect(Value) end; pcall(table_clear, Object) end end; for _, Name in ipairs(Signal) do if type(Name) ~= "string" then continue end; local Objects = Registry[Name]; if not Objects then continue end; Registry[Name] = nil; for i = 1, #Objects do Disconnect(Objects[i]) end; table_clear(Objects) end
 end
 
-function API:_ExitFM(): ()
-    for Name, _ in pairs(self._Signal or {}) do self:_Disconnect(Name) end; self._Signal = nil
+function API:_ExitFM()
+    local Registry = self._Signal; if not Registry then return end; local Names = {}; for Name in pairs(Registry) do Names[#Names + 1] = Name end; self:_Disconnect(Names); self._Signal = nil
 end
 
 function globalEnv._IsLoadedFM() --> typeof(_IsLoadedFM) == "function" and _IsLoadedFM();
@@ -130,27 +129,27 @@ function globalEnv._IsLoadedFM() --> typeof(_IsLoadedFM) == "function" and _IsLo
 end
 
 function globalEnv._Clean(Object, ...)
-    if not Object then return end
-
-    if type(table.clear) == "function" then
-        table.clear(Object)
+    if type(Object) ~= "table" then
+        return false
     end
 
-    if type(setmetatable) == "function" then
-        pcall(setmetatable, Object, nil)
-    end
+    pcall(setmetatable, Object, nil)
 
-    pcall(function()
-        for Key in pairs(Object) do
+    if type(table_clear) == "function" then
+        table_clear(Object)
+    else
+        for Key in next, Object do
             rawset(Object, Key, nil)
         end
-    end)
+    end
+
+    return true
 end
 
 -- // @Engine.luau
 local function Build_Engine(Running: Model)
     if Running and typeof(Running) ~= "boolean" then
-        Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart",5), Running:WaitForChild("Humanoid",5);
+        Character, Roots, Humanoid = Running, Running:WaitForChild("HumanoidRootPart", 5), Running:WaitForChild("Humanoid", 5);
         Class.Character, Class.Roots, Class.Humanoid = Character, Roots, Humanoid;
 	end
 
@@ -174,6 +173,20 @@ API:_Connect("@WindowListener", {
 })
 
 -- // @Functions.module
+function API:GetServerUptime(Format)
+    local Uptime = math_floor(Workspace.DistributedGameTime)
+
+    if Format then
+        local Hours = math_floor(Uptime / 3600)
+        local Minutes = math_floor((Uptime % 3600) / 60)
+        local Seconds = Uptime % 60
+
+        return string_format("%02d:%02d:%02d", Hours, Minutes, Seconds)
+    end
+
+    return Uptime
+end
+
 function API:CreateInstance(ClassName: string, Properties: { [string]: any }?)
     local InstanceObj = Instance_new(ClassName)
     if Properties then
@@ -2857,8 +2870,8 @@ function API:ResolvePosition(...)
                 if BasePart then
                     return BasePart.Position
                 end
-                local Pivot = pcall(Instance.GetPivot, Instance)
-                if Pivot then return Pivot.Position end
+                local Ok, Pivot = pcall(Instance.GetPivot, Instance)
+                if Ok and typeof(Pivot) == "CFrame" then return Pivot.Position end
             end
             
             if Instance:IsA("Model") then
@@ -2876,8 +2889,8 @@ function API:ResolvePosition(...)
                 if Roots then
                     return Roots.Position
                 end
-                local Pivot = pcall(Instance.Character.GetPivot, Instance.Character)
-                if Pivot then return Pivot.Position end
+                local Ok, Pivot = pcall(Instance.Character.GetPivot, Instance.Character)
+                if Ok and typeof(Pivot) == "CFrame" then return Pivot.Position end
             end
 
             if Instance:IsA("Humanoid") and Instance.Parent then
@@ -2885,13 +2898,13 @@ function API:ResolvePosition(...)
                 if Roots then
                     return Roots.Position
                 end
-                local Pivot = pcall(Instance.Parent.GetPivot, Instance.Parent)
-                if Pivot then return Pivot.Position end
+                local Ok, Pivot = pcall(Instance.Parent.GetPivot, Instance.Parent)
+                if Ok and typeof(Pivot) == "CFrame" then return Pivot.Position end
             end
 
             if Instance.GetPivot then
-                local Pivot = pcall(Instance.GetPivot, Instance)
-                if Pivot and typeof(Pivot) == "CFrame" then
+                local Ok, Pivot = pcall(Instance.GetPivot, Instance)
+                if Ok and typeof(Pivot) == "CFrame" then
                     return Pivot.Position
                 end
             end
@@ -3472,12 +3485,6 @@ function API:TableRemove(T, Value)
     return false
 end
 
-function API:TableClear(T)
-    for i = #T, 1, -1 do
-        T[i] = nil
-    end
-end
-
 function API:Tween(Target: BasePart?, Property: string, Goal: any,
                       Duration: number?, EasingStyle: Enum.EasingStyle?,
                       EasingDirection: Enum.EasingDirection?, Repeats: number?,
@@ -3498,6 +3505,115 @@ function API:Tween(Target: BasePart?, Property: string, Goal: any,
     Tween:Play()
 
     return Tween
+end
+
+function API:WatchCharacter(Character, Callback)
+    if typeof(Character) ~= "Instance" then
+        return nil, "Character must be an Instance"
+    end
+
+    if typeof(Callback) ~= "function" then
+        return nil, "Callback must be a function"
+    end
+
+    local Watcher = {
+        Character = Character,
+
+        Connections = {},
+        InstanceConnections = {},
+        AttributeValues = {},
+
+        Destroyed = false,
+    }
+
+    local function DisconnectInstance(Instance)
+        local Connections = Watcher.InstanceConnections[Instance]
+
+        if Connections then
+            for _, Connection in ipairs(Connections) do
+                Connection:Disconnect()
+            end
+        end
+
+        Watcher.InstanceConnections[Instance] = nil
+        Watcher.AttributeValues[Instance] = nil
+    end
+
+    local function WatchInstance(Instance)
+        if Watcher.Destroyed or Watcher.InstanceConnections[Instance] then
+            return
+        end
+
+        local Connections = {}
+        local Attributes = Instance:GetAttributes()
+
+        Watcher.InstanceConnections[Instance] = Connections
+        Watcher.AttributeValues[Instance] = Attributes
+
+        table_insert(Connections, Instance.AttributeChanged:Connect(function(Name)
+            if Watcher.Destroyed then return end
+
+            local OldValue = Attributes[Name]
+            local NewValue = Instance:GetAttribute(Name)
+
+            Attributes[Name] = NewValue
+
+            Callback("Attribute", Instance, Name, NewValue, OldValue)
+        end))
+
+        if Instance:IsA("ValueBase") then
+            local OldValue = Instance.Value
+
+            table_insert(Connections, Instance.Changed:Connect(function(NewValue)
+                if Watcher.Destroyed then return end
+
+                local Previous = OldValue
+                OldValue = NewValue
+
+                Callback("Value", Instance, Instance.Name, NewValue, Previous)
+            end))
+        end
+    end
+
+    table_insert(
+        Watcher.Connections,
+        Character.DescendantAdded:Connect(WatchInstance)
+    )
+
+    table_insert(
+        Watcher.Connections,
+        Character.DescendantRemoving:Connect(DisconnectInstance)
+    )
+
+    WatchInstance(Character)
+
+    for _, Instance in ipairs(Character:GetDescendants()) do
+        WatchInstance(Instance)
+    end
+
+    function Watcher:Destroy()
+        if self.Destroyed then return end
+
+        self.Destroyed = true
+
+        for _, Connection in ipairs(self.Connections) do
+            Connection:Disconnect()
+        end
+
+        table_clear(self.Connections)
+
+        for Instance, Connections in pairs(self.InstanceConnections) do
+            for _, Connection in ipairs(Connections) do
+                Connection:Disconnect()
+            end
+
+            self.InstanceConnections[Instance] = nil
+        end
+
+        table_clear(self.AttributeValues)
+    end
+
+    return Watcher
 end
 
 function API:GetTools()
@@ -3879,11 +3995,7 @@ function API:InteractUI(Button, Method, Manual)
 
             if #MouseButton1Click_Connection == 0 then GuiService.SelectedObject = nil return end
             for _, v in MouseButton1Click_Connection do
-                if Manual then
-                    v.Function()
-                else
-                    v:Fire()
-                end
+                if Manual then v.Function() else v:Fire() end
             end
             GuiService.SelectedObject = nil
         end)
@@ -3961,9 +4073,9 @@ function API:Unpress(Key)
     VirtualInputManager:SendKeyEvent(false, Key, false, Game)
 end
 
-function API:Click()
+function API:Click(Delay)
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, Game, 0)
-    task_wait(0.1)
+    task_wait(Delay or 0.1)
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, Game, 0)
 end
 
@@ -3971,6 +4083,15 @@ function API:SetFpsCap(Fps)
     if typeof(setfpscap) == "function" then 
 		setfpscap(Fps) 
 	end
+end
+
+function API:GameplayPaused(State)
+    State = State == true
+
+    LocalPlayer.GameplayPaused = State
+    GuiService:SetGameplayPausedNotificationEnabled(not State)
+
+    return true
 end
 
 function API:AntiAFK()
@@ -4005,7 +4126,8 @@ function API:Sit(State)
 end
 
 function API:StopSeating()
-    if self.IsSeating and self:IsState(Enum.HumanoidStateType.Seated) then
+    if self.IsSeating 
+        and self:IsState(Enum.HumanoidStateType.Seated) then
         self:Sit(false)
     end
 end
@@ -4085,6 +4207,29 @@ function API:IsState(StateName)
     local Hum = self:GetHumanoid()
     if not Hum then return false end
     return Hum:GetState() == StateName
+end
+
+function API:SetState(State, Enabled)
+    local Humanoid = self:GetHumanoid()
+    if not Humanoid then return false end
+
+    if typeof(State) == "string" then
+        local Success, Result = pcall(function()
+            return Enum.HumanoidStateType[State]
+        end)
+
+        if not Success then return false end
+        State = Result
+    end
+
+    if typeof(State) ~= "EnumItem"
+        or State.EnumType ~= Enum.HumanoidStateType
+        or typeof(Enabled) ~= "boolean" then
+        return false
+    end
+
+    Humanoid:SetStateEnabled(State, Enabled)
+    return true
 end
 
 function API:PlatformStand(State)
@@ -4234,9 +4379,8 @@ end
 
 function API:BringTools(Options)
     Options = Options or {}
-    
+
     local Radius = Options.Radius or math_huge
-    local Interval = Options.Interval or 0.5
     local BatchSize = Options.BatchSize or math_huge
     local Paths = Options.Paths or {workspace}
 
@@ -4246,69 +4390,32 @@ function API:BringTools(Options)
         Paths = {Paths}
     end
 
-    self:StopBringTools()
+    local Humanoid = self:GetHumanoid()
+    if not Humanoid then
+        return false
+    end
 
-    self.BroughtTools, self.ToolsActive, Elapsed = self.BroughtTools or {}, true, 0
-    
-    local function Tools_Task()
-        if not self.ToolsActive then return end
-        
-        local Humanoid = self:GetHumanoid()
-        if not Humanoid then return end
+    local Equipped = 0
 
-        local Tools = {}
+    for _, Path in ipairs(Paths) do
+        if Path and Path:IsA("Instance") then
+            for _, Item in ipairs(Path:GetChildren()) do
+                if Equipped >= BatchSize then
+                    return true
+                end
 
-        for _, v in ipairs(Paths) do
-            if v and v:IsA("Instance") then
-                for _, v in ipairs(v:GetChildren()) do
-                    if v:IsA("BackpackItem") and v:FindFirstChild("Handle") then
-                        if not self.BroughtTools[v] then
-                            local Distance = self:GetDistance(v)
-                            if Distance <= Radius then
-                                table_insert(Tools, v)
-                            end
+                if Item:IsA("BackpackItem") then
+                    if self:GetDistance(Item) <= Radius then
+                        if pcall(Humanoid.EquipTool, Humanoid, Item) then
+                            Equipped = Equipped + 1
                         end
                     end
                 end
             end
         end
-        
-        for i = 1, math_min(BatchSize, #Tools) do
-            local v = Tools[i]
-            if v and v.Parent then
-                Humanoid:EquipTool(v)
-                self.BroughtTools[v] = true
-            end
-        end
-          
-        for v, _ in pairs(self.BroughtTools) do
-            if not v or not v.Parent then
-                self.BroughtTools[v] = nil
-            end
-        end
     end
 
-    self.Tools_Connection = Heartbeat:Connect(function(deltaTime)
-        if not self.ToolsActive then return end
-
-        Elapsed = Elapsed + deltaTime
-        if Elapsed >= Interval then 
-            Elapsed = 0
-            Tools_Task()
-        end
-    end)
-    
-    self:_Connect("@BringTools", self.Tools_Connection)
     return true
-end
-
-function API:StopBringTools()
-    if self.Tools_Connection then
-        self:_Disconnect("@BringTools")
-
-        self.Tools_Connection, self.ToolsActive = nil, false
-        table_clear(self.BroughtTools)
-    end
 end
 
 function API:Pathfind(Destination, Options)
@@ -5984,38 +6091,50 @@ function API:XRay(State)
     end
 end
 
-function API:AntiFling()
+function API:AntiFling(IncludeStates)
     if self.FlingActive then return end
 
-	self.FlingActive = true
+    self.FlingActive = true
+    self._AntiFlingIncludesStates = IncludeStates == true
 
     local Connection = Heartbeat:Connect(function()
-        local Char = self:GetCharacter()
-        if not Char then return end
+        local Root = self:GetRoot()
+        if not Root then return end
 
-        local Hum = Char:FindFirstChild("HumanoidRootPart")
-        if not Hum then return end
-        
-        if not Hum:FindFirstChild("0x0x0x0x0") then
-            local BV = self:CreateInstance("BodyVelocity", {
-                Name = "0x0x0x0x0",
+        local BV = Root:FindFirstChild("@AntiVelocity")
+
+        if not BV then
+            BV = self:CreateInstance("BodyVelocity", {
+                Name = "@AntiVelocity",
                 Velocity = Vector3_zero,
-                MaxForce = Vector3_new(40000, 40000, 40000),
-                Parent = Hum
+                MaxForce = Vector3_new(math_huge, math_huge, math_huge),
+                P = 10000,
+                Parent = Root,
             })
+
             self:_Connect("@AntiFling", BV)
         end
 
-        Hum.Velocity = Vector3_zero
-        Hum.AssemblyLinearVelocity = Vector3_zero
+        Root.AssemblyLinearVelocity = Vector3_zero
+        Root.AssemblyAngularVelocity = Vector3_zero
 
-        local AntiFling = Hum:FindFirstChild("0x0x0x0x0")
-        if AntiFling then
-            AntiFling.Velocity = Vector3_zero
+        Root.RotVelocity = Vector3_zero
+        Root.Velocity = Vector3_zero
+
+        BV.Velocity = Vector3_zero
+
+        if self._AntiFlingIncludesStates then
+            self:SetState("Jumping", false)
+            self:SetState("Seated", false)
+            self:SetState("FallingDown", false)
+            self:SetState("Ragdoll", false)
+            self:SetState("Climbing", false)
+            self:SetState("Physics", false)
+            self:SetState("PlatformStanding", false)
         end
     end)
 
-	self:_Connect("@AntiFling", Connection)
+    self:_Connect("@AntiFling", Connection)
 end
 
 function API:StopFling()
@@ -6023,9 +6142,21 @@ function API:StopFling()
 
     self.FlingActive = false
     self:_Disconnect("@AntiFling")
+
+    if self._AntiFlingIncludesStates then
+        self:SetState("Jumping", true)
+        self:SetState("Seated", true)
+        self:SetState("FallingDown", true)
+        self:SetState("Ragdoll", true)
+        self:SetState("Climbing", true)
+        self:SetState("Physics", true)
+        self:SetState("PlatformStanding", true)
+    end
+
+    self._AntiFlingIncludesStates = nil
 end
 
-function API:Noclip(Duration)    
+function API:Noclip(Duration)
     self.NoclipActive = true
     self.NoclipTimeout = os_clock() + (Duration or 0.45)
 
@@ -6033,25 +6164,75 @@ function API:Noclip(Duration)
         self.Origins = {}
     end
 
-    if not self.NoclipConnection then
-        self.NoclipConnection = Heartbeat:Connect(function()
-            local Character = self:GetCharacter()
+    if self.NoclipConnection then return end
 
-            if not Character or os_clock() >= self.NoclipTimeout then
-                self:StopClip()
-                return
-            end
+    local function AddPart(Part)
+        if not Part:IsA("BasePart") then return end
 
-            for _, v in pairs(Character:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    if self.Origins[v] == nil then
-                        self.Origins[v] = v.CanCollide
-                    end
-                    v.CanCollide = false
-                end
-            end
-        end)
+        if self.Origins[Part] == nil then
+            self.Origins[Part] = Part.CanCollide
+        end
+
+        if Part.CanCollide then
+            Part.CanCollide = false
+        end
     end
+
+    local function RemovePart(Part)
+        local Original = self.Origins[Part]
+        if Original == nil then return end
+
+        self.Origins[Part] = nil
+        pcall(function() Part.CanCollide = Original end)
+    end
+
+    local function HandleCharacter(Character)
+        if self.NoclipCharacter == Character then return end
+
+        if self.NoclipAddedConnection then
+            self.NoclipAddedConnection:Disconnect()
+            self.NoclipAddedConnection = nil
+        end
+
+        if self.NoclipRemovingConnection then
+            self.NoclipRemovingConnection:Disconnect()
+            self.NoclipRemovingConnection = nil
+        end
+
+        for Part in pairs(self.Origins) do
+            RemovePart(Part)
+        end
+
+        self.NoclipCharacter = Character
+        if not Character then return end
+
+        self.NoclipAddedConnection = Character.DescendantAdded:Connect(AddPart)
+        self.NoclipRemovingConnection = Character.DescendantRemoving:Connect(RemovePart)
+
+        for _, Part in pairs(Character:GetDescendants()) do
+            AddPart(Part)
+        end
+    end
+
+    HandleCharacter(LocalPlayer.Character)
+
+    self.NoclipConnection = Stepped:Connect(function()
+        if os_clock() >= self.NoclipTimeout then
+            self:StopClip()
+            return
+        end
+
+        local Character = LocalPlayer.Character
+        if Character ~= self.NoclipCharacter then
+            HandleCharacter(Character)
+        end
+
+        for Part in pairs(self.Origins) do
+            if Part.CanCollide then
+                Part.CanCollide = false
+            end
+        end
+    end)
 end
 
 function API:StopClip()
@@ -6059,19 +6240,25 @@ function API:StopClip()
         self.NoclipConnection:Disconnect()
         self.NoclipConnection = nil
     end
-    
+
+    if self.NoclipAddedConnection then
+        self.NoclipAddedConnection:Disconnect()
+        self.NoclipAddedConnection = nil
+    end
+
+    if self.NoclipRemovingConnection then
+        self.NoclipRemovingConnection:Disconnect()
+        self.NoclipRemovingConnection = nil
+    end
+
     self.NoclipActive = false
 
-    local Character = self:GetCharacter()
-    if Character and self.Origins then
-        for v, Original in pairs(self.Origins) do
-            if v and v.Parent then
-                v.CanCollide = Original
-            end
-        end
+    for Part, Original in pairs(self.Origins or {}) do
+        pcall(function() Part.CanCollide = Original end)
     end
-    
+
     self.Origins = {}
+    self.NoclipCharacter = nil
     self.NoclipTimeout = nil
 end
 
@@ -6273,6 +6460,29 @@ function API:IsMutual(From, To, Options)
     }
 end
 
+function API:Blink(Distance)
+    if typeof(Distance) ~= "number" then
+        return false, "Distance must be a number"
+    end
+
+    local Root = self:GetRoot()
+
+    if not Root then
+        return false, "Root not found"
+    end
+
+    local Direction = Root.CFrame.LookVector
+    Direction = Vector3_new(Direction.X, 0, Direction.Z)
+
+    if Direction.Magnitude < 0.001 then
+        return false, "No horizontal direction"
+    end
+    Root.CFrame = Root.CFrame + Direction.Unit * Distance
+
+    return true, Root.CFrame
+end
+
+
 function API:Raycast(Origin, Direction, Distance, IgnoreList, FilterType, IgnoreWater, Callback)
     local Origins = self:ResolvePosition(Origin)
     if not Origins then return nil end
@@ -6343,6 +6553,48 @@ function API:IsBehindWall(Target, Character)
     end
     
     return false
+end
+
+function API:CanSee(Target, Origin)
+    local Part = self:GetPart(Target)
+
+    if not Part then
+        return false, nil
+    end
+
+    local Root = self:GetRoot()
+
+    local From = typeof(Origin) == "Vector3"
+        and Origin
+        or (Root and Root.Position)
+
+    if not From then
+        return false, nil
+    end
+
+    local Direction = Part.Position - From
+
+    if Direction.Magnitude == 0 then
+        return true, nil
+    end
+
+    local Params = RaycastParamsNew()
+    Params.FilterType = Enum.RaycastFilterType.Exclude
+
+    local Character = self:GetCharacter()
+    Params.FilterDescendantsInstances = Character and { Character } or {}
+
+    local Hit = Workspace:Raycast(From, Direction, Params)
+    local Container = Target
+
+    if Target:IsA("Player") then
+        Container = Target.Character
+    end
+
+    return not Hit
+        or Hit.Instance == Part
+        or (Container and Hit.Instance:IsDescendantOf(Container))
+        or false, Hit
 end
 
 function API:IsOnGround(Options)
@@ -6580,6 +6832,31 @@ function API:GetCenter(Instance)
     return (Min + Max) / 2
 end
 
+function API:AtDestination(Target, Options)
+    Options = Options or {}
+
+    local Root = self:GetRoot()
+    if not Root then return false end
+
+    local Position = self:ResolvePosition(Target)
+    if not Position then return false end
+
+    local Horizontal = Options.Horizontal or 5
+    local Vertical = Options.Vertical or 5
+    local Offset = Root.Position - Position
+
+    local HorizontalDistance = math_sqrt(
+        Offset.X * Offset.X + Offset.Z * Offset.Z
+    )
+
+    local VerticalDistance = math_abs(Offset.Y)
+
+    local Arrived = HorizontalDistance <= Horizontal
+        and VerticalDistance <= Vertical
+
+    return Arrived, HorizontalDistance, VerticalDistance
+end
+
 function API:IsNPC(Model)
     if typeof(Model) ~= "Instance" or not Model:IsA("Model") then
         return false
@@ -6712,6 +6989,104 @@ function API:Fakeout(Position, Duration)
     return true
 end
 
+function API:ReadPositions(FileName)
+    FileName = FileName or "@PosManager/Positions.json"
+
+    local Data = self:LoadData(FileName)
+
+    if Data == nil then
+        if self:FileExists(FileName) then
+            return nil, "Could not read positions file"
+        end
+
+        return {}
+    end
+
+    if typeof(Data) ~= "table" then
+        return nil, "Invalid positions file"
+    end
+
+    return Data
+end
+
+function API:SavePosition(Name, Position, FileName)
+    if typeof(Name) ~= "string" or Name == "" then
+        return false, "Name must be a non-empty string"
+    end
+
+    if Position == nil then
+        local Root = self:GetRoot()
+        if not Root then return false, "Root is unavailable" end
+
+        Position = Root.CFrame
+    elseif typeof(Position) == "Vector3" then
+        Position = CFrame.new(Position)
+    elseif typeof(Position) ~= "CFrame" then
+        return false, "Position must be a Vector3 or CFrame"
+    end
+
+    local Positions, Error = self:ReadPositions(FileName)
+    if not Positions then return false, Error end
+
+    Positions[Name] = {Position:GetComponents()}
+
+    if not self:SaveData(FileName or "@PosManager/Positions.json", Positions) then
+        return false, "Could not save positions file"
+    end
+
+    return true
+end
+
+function API:LoadPosition(Name, FileName)
+    local Positions, Error = self:ReadPositions(FileName)
+    if not Positions then return nil, Error end
+
+    local Components = Positions[Name]
+
+    if typeof(Components) ~= "table" or #Components ~= 12 then
+        return nil, "Position not found or invalid"
+    end
+
+    for _, Value in ipairs(Components) do
+        if typeof(Value) ~= "number" then
+            return nil, "Invalid position components"
+        end
+    end
+
+    return CFrame.new(table_unpack(Components))
+end
+
+function API:GetSavedPositions(FileName)
+    local Positions, Error = self:ReadPositions(FileName)
+    if not Positions then return nil, Error end
+
+    local Names = {}
+
+    for Name in pairs(Positions) do
+        table_insert(Names, Name)
+    end
+
+    table_sort(Names)
+    return Names
+end
+
+function API:DeletePosition(Name, FileName)
+    local Positions, Error = self:ReadPositions(FileName)
+    if not Positions then return false, Error end
+
+    if Positions[Name] == nil then
+        return false, "Position not found"
+    end
+
+    Positions[Name] = nil
+
+    if not self:SaveData(FileName or "@PosManager/Positions.json", Positions) then
+        return false, "Could not save positions file"
+    end
+
+    return true
+end
+
 function API:CalculateSpeed(Unit, DecimalPlaces, Target)
     Unit = Unit or "KPH"
     DecimalPlaces = DecimalPlaces or 1
@@ -6771,6 +7146,194 @@ function API:IsMoving(Character)
     
     local Hum = Character:FindFirstChild("Humanoid")
     return Hum and Hum.MoveDirection.Magnitude > 0 or false
+end
+
+function API:OverrideProperty(Instance, Property, Name, Value, Priority)
+    assert(typeof(Instance) == "Instance", "OverrideProperty: Invalid instance")
+    assert(typeof(Property) == "string", "OverrideProperty: Invalid property")
+    assert(typeof(Name) == "string", "OverrideProperty: Invalid name")
+
+    Priority = Priority or 0
+    assert(typeof(Priority) == "number", "OverrideProperty: Invalid priority")
+
+    self._PropertyOverrides = self._PropertyOverrides or {}
+
+    local Instances = self._PropertyOverrides
+    local Properties = Instances[Instance]
+
+    if not Properties then
+        Properties = {}
+        Instances[Instance] = Properties
+    end
+
+    local Data = Properties[Property]
+
+    if not Data then
+        local Success, Original = pcall(function()
+            return Instance[Property]
+        end)
+
+        if not Success then
+            if next(Properties) == nil then
+                Instances[Instance] = nil
+            end
+
+            return false, Original
+        end
+
+        Data = {
+            Original = Original,
+            Overrides = {},
+            Order = 0,
+        }
+
+        Properties[Property] = Data
+    end
+
+    local Previous = Data.Overrides[Name]
+
+    if not Previous then
+        Data.Order = Data.Order + 1
+    end
+
+    Data.Overrides[Name] = {
+        Value = Value,
+        Priority = Priority,
+        Order = Previous and Previous.Order or Data.Order,
+    }
+
+    local function GetBest()
+        local Best
+
+        for _, Entry in pairs(Data.Overrides) do
+            if not Best
+                or Entry.Priority > Best.Priority
+                or (
+                    Entry.Priority == Best.Priority
+                    and Entry.Order < Best.Order
+                ) then
+
+                Best = Entry
+            end
+        end
+
+        return Best
+    end
+
+    local Best = GetBest()
+
+    local Success, Error = pcall(function()
+        Instance[Property] = Best.Value
+    end)
+
+    if not Success then
+        Data.Overrides[Name] = Previous
+
+        if next(Data.Overrides) == nil then
+            Properties[Property] = nil
+
+            if next(Properties) == nil then
+                Instances[Instance] = nil
+            end
+        end
+
+        return false, Error
+    end
+
+    return true
+end
+
+function API:RemoveOverride(Instance, Property, Name)
+    local Instances = self._PropertyOverrides
+    local Properties = Instances and Instances[Instance]
+    local Data = Properties and Properties[Property]
+
+    if not Data or not Data.Overrides[Name] then
+        return false, "Override not found"
+    end
+
+    local Removed = Data.Overrides[Name]
+    Data.Overrides[Name] = nil
+
+    local Best
+
+    for _, Entry in pairs(Data.Overrides) do
+        if not Best
+            or Entry.Priority > Best.Priority
+            or (
+                Entry.Priority == Best.Priority
+                and Entry.Order < Best.Order
+            ) then
+
+            Best = Entry
+        end
+    end
+
+    local Value = Best and Best.Value or Data.Original
+
+    local Success, Error = pcall(function()
+        Instance[Property] = Value
+    end)
+
+    if not Success then
+        Data.Overrides[Name] = Removed
+        return false, Error
+    end
+
+    if not Best then
+        Properties[Property] = nil
+
+        if next(Properties) == nil then
+            Instances[Instance] = nil
+        end
+    end
+
+    return true
+end
+
+function API:ClearPropOverrides()
+    local Instances = self._PropertyOverrides
+    if not Instances then return end
+
+    for Instance, Properties in pairs(Instances) do
+        for Property, Data in pairs(Properties) do
+            local Success, Error = pcall(function()
+                Instance[Property] = Data.Original
+            end)
+
+            if not Success then
+                warn("[@PropertyOverrides.luau]: " .. tostring(Error))
+            end
+        end
+    end
+
+    table_clear(Instances)
+    self._PropertyOverrides = nil
+end
+
+function API:IsStable(Name, Condition, Duration)
+    self._StableConditions = self._StableConditions or {}
+
+    if not Condition then
+        self._StableConditions[Name] = nil
+        return false
+    end
+
+    local Now = os_clock()
+    local Started = self._StableConditions[Name]
+
+    if not Started then
+        Started = Now
+        self._StableConditions[Name] = Started
+    end
+
+    return Now - Started >= Duration
+end
+
+function API:ResetStable(Name)
+    if self._StableConditions then
+        self._StableConditions[Name] = nil
+    end
 end
 
 function API:GetClosestNPC(Radius)
@@ -7188,35 +7751,123 @@ function API:GetNPC(Model)
     return Status
 end
 
-function API:Travel(Speed, ...)
-    local args = {...}
-    if #args < 1 then return end
+local function TravelStep(Self, Speed, Target, LookAt, UseTranslateBy, ArriveDistance, Offset)
+    local MoveSpeed = tonumber(Speed)
 
-    local Position = self:ResolvePosition(args[1])
-    local LookAt = args[2] and self:ResolvePosition(args[2]) or nil
+    if not MoveSpeed or MoveSpeed ~= MoveSpeed or MoveSpeed <= 0 or MoveSpeed == math_huge then
+        return nil, "Speed must be a finite number greater than zero"
+    end
 
-    local Roots = self:GetRoot();
-    if not Roots then return end
+    local Tolerance = ArriveDistance == nil and 2 or tonumber(ArriveDistance)
 
-    Roots.Velocity = Vector3_zero
-    Roots.AssemblyLinearVelocity = Vector3_zero
+    if not Tolerance or Tolerance ~= Tolerance or Tolerance < 0 or Tolerance == math_huge then
+        return nil, "ArriveDistance must be a finite number greater than or equal to zero"
+    end
 
-    local Current = Roots.Position
-    local Delta = Position - Current;
+    Tolerance = math_max(Tolerance, 0.001)
+
+    local Character = Self:GetCharacter()
+    local Roots = Self:GetRoot()
+
+    if not Character or not Roots or not Roots.Parent or not Roots:IsDescendantOf(Character) then
+        return nil, "Character or root is unavailable"
+    end
+
+    local FrameDelta = Heartbeat:Wait()
+
+    if Character ~= Self:GetCharacter() or Roots ~= Self:GetRoot() or not Roots.Parent then
+        Self._TravelStepClock = nil
+        return nil, "Character changed during travel"
+    end
+
+    local Destination = Self:ResolvePosition(Target)
+
+    if typeof(Destination) ~= "Vector3" then
+        Self._TravelStepClock = nil
+        return nil, "Could not resolve target position"
+    end
+
+    if Offset ~= nil then
+        if typeof(Offset) ~= "Vector3" then
+            return nil, "Offset must be a Vector3"
+        end
+
+        Destination += Offset
+    end
+
+    local function IsFinite(Value)
+        return Value == Value and Value > -math_huge and Value < math_huge
+    end
+
+    if not IsFinite(Destination.X)
+        or not IsFinite(Destination.Y)
+        or not IsFinite(Destination.Z) then
+
+        Self._TravelStepClock = nil
+        return nil, "Target position must be finite"
+    end
+
+    local Now = os_clock()
+    local Clock = Self._TravelStepClock
+    local DeltaTime = FrameDelta
+
+    if Clock and Clock.Root == Roots and Clock.Translate == UseTranslateBy then
+        DeltaTime = Now - Clock.Time
+    end
+
+    DeltaTime = math_clamp(DeltaTime, 0, 0.25)
+
+    Self._TravelStepClock = {
+        Root = Roots,
+        Translate = UseTranslateBy,
+        Time = Now,
+    }
+
+    local Delta = Destination - Roots.Position
     local Distance = Delta.Magnitude
-    
-    if Distance < 0.05 then return end
 
-    local Num = tonumber(Speed)
-    if not Num or Num <= 0 then Num = math_huge end
-    local dt = Heartbeat:Wait();
+    local Movement = Distance > 0.001
+        and Delta.Unit * math_min(MoveSpeed * DeltaTime, Distance)
+        or Vector3_zero
 
-    local Step = math_min(Num * dt, Distance)
-    local Direction = (Distance > 0 and Delta.Unit) or Vector3_zero
-    local NewPos = Current + Direction * Step;                
+    local NewPosition = Roots.Position + Movement
 
-    local cf = CFrame_lookAt(NewPos, LookAt or (NewPos + Direction));
-    self:GetCharacter():PivotTo(cf);
+    Roots.AssemblyLinearVelocity = Vector3_zero
+    Roots.AssemblyAngularVelocity = Vector3_zero
+
+    if UseTranslateBy then
+        Character:TranslateBy(Movement)
+    else
+        Roots.CFrame = CFrame_new(NewPosition) * Roots.CFrame.Rotation
+    end
+
+    if LookAt ~= nil then
+        local LookPosition = Self:ResolvePosition(LookAt)
+
+        if typeof(LookPosition) == "Vector3" then
+            local Direction = LookPosition - Roots.Position
+
+            if Direction.Magnitude > 0.001 then
+                local Up = math_abs(Direction.Unit.Y) > 0.98
+                    and Vector3_new(0, 0, -1)
+                    or Vector3_new(0, 1, 0)
+
+                Roots.CFrame = CFrame.lookAt(Roots.Position, LookPosition, Up)
+            end
+        end
+    end
+
+    local Remaining = (Destination - Roots.Position).Magnitude
+
+    return Remaining <= Tolerance, Remaining
+end
+
+function API:Travel(Speed, Target, LookAt, ArriveDistance, Offset)
+    return TravelStep(self, Speed, Target, LookAt, false, ArriveDistance, Offset)
+end
+
+function API:TranslateBy(Speed, Target, LookAt, ArriveDistance, Offset)
+    return TravelStep(self, Speed, Target, LookAt, true, ArriveDistance, Offset)
 end
 
 function API:Spectate(Input)
@@ -7356,39 +8007,50 @@ end
 function API:Load_DirectorCut(Options)
     Options = Options or {}
 
-    local Repo, Cache = "https://raw.githubusercontent.com/FlamesW/Interface/refs/heads/home/Library.luau", (Options.Cache or "DirectorCut/Assets/Library.luau")
+    local Repo = "https://raw.githubusercontent.com/FlamesW/Interface/refs/heads/home/Library.luau"
+    local Cache = Options.Cache or "DirectorCut/Assets/Library.luau"
 
     if self.DirectorCut_Injected and self.DirectorCut_Cache == Cache then
         return self.DirectorCut_Injected
     end
 
-    local Content = self:LoadData(Cache)
+    local Content = is_file(Cache) and read_file(Cache)
 
-    if Content and type(Content) == "string" and #Content > 0 then
+    if Content and #Content > 0 then
         task_spawn(function()
-            local Success, Remote = pcall(function()
-                return Game:HttpGet(Repo .. "?nocache=" .. tostring(os_clock()))
-            end)
+            local Remote = Game:HttpGet(Repo .. "?nocache=" .. tostring(os_clock()))
 
-            if Success and Remote and Remote ~= Content then
-                self:SaveData(Cache, Remote)
+            if Remote and Remote ~= Content then
+                local Chunk = loadstring(Remote)
+
+                if Chunk then
+                    write_file(Cache, Remote)
+                end
             end
         end)
     else
         Content = Game:HttpGet(Repo .. "?nocache=" .. tostring(os_clock()))
-        self:SaveData(Cache, Content)
+
+        local Directory = Cache:match("(.+)/")
+
+        if Directory then
+            self:CreateDirectory(Directory)
+        end
+
+        write_file(Cache, Content)
     end
 
-    local Success, Library = pcall(function()
-        return loadstring(Content)()
-    end)
+    local Chunk, Error = loadstring(Content)
 
-    if not Success then
-        warn("[DirectorCut]: Failed to load: " .. tostring(Library))
+    if not Chunk then
+        warn("[DirectorCut]: Failed to compile: " .. tostring(Error))
         return nil
     end
 
+    local Library = Chunk()
+
     self.DirectorCut_Injected, self.DirectorCut_Cache = Library, Cache
+
     return Library
 end
 
@@ -7548,33 +8210,27 @@ function API:Unload_OBS()
     return true
 end
 
-function API:Notify(Title, Description, Duration, Image)
-    -- // Load Notification Library, All credits to lxte 🫶, I've forked it to add gethui suppport and boost runtime performance.
-    local Framework = self:LoadData("@Notification.UI")
 
-    if not Framework then
-        local Success, Result = pcall(function()
-            return Game:HttpGet("https://raw.githubusercontent.com/FlamesW/Notification/refs/heads/home/Framework.luau")
-        end)
-        
-        if not Success then
-            warn("[Notify]: Failed to download framework")
+function API:Notify(Title, Description, Duration, Image)
+    -- // Load Notification Library, All credits to lxte 🫶, I've forked it to add gethui support and boost runtime performance.
+
+    if not self.Notification_Handler then
+        local Framework = self:LoadData("@Notification.UI")
+
+        if not Framework then
+            Framework = Game:HttpGet("https://raw.githubusercontent.com/FlamesW/Notification/refs/heads/home/Framework.luau")
+            self:SaveData("@Notification.UI", Framework)
+        end
+
+        local Chunk, Error = loadstring(Framework)
+
+        if not Chunk then
+            warn("[Notify]: Failed to compile framework: " .. tostring(Error))
             return false
         end
 
-        Framework = Result
-        self:SaveData("@Notification.UI", Result)
-    end
-    
-    local Success, Library = pcall(function()
-        return loadstring(Framework)()
-    end)
+        local Library = Chunk()
 
-    if not Success then
-        return false
-    end
-
-    if not self.Notification_Handler then
         self.Notification_Handler = Library:New({
             BackgroundColor = Color3_fromRGB(68, 71, 0),
             TitleColor = Color3_fromRGB(255, 255, 255),
@@ -8266,41 +8922,162 @@ function API:Kick(Reason)
     LocalPlayer:Kick(Reason);
 end
 
+function API:SetStatus(Name, Status)
+    self._Statuses = self._Statuses or {}
+
+    if Status == nil then
+        self._Statuses[Name] = nil
+        return
+    end
+
+    self._Statuses[Name] = Status
+end
+
+function API:GetStatus(Name)
+    return self._Statuses and self._Statuses[Name] or nil
+end
+
+function API:ClearStatuses()
+    if self._Statuses then
+        table_clear(self._Statuses)
+    end
+end
+
 function API:FireRemote(Remote, ...)
-    local Event = ReplicatedStorage:FindFirstChild(Remote)
+    local Event
+    if typeof(Remote) == "Instance" then
+        Event = Remote
+    elseif typeof(Remote) == "string" then
+        Event = ReplicatedStorage:FindFirstChild(Remote, true)
+    end
+
     if not Event then
-        return false
+        return false, nil
     end
 
     if Event:IsA("RemoteEvent") then
-        Event:FireServer(...)
-        return true
+        local Ok, Err = pcall(Event.FireServer, Event, ...)
+        if not Ok then
+            warn(("[Remote]: FireServer failed on %s: %s"):format(Event:GetFullName(), tostring(Err)))
+            return false, nil
+        end
+        return true, nil
     end
-    
+
     if Event:IsA("RemoteFunction") then
-        return Event:InvokeServer(...)
+        local Ok, Result = pcall(Event.InvokeServer, Event, ...)
+        if not Ok then
+            warn(("[Remote]: InvokeServer failed on %s: %s"):format(Event:GetFullName(), tostring(Result)))
+            return false, nil
+        end
+        return true, Result
     end
-    
-    return false
+
+    return false, nil
 end
 
 function API:ListenRemote(Remote, Callback)
-    local Event = ReplicatedStorage:FindFirstChild(Remote)
-    if not Event then
-        return false
+    local Event
+    if typeof(Remote) == "Instance" then
+        Event = Remote
+    elseif typeof(Remote) == "string" then
+        Event = ReplicatedStorage:FindFirstChild(Remote, true)
     end
-    
-    if Event:IsA("RemoteEvent") then
-        Event.OnClientEvent:Connect(Callback)
-        return true
+
+    if not Event or typeof(Callback) ~= "function" then
+        return false, nil
     end
-    
+
+    self._RemoteListeners = self._RemoteListeners or {}
+
     if Event:IsA("RemoteFunction") then
         Event.OnClientInvoke = Callback
-        return true
+        return true, nil
     end
-    
-    return false
+
+    if Event:IsA("RemoteEvent") then
+        for i = #self._RemoteListeners, 1, -1 do
+            local Existing = self._RemoteListeners[i]
+            if not Existing.Connected then
+                table_remove(self._RemoteListeners, i)
+            end
+        end
+
+        local Connection = Event.OnClientEvent:Connect(Callback)
+        table_insert(self._RemoteListeners, Connection)
+        return true, Connection
+    end
+
+    return false, nil
+end
+
+function API:Interact(Target)
+    if typeof(Target) ~= "Instance" then
+        return false, "Invalid target"
+    end
+
+    local Prompt = Target:IsA("ProximityPrompt")
+        and Target
+        or Target:FindFirstChildWhichIsA("ProximityPrompt", true)
+
+    local Click = Target:IsA("ClickDetector")
+        and Target
+        or Target:FindFirstChildWhichIsA("ClickDetector", true)
+
+    if Prompt then
+        if not Prompt.Enabled then
+            return false, "Prompt is disabled"
+        end
+
+        if typeof(fireproximityprompt) ~= "function" then
+            return false, "fireproximityprompt is unavailable"
+        end
+
+        Prompt.HoldDuration = 0
+
+        local Success, Error = pcall(fireproximityprompt, Prompt)
+        return Success, Success and Prompt or Error
+    end
+
+    if Click then
+        if typeof(fireclickdetector) ~= "function" then
+            return false, "fireclickdetector is unavailable"
+        end
+
+        local Success, Error = pcall(fireclickdetector, Click)
+        return Success, Success and Click or Error
+    end
+
+    local Touch = Target:IsA("TouchTransmitter")
+        and Target
+        or Target:FindFirstChildWhichIsA("TouchTransmitter", true)
+
+    local Part = Touch and Touch.Parent
+
+    if not Part and Target:IsA("BasePart") then
+        Part = Target
+    end
+
+    if Part and Part:IsA("BasePart") then
+        if typeof(firetouchinterest) ~= "function" then
+            return false, "firetouchinterest is unavailable"
+        end
+
+        local Root = self:GetRoot()
+        if not Root then
+            return false, "Root is unavailable"
+        end
+
+        local Success, Error = pcall(function()
+            firetouchinterest(Root, Part, 0)
+            task_wait()
+            firetouchinterest(Root, Part, 1)
+        end)
+
+        return Success, Success and Part or Error
+    end
+
+    return false, "No ProximityPrompt, ClickDetector, or touch part found"
 end
 
 function API:Verify(Options)
@@ -8440,6 +9217,314 @@ function API:Verify(Options)
     end
     
     return false, nil, nil
+end
+
+function API:CreateAutofarm(Options)
+    Options = Options or {}
+
+    local Self = self
+    local Folders = Options.TargetFolders
+
+    if not Folders then
+        Folders = { Options.TargetFolder or workspace }
+    elseif typeof(Folders) == "Instance" then
+        Folders = { Folders }
+    end
+
+    assert(
+        typeof(Folders) == "table" and #Folders > 0,
+        "CreateAutofarm: TargetFolders must contain at least one folder"
+    )
+
+    local Autofarm = {
+        Name = Options.Name or ("Autofarm_" .. Self:RandomString(8)),
+
+        TargetFolders = Folders,
+        ClassName = Options.ClassName or "Model",
+        Distance = Options.Distance or 50,
+
+        TargetPart = Options.TargetPart,
+        Parts = Options.Parts or {},
+
+        CustomFilter = Options.CustomFilter,
+        Recursive = Options.Recursive == true,
+
+        Candidates = {},
+        Connections = {},
+
+        Destroyed = false,
+    }
+
+    assert(
+        typeof(Autofarm.ClassName) == "string",
+        "CreateAutofarm: ClassName must be a string"
+    )
+
+    assert(
+        typeof(Autofarm.Distance) == "number" and Autofarm.Distance >= 0,
+        "CreateAutofarm: Distance must be a non-negative number"
+    )
+
+    assert(
+        Autofarm.TargetPart == nil or typeof(Autofarm.TargetPart) == "string",
+        "CreateAutofarm: TargetPart must be a string or nil"
+    )
+
+    assert(
+        typeof(Autofarm.Parts) == "table",
+        "CreateAutofarm: Parts must be a table"
+    )
+
+    assert(
+        Autofarm.CustomFilter == nil or typeof(Autofarm.CustomFilter) == "function",
+        "CreateAutofarm: CustomFilter must be a function or nil"
+    )
+
+    local SeenFolders = {}
+
+    for _, Folder in ipairs(Folders) do
+        assert(
+            typeof(Folder) == "Instance",
+            "CreateAutofarm: Every target folder must be an Instance"
+        )
+
+        assert(
+            not SeenFolders[Folder],
+            "CreateAutofarm: The same target folder was provided twice"
+        )
+
+        SeenFolders[Folder] = true
+    end
+
+    local FolderCandidates = {}
+
+    local function AddCandidate(Folder, Target)
+        if not Target:IsA(Autofarm.ClassName) then return end
+
+        local Candidates = FolderCandidates[Folder]
+
+        if Candidates[Target] then return end
+
+        Candidates[Target] = true
+
+        Autofarm.Candidates[Target] = (Autofarm.Candidates[Target] or 0) + 1
+    end
+
+    local function RemoveCandidate(Folder, Target)
+        local Candidates = FolderCandidates[Folder]
+
+        if not Candidates or not Candidates[Target] then return end
+
+        Candidates[Target] = nil
+
+        local Count = Autofarm.Candidates[Target]
+
+        if Count and Count > 1 then
+            Autofarm.Candidates[Target] = Count - 1
+        else
+            Autofarm.Candidates[Target] = nil
+        end
+    end
+
+    for _, Folder in ipairs(Folders) do
+        FolderCandidates[Folder] = {}
+
+        local Added = Autofarm.Recursive
+            and Folder.DescendantAdded
+            or Folder.ChildAdded
+
+        local Removing = Autofarm.Recursive
+            and Folder.DescendantRemoving
+            or Folder.ChildRemoved
+
+        table_insert(
+            Autofarm.Connections,
+            Added:Connect(function(Target)
+                AddCandidate(Folder, Target)
+            end)
+        )
+
+        table_insert(
+            Autofarm.Connections,
+            Removing:Connect(function(Target)
+                RemoveCandidate(Folder, Target)
+            end)
+        )
+
+        local Existing = Autofarm.Recursive
+            and Folder:GetDescendants()
+            or Folder:GetChildren()
+
+        for _, Target in ipairs(Existing) do
+            AddCandidate(Folder, Target)
+        end
+    end
+
+    function Autofarm:GetPart(Target)
+        if typeof(Target) ~= "Instance" then
+            return nil
+        end
+
+        if Target:IsA("BasePart") then
+            return Target
+        end
+
+        if not Target:IsA("Model") then
+            return nil
+        end
+
+        if self.TargetPart then
+            local Part = Target:FindFirstChild(self.TargetPart, true)
+
+            if Part and Part:IsA("BasePart") then
+                return Part
+            end
+
+            return nil
+        end
+
+        local Part = Target.PrimaryPart
+            or Target:FindFirstChild("HumanoidRootPart")
+            or Target:FindFirstChildWhichIsA("BasePart", true)
+
+        if Part and Part:IsA("BasePart") then
+            return Part
+        end
+
+        return nil
+    end
+
+    function Autofarm:GetParts(Target)
+        local FoundParts = {}
+
+        if typeof(Target) ~= "Instance" then
+            return FoundParts
+        end
+
+        for _, Name in ipairs(self.Parts) do
+            if typeof(Name) == "string" then
+                local Part = Target:FindFirstChild(Name, true)
+
+                if Part and Part:IsA("BasePart") then
+                    FoundParts[Name] = Part
+                end
+            end
+        end
+
+        return FoundParts
+    end
+
+    function Autofarm:GetTarget()
+        if self.Destroyed then
+            return nil, math.huge, nil, nil
+        end
+
+        local Root = Self:GetRoot()
+
+        if not Root then
+            return nil, math.huge, nil, nil
+        end
+
+        local Character = Self:GetCharacter()
+        local RootPosition = Root.Position
+
+        local BestTarget = nil
+        local BestPart = nil
+        local BestDistanceSquared = self.Distance * self.Distance
+
+        for Target in pairs(self.Candidates) do
+            local IsValid = true
+
+            if Character and (Target == Character or Target:IsDescendantOf(Character)) then
+                IsValid = false
+            end
+
+            if IsValid then
+                local Part = self:GetPart(Target)
+
+                if Part then
+                    local Offset = RootPosition - Part.Position
+                    local DistanceSquared = Offset:Dot(Offset)
+
+                    if DistanceSquared <= BestDistanceSquared then
+                        if self.CustomFilter then
+                            local Success, Result = pcall(
+                                self.CustomFilter,
+                                Target,
+                                Part
+                            )
+
+                            if not Success then
+                                warn(
+                                    "[@Autofarm.luau]: Filter error in '"
+                                        .. self.Name .. "': " .. tostring(Result)
+                                )
+
+                                IsValid = false
+                            elseif not Result then
+                                IsValid = false
+                            end
+                        end
+
+                        if IsValid then
+                            BestTarget = Target
+                            BestPart = Part
+                            BestDistanceSquared = DistanceSquared
+                        end
+                    end
+                end
+            end
+        end
+
+        if BestTarget then
+            return BestTarget, math_sqrt(BestDistanceSquared), BestPart, self:GetParts(BestTarget)
+        end
+
+        return nil, math.huge, nil, nil
+    end
+
+    function Autofarm:SetDistance(Distance)
+        assert(
+            typeof(Distance) == "number" and Distance >= 0,
+            "Autofarm:SetDistance expects a non-negative number"
+        )
+
+        self.Distance = Distance
+    end
+
+    function Autofarm:SetPart(PartName)
+        assert(
+            PartName == nil or typeof(PartName) == "string",
+            "Autofarm:SetPart expects a string or nil"
+        )
+
+        self.TargetPart = PartName
+    end
+
+    function Autofarm:SetFilter(Filter)
+        assert(
+            Filter == nil or typeof(Filter) == "function",
+            "Autofarm:SetFilter expects a function or nil"
+        )
+
+        self.CustomFilter = Filter
+    end
+
+    function Autofarm:Destroy()
+        if self.Destroyed then return end
+
+        self.Destroyed = true
+
+        for _, Connection in ipairs(self.Connections) do
+            Connection:Disconnect()
+        end
+
+        table_clear(self.Connections)
+        table_clear(self.Candidates)
+        table_clear(FolderCandidates)
+    end
+
+    return Autofarm
 end
 
 function API:CreateBaseplate(Options)
@@ -10056,6 +11141,25 @@ function API:AddFeature(Group, Name, Options) -- // @Obsidian only
     return Object
 end
 
+function API:Build(Path, Value)
+    local Segments = {}
+    for Part in Path:gmatch("[^/]+") do
+        table_insert(Segments, Part)
+    end
+
+    local Root = globalEnv
+    for i = 1, #Segments - 1 do
+        local Key = Segments[i]
+        Root[Key] = Root[Key] or {}
+        Root = Root[Key]
+    end
+
+    local Last = Segments[#Segments]
+    Root[Last] = Root[Last] or Value
+
+    return self
+end
+
 function API:OnUnload(Callback)
     self._UnloadedFM = Callback
 end
@@ -10103,14 +11207,15 @@ function API:Unload()
     self:StopFps()
     self:StopSeating()
     self:StopSpectate()
-    self:StopBringTools()
 
+    self:ClearPropOverrides()
     self:ClearHighlights()
     self:ClearBaseplates()
     self:ClearWebSockets()
     self:ClearGamepasses()
     self:ClearDrawingsV()
     self:ClearDrawings()
+    self:ClearStatuses()
     self:ClearSounds()
     self:ClearRaknet()
     self:ClearSpoofs()
@@ -10120,31 +11225,12 @@ function API:Unload()
 
     task_wait(0.25)
     globalEnv._Clean(global.FunctionManager_Engine, nil)
-
     global.FunctionManager_Engine = nil
+
     Build_Engine, Window_Focused, Class = nil, nil, nil
     LocalPlayer, Character, Roots, Humanoid, CurrentCamera = nil, nil, nil, nil, nil
 
     globalEnv._Clean(API, nil); globalEnv._Clean(self, nil); globalEnv._Clean = nil
-end
-
-function API:Build(Path, Value)
-    local Segments = {}
-    for Part in Path:gmatch("[^/]+") do
-        table_insert(Segments, Part)
-    end
-
-    local Root = globalEnv
-    for i = 1, #Segments - 1 do
-        local Key = Segments[i]
-        Root[Key] = Root[Key] or {}
-        Root = Root[Key]
-    end
-
-    local Last = Segments[#Segments]
-    Root[Last] = Root[Last] or Value
-
-    return self
 end
 
 function API:Merge(...)
@@ -10162,6 +11248,20 @@ function API:Merge(...)
         end
     end
     return self
+end
+
+function API:RunFunctions(...)
+    local Functions = { ... }
+
+    if #Functions == 1 and typeof(Functions[1]) == "table" then
+        Functions = Functions[1]
+    end
+
+    for _, Function in ipairs(Functions) do
+        if typeof(Function) == "function" then
+            task_spawn(Function)
+        end
+    end
 end
 
 function API.Launch(Class)
