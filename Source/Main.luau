@@ -44,7 +44,7 @@ API.__index = API
 
 -- // @Variables
 local Workspace, GetService, Class = workspace, Game.GetService, API;
-local Project = {Name = "Function Manager", Build = "@2.28", Author = "FlamesW", File = "Module.luau"}
+local Project = {Name = "Function Manager", Build = "@2.29", Author = "FlamesW", File = "Module.luau"}
 
 local Players: Players? = cloneref(GetService(Game, "Players"));
 local RunService: RunService? = cloneref(GetService(Game, "RunService"));
@@ -5110,7 +5110,6 @@ function API:Flight(State, Speed)
     self:_Connect("@Flight", BG)
 
     local Camera = CurrentCamera
-    local ControlModule = self:GetControlModule() or nil
     local Velocity, Smooth = Vector3_zero, Roots.CFrame
 
     local Connection = RenderStepped:Connect(function(DeltaTime)
@@ -5123,23 +5122,34 @@ function API:Flight(State, Speed)
         if BV and BV.Parent ~= Roots then BV.Parent = Roots end
         if BG and BG.Parent ~= Roots then BG.Parent = Roots end
 
-        local MoveDirection = Vector3_zero
+        local Humanoid = self:GetHumanoid()
+        local MoveDirection = Humanoid and Humanoid.MoveDirection or Vector3_zero
 
-        if ControlModule then
-            local Direction = ControlModule:GetMoveVector()
-            MoveDirection = (Camera.CFrame.RightVector * Direction.X)
-                          + (Camera.CFrame.LookVector * -Direction.Z)
+        if MoveDirection.Magnitude > 0 then
+            local Camera_Frame = Camera.CFrame
+            local Look = Camera_Frame.LookVector
 
-            if IsKeyDown(UserInputService, Enum.KeyCode.Space) then
-                MoveDirection += Camera.CFrame.UpVector
+            local FlatForward = Vector3_new(Look.X, 0, Look.Z)
+            if FlatForward.Magnitude < 0.001 then
+                local Right = Camera_Frame.RightVector
+                FlatForward = Vector3_new(-Right.Z, 0, Right.X)
             end
-            if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
-                MoveDirection -= Camera.CFrame.UpVector
-            end
+            FlatForward = FlatForward.Unit
+            local FlatRight = FlatForward:Cross(Vector3_new(0, 1, 0))
+            local ForwardInput = MoveDirection:Dot(FlatForward)
+            local RightInput = MoveDirection:Dot(FlatRight)
+            MoveDirection = Look * ForwardInput + Camera_Frame.RightVector * RightInput
+        end
 
-            if MoveDirection.Magnitude > 0 then
-                MoveDirection = MoveDirection.Unit * self.FlightData.Speed
-            end
+        if IsKeyDown(UserInputService, Enum.KeyCode.Space) then
+            MoveDirection += Camera.CFrame.UpVector
+        end
+        if IsKeyDown(UserInputService, Enum.KeyCode.LeftControl) then
+            MoveDirection -= Camera.CFrame.UpVector
+        end
+
+        if MoveDirection.Magnitude > 0 then
+            MoveDirection = MoveDirection.Unit * self.FlightData.Speed
         end
 
         if self.FlightData.SpeedControls and self.FlightData.SpeedControls.Enabled then
